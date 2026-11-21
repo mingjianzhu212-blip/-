@@ -2177,7 +2177,7 @@ const XX = (function(){
           '</div>';
       });
       html += '</div>';
-      html += '<p class="hint">打坐 / 历练 / 爬塔自动计入 · 每日 0 点重置</p>';
+      html += '<p class="hint">打坐 / 历练 / 爬塔自动计入 · 每日 08:00 重置</p>';
       /* 阶段三 S4：内容没变不重建，避免 500ms 重绘把 mousedown/mouseup 拆到两个节点上 */
       if(dBox.dataset.sig !== html){ dBox.dataset.sig = html; dBox.innerHTML = html; }
       if (!dBox.dataset.d_binded) {
@@ -2451,7 +2451,24 @@ const XX = (function(){
     }, k => { if(k) challengeArena(i, k); });
     return true;
   }
+  /* 第三批 P0：论剑商店兑换二次确认（声望余额/换后余额）；真正扣声望下沉到 doBuyRep */
   function buyRep(idx){
+    const it = ARENA_SHOP[idx];
+    if(!it){ log('商品不存在，请刷新宗门商店后重试。', 'bad'); return; }
+    if(S.arena.rep < it.rep){ log('声望不足，换【' + it.name + '】要 ' + it.rep + ' 声望。', 'bad'); return; }
+    if(it.id === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
+    if(it.id === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满，先去灵兽园孵化。', 'bad'); return; }
+    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && S.bag.length >= bagCap()){ log('背包已满，先腾点地方。', 'bad'); return; }
+    pickStance({
+      icon: '🏅', title: '论剑台 · 确认兑换',
+      text: '物品：<b>' + escHTML(it.name) + '</b> ×1' +
+        '<br>单价：<b>' + fmt(it.rep) + '</b> 声望' +
+        '<br>余额：' + fmt(S.arena.rep) + ' → 换后 <b>' + fmt(S.arena.rep - it.rep) + '</b>',
+      opts: [{ k: 'ok', n: '确认兑换', d: '声望 -' + fmt(it.rep) }],
+      foot: '取消不会扣任何声望，货品保留。'
+    }, k => { if(k === 'ok') doBuyRep(idx); });
+  }
+  function doBuyRep(idx){
     const it = ARENA_SHOP[idx];
     if(!it){ log('商品不存在，请刷新宗门商店后重试。', 'bad'); return; } // P0-3 死键反馈（2026-11-13 收口；原型 buyRepFeedback 经 GPT V3 + Muse 第四方确认）
     if(S.arena.rep < it.rep){ log('声望不足，换【' + it.name + '】要 ' + it.rep + ' 声望。', 'bad'); return; }
@@ -4289,19 +4306,37 @@ const XX = (function(){
   /* 今日日期键（本地时区）。补零输出：旧实现是 `2026-11-8`，
      字符串比较时 '2026-11-8' > '2026-11-10'，任何"日期是否往后走了"的判定都会错。
      旧的未补零值仍能被 dayNo() 正确解析，所以历史存档无需迁移。 */
-  function todayKey(){
-    const d = new Date();
-    const p = n => (n < 10 ? '0' : '') + n;
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  /* 第三批 A1（2026-11-22 制作人拍板）：全部每日系统以本地 08:00 为日界。
+     做法：把当前时刻整体前移 8 小时再取本地日期——07:59 仍算前一日，08:00 翻篇。
+     旧档里的日期键（自然日）仍按同一格式解析，无需改存档结构。 */
+  const DAY_RESET_HOUR = 8;
+  function dayStampAt(ts){
+    const d = new Date(Number(ts) - DAY_RESET_HOUR * 3600 * 1000);
+    return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
   }
+  function dayStamp(){ return dayStampAt(Date.now()); }
+  function todayKeyAt(ts){
+    const t = dayStampAt(ts);
+    const p = n => (n < 10 ? '0' : '') + n;
+    return t.y + '-' + p(t.m) + '-' + p(t.d);
+  }
+  function todayKey(){ return todayKeyAt(Date.now()); }
   /* 可比日序号 YYYYMMDD：只用它做"跨天了吗"的大小判定，不做日期加减（月份边界会错）。
      ⚠️ 保证范围（与 js/daily.js 同一口径，别写成"防作弊"）：
      严格递增判定只防「回拨」与「同日重复触发」，**不防把系统时间连续向未来推进**
      （8→9→10…每次都是更晚的一天）。客户端没有可信时间源，离线单机档做不到；
      要真正防这一类必须有服务端下发时间。 */
-  function todayNo(){
-    const d = new Date();
-    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  function todayNoAt(ts){
+    const t = dayStampAt(ts);
+    return t.y * 10000 + t.m * 100 + t.d;
+  }
+  function todayNo(){ return todayNoAt(Date.now()); }
+  /* 距下一次 08:00 重置的毫秒数（只用于显示倒计时） */
+  function nextDayResetMs(){
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), DAY_RESET_HOUR, 0, 0, 0);
+    if(now.getTime() >= next.getTime()) next.setDate(next.getDate() + 1);
+    return Math.max(0, next.getTime() - now.getTime());
   }
   function dayNo(s){
     const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s == null ? '' : s));
@@ -5156,6 +5191,7 @@ const XX = (function(){
   function offlineCapSec(){
     return Math.max(12 * 3600, 8 * 3600 * Math.pow(1.12, Math.max(0, (S.rank | 0) - 14))) + dtOffSec();
   }
+  let lastOfflineInfo = null;
   function offline(){
     let dt = (Date.now() - (S.last || Date.now())) / 1000;
     /* ⚠️ S.last 若是脏值（字符串/NaN），这里会算出 NaN。
@@ -5181,8 +5217,13 @@ const XX = (function(){
     const cut = Math.max(0, dt - used);
     const cdBefore = Math.max(0, secludeTs() - (S.last || Date.now()));
     const e0 = S.exp, s0 = S.stone, o0 = S.ore, h0 = S.stats.hunt || 0;
+    const logN0 = (S.log || []).length;
     tick(used);
     const gExp = S.exp - e0, gStone = S.stone - s0, gOre = S.ore - o0, gHunt = (S.stats.hunt || 0) - h0;
+    /* 第三批 P0：离线期间山门差事/议事等自动结算的条目（log 是 unshift 头插，新条目在最前） */
+    const dispatch = (S.log || []).slice(0, Math.max(0, (S.log || []).length - logN0))
+      .map(x => x.t).filter(t => /弟子|差事|议事|回山|出师|山门/.test(t)).slice(0, 5);
+    lastOfflineInfo = { used: used, dt: dt, cap: cap, gExp: gExp, gStone: gStone, gOre: gOre, gHunt: gHunt, dispatch: dispatch };
     /* 回执底层数字：按出关时速率核算（期间若破境，expRate 随 rank 变，故不写成「速率×时长」。 */
     const rateNow = passiveRate(), stoneNow = stoneRate();
     const cdSpent = Math.min(dt * 1000, cdBefore);
@@ -5192,10 +5233,11 @@ const XX = (function(){
     const ripe = ripeCount();
     if(ripe > 0) log('🌱 出关时，灵田里有 ' + ripe + ' 株作物已经成熟，快收进炼丹房。', 'sys');
     /* 闭关归来 · 结算弹窗：离线 ≥5 分钟才摆席（刷新/短退不打扰） */
-    if(used >= 300){
+    /* 第三批 P0：离线 ≥10 分钟才摆席（刷新/短退不打扰），并改用软结算不挡操作 */
+    if(used >= 600){
       pushLetters({ used: used, ripe: ripe, gExp: gExp, gStone: gStone, gOre: gOre, gHunt: gHunt });
       showOffline({ used: used, cap: cap, capped: dt > cap, ripe: ripe, gExp: gExp, gStone: gStone, gOre: gOre, gHunt: gHunt,
-        dt: dt, cut: cut, rate: rateNow, stoneRate: stoneNow, cdBefore: cdBefore, cdSpent: cdSpent, cdLeft: cdLeftMs });
+        dt: dt, cut: cut, rate: rateNow, stoneRate: stoneNow, cdBefore: cdBefore, cdSpent: cdSpent, cdLeft: cdLeftMs, dispatch: dispatch });
     }
   }
   /* 闭关归来弹窗：放置游戏的核心反馈——重进游戏先看这一屏收获 */
@@ -5417,6 +5459,7 @@ function towerBossCompLetter(){
     ];
     if(o.gOre >= 1) list.push(['矿石', '+' + fmt(o.gOre)]);
     if(o.gHunt > 0) list.push(['猎妖击杀', o.gHunt + ' 只']);
+    (o.dispatch || []).forEach(t => list.push(['期间事务', String(t).replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '')]));
     if(rows) rows.innerHTML = list.map(r =>
       '<div class="off-row"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>').join('');
     const noteBits = [];
@@ -5430,6 +5473,7 @@ function towerBossCompLetter(){
     }
     if(note) note.textContent = noteBits.join(' · ');
     renderLetters();     /* 信匣：待拆的信（跨次留存，不拆就一直在） */
+    m.classList.add('soft');   /* P0：软结算——遮罩不挡操作，卡片可手动关 */
     m.classList.remove('hidden');
     if(typeof sfx !== 'undefined' && sfx.win) sfx.win();
   }
@@ -5911,9 +5955,16 @@ function towerBossCompLetter(){
        不再拼进闭关那行；没有药力时也如实写"当前无"。 */
     const pillMs = Math.max(0, (Number(S.pillUntil) || 0) - Date.now());
     const pillLeft = pillMs > 0 ? Math.ceil(pillMs / 60000) : 0;
-    setTxt('bc-pill', pillLeft > 0
-      ? '💊 丹药药力：还剩约 ' + pillLeft + ' 分钟（' + fmtWhen(Number(S.pillUntil) || Date.now()) + ' 到期）'
-      : '💊 丹药药力：当前无（服食破境丹后，这里会写清剩余时间）');
+    const pillEl = document.getElementById('bc-pill');
+    if(pillEl){
+      const hint = (typeof pillHintText === 'function') ? pillHintText() : '';
+      pillEl.innerHTML = (pillLeft > 0
+        ? '💊 丹药药力：还剩约 ' + pillLeft + ' 分钟（' + fmtWhen(Number(S.pillUntil) || Date.now()) + ' 到期）'
+        : '💊 丹药药力：当前无（服食破境丹后，这里会写清剩余时间）') +
+        (hint ? ' <button type="button" class="mat-go" data-mat-go="dong:xx-alchemy-sec">缺丹药？去炼丹房</button>' : '');
+      const mb = pillEl.querySelector('[data-mat-go]');
+      if(mb) mb.onclick = () => { closeBreakConfirm(); if(window.ROUTER) ROUTER.open('dong', 'xx-alchemy-sec'); };
+    }
     const ok = document.getElementById('bc-ok');
     if(ok){
       ok.disabled = !canBreak;
@@ -6762,7 +6813,30 @@ function towerBossCompLetter(){
       if(rb2) spendFloat('-' + fmt(cost) + ' 灵石', rb2);
     }
   }
+  /* 第三批 P0：坊市购买二次确认（物品/数量/单价/余额/买后余额）；真正扣款下沉到 doBuyMarket */
   function buyMarket(idx, fromEl){
+    resetMarket();
+    const slot = S.market.goods[idx];
+    if(!slot || slot.bought){ log('这格货已经售出或换新了，刷新货架再看。', 'bad'); return; }
+    const g = marketItem(slot.id);
+    if(!g){ log('这格货的数据缺失，已为你换新货。', 'bad'); rollMarket(); renderMarket(); return; }
+    if(S.stone < slot.price){ const m='灵石不足，买【' + g.name + '】要 ' + fmt(slot.price) + ' 灵石（差 ' + fmt(slot.price - S.stone) + '）。'; log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){} return; }
+    if(g.kind === 'item' && S.bag.length >= bagCap()){ log('背包已满，先卖点东西再来。', 'bad'); return; }
+    if(g.kind === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满（' + BAL.petEggMax + ' 枚），先去灵兽园孵化。', 'bad'); return; }
+    if(g.kind === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
+    const qty = g.kind === 'res' ? 20 : g.kind === 'bag' ? BAG_STEP : 1;
+    const qtyTxt = /[×x]\s*\d+/.test(g.name) ? '' : ' ×' + qty;   /* 货名自带数量时不再重复 */
+    const after = S.stone - slot.price;
+    pickStance({
+      icon: '🛒', title: '坊市 · 确认购买',
+      text: '物品：<b>' + escHTML(g.name) + '</b>' + qtyTxt +
+        '<br>单价：<b>' + fmt(slot.price) + '</b> 灵石' +
+        '<br>余额：' + fmt(S.stone) + ' → 买后 <b>' + fmt(after) + '</b>',
+      opts: [{ k: 'ok', n: '确认购买', d: '灵石 -' + fmt(slot.price) }],
+      foot: '取消不会扣任何资源，货格保留。'
+    }, k => { if(k === 'ok') doBuyMarket(idx, fromEl); });
+  }
+  function doBuyMarket(idx, fromEl){
     resetMarket();
     const slot = S.market.goods[idx];
     if(!slot || slot.bought){ log('这格货已经售出或换新了，刷新货架再看。', 'bad'); return; }
@@ -6857,9 +6931,11 @@ function towerBossCompLetter(){
         '<div class="mk-line"><span>买入行情</span><b class="' + (br > 1.05 ? 'bad' : br < 0.95 ? 'good' : '') + '">×' + br.toFixed(2) + '</b></div>' +
         '<div class="mk-line"><span>收购行情</span><b class="' + (sr > 1.05 ? 'good' : sr < 0.95 ? 'bad' : '') + '">×' + sr.toFixed(2) + '</b></div>' +
         '<div class="mk-line"><span>今日已寄售</span><b>' + S.market.sold + ' / ' + BAL.marketSellMax + '</b></div>' +
+        '<div class="mk-line"><span>整架补货</span><b>' + fmtCd(nextDayResetMs()) + ' 后（08:00）</b></div>' +
+        '<div class="mk-line"><span>免费刷新</span><b>' + (S.market.freeRefresh | 0) + ' / 1</b></div>' +
         '<button class="mk-refresh" data-mk="refresh">🔄 换新货' +
           (S.market.freeRefresh > 0 ? '（今日免费）' : ' · ' + fmt(Math.floor(needOf(S.rank) * BAL.marketRefreshK)) + ' 灵石') + '</button>' +
-        '<p class="hint">货架每日一换，价格随境界水涨船高 · 寄售超额后坊市压价 ' + (BAL.marketSellDown * 10) + ' 折</p>';
+        '<p class="hint">货架每日 08:00 整架补货 · 每格限购 1 件 · 价格随境界水涨船高 · 寄售超额后坊市压价 ' + (BAL.marketSellDown * 10) + ' 折</p>';
       const rb = rateBox.querySelector('[data-mk="refresh"]');
       if(rb) rb.addEventListener('click', ev => refreshMarket(ev.currentTarget));
     }
@@ -7446,6 +7522,102 @@ function towerBossCompLetter(){
     box.innerHTML = html;
   }
 
+  /* ===== 第三批 P0 · C1：今日清单（只聚合现有每日系统，不新造玩法/数值） ===== */
+  function todayCountRows(){
+    const rows = [];
+    const reset = '08:00 重置';
+    /* 七日签到 */
+    rows.push({ name: '七日签到', icon: '🎁', sub: '第 ' + ((S.sign.days % 7) + 1) + ' 天 · ' + reset,
+      done: !signCanClaim(), state: signCanClaim() ? '可签' : '已签',
+      claim: signCanClaim() ? 'sign' : '', go: '' });
+    /* 日课 3 项 */
+    try{
+      (Daily.list() || []).forEach(t => {
+        rows.push({ name: t.name, icon: t.icon || '📜',
+          sub: t.prog + ' / ' + t.goal + ' · ' + reset,
+          done: !!t.claimed, state: t.claimed ? '已领' : (t.done ? '可领' : (t.prog + '/' + t.goal)),
+          claim: (!t.claimed && t.done) ? ('daily:' + t.id) : '', go: '' });
+      });
+    }catch(e){}
+    /* 行动次数 */
+    const actName = { sit:'打坐', herb:'采药', train:'历练', enlight:'顿悟', ponder:'参悟' };
+    Object.keys(BAL.actLimit || {}).forEach(k => {
+      const lim = BAL.actLimit[k] | 0, used = (S.acts && S.acts[k]) | 0;
+      const left = Math.max(0, lim - used);
+      rows.push({ name: actName[k] || k, icon: '🧘', sub: '剩 ' + left + ' / ' + lim + ' 次 · ' + reset,
+        done: left <= 0, state: left > 0 ? ('剩 ' + left + ' 次') : '今日已用完',
+        claim: '', go: 'xiu:xx-acts' });
+    });
+    /* 灵田待收（非每日，但属于“现在就能做”的可见进展） */
+    const ripe = ripeCount();
+    rows.push({ name: '灵田待收', icon: '🌾', sub: ripe > 0 ? (ripe + ' 株成熟 · 随时可收') : '暂无成熟作物',
+      done: ripe <= 0, state: ripe > 0 ? ('可收 ' + ripe + ' 株') : '等待生长',
+      claim: '', go: 'dong:xx-field' });
+    /* 坊市：免费刷新 / 寄售额度（B1 只显形现有规则） */
+    rows.push({ name: '坊市免费刷新', icon: '🛒', sub: '剩 ' + (S.market.freeRefresh | 0) + ' / 1 次 · ' + reset,
+      done: (S.market.freeRefresh | 0) <= 0, state: (S.market.freeRefresh | 0) > 0 ? '可用' : '已用完',
+      claim: '', go: 'market' });
+    rows.push({ name: '坊市寄售额度', icon: '💰', sub: (S.market.sold | 0) + ' / ' + BAL.marketSellMax + ' 件 · ' + reset,
+      done: (S.market.sold | 0) >= BAL.marketSellMax, state: (BAL.marketSellMax - (S.market.sold | 0)) + ' 件余量',
+      claim: '', go: 'market' });
+    /* 秘境扫荡 */
+    const secTotal = secretTotal();
+    rows.push({ name: '秘境扫荡', icon: '🌀', sub: secTotal > 0 ? ('已通 ' + secTotal + ' 层 · ' + reset) : '尚未通关任何秘境',
+      done: secTotal <= 0 || !!S.secret.swept, state: S.secret.swept ? '已扫荡' : (secTotal > 0 ? '可扫荡' : '未解锁'),
+      claim: '', go: 'secret' });
+    /* 塔扫荡 */
+    const twCan = S.towerMax | 0, twDone = S.towerSwept | 0;
+    rows.push({ name: '镇妖塔扫荡', icon: '🏯', sub: '已扫 ' + Math.min(twDone, twCan) + ' / ' + twCan + ' 层 · ' + reset,
+      done: twCan <= 0 || twDone >= twCan, state: twDone >= twCan ? '已扫完' : ((twCan - twDone) + ' 层可扫'),
+      claim: '', go: 'tower' });
+    /* 论剑 */
+    rows.push({ name: '论剑台', icon: '⚔️', sub: '今日剩 ' + (S.arena.left | 0) + ' 次 · ' + reset,
+      done: (S.arena.left | 0) <= 0, state: (S.arena.left | 0) > 0 ? '可挑战' : '次数用尽',
+      claim: '', go: 'arena' });
+    /* 仙盟出战 */
+    rows.push({ name: '仙盟出战', icon: '🏳️', sub: '今日剩 ' + (S.union.left | 0) + ' 次 · ' + reset,
+      done: (S.union.left | 0) <= 0, state: (S.union.left | 0) > 0 ? '可出战' : '已出战',
+      claim: '', go: 'event' });
+    /* 山门议事 */
+    rows.push({ name: '山门议事', icon: '📜', sub: '今日一条 · ' + reset,
+      done: councilDone(), state: councilDone() ? '已议' : '待议',
+      claim: '', go: 'zong:xx-council' });
+    return rows;
+  }
+  function renderToday(){
+    const list = document.getElementById('today-list');
+    const cd = document.getElementById('today-reset');
+    if(cd) cd.textContent = '距下次重置 ' + fmtCd(nextDayResetMs());
+    if(!list) return;
+    const rows = todayCountRows();
+    list.innerHTML = rows.map(r => {
+      let btn = '<span></span>';
+      if(r.claim){
+        const attr = r.claim === 'sign' ? 'data-today-claim="sign"' : 'data-today-claim="' + r.claim + '"';
+        btn = '<button type="button" ' + attr + '>领取</button>';
+      }else if(r.go){
+        btn = '<button type="button" class="ghost" data-today-go="' + r.go + '">去</button>';
+      }
+      return '<div class="today-row' + (r.done ? ' done' : '') + '">' +
+        '<div class="tr-main"><b>' + (r.icon ? r.icon + ' ' : '') + r.name + '</b><small>' + r.sub + '</small></div>' +
+        '<span class="tr-state">' + r.state + '</span>' + btn + '</div>';
+    }).join('');
+    renderTodayDot();
+  }
+  function renderTodayDot(){
+    const d = document.getElementById('sc-today-dot');
+    if(!d) return;
+    let on = false;
+    try{ on = signCanClaim() || dailyClaimable(); }catch(e){}
+    d.classList.toggle('on', on);
+  }
+  function claimDailyToday(id){
+    if(typeof Daily === 'undefined' || !Daily.claim) return;
+    return Promise.resolve(Daily.claim(id)).then(r => {
+      if(r && r.ok){ sfx.win(); settleDailyClaim(r); render(); renderToday(); }
+      else log((r && r.msg) || '领取失败', 'bad');
+    }, () => log('领取失败，请重试。', 'bad'));
+  }
   function renderRole(){
     /* 页眉战力先写：拆页后札记/道碑/悟道三页没有属性表，也得照样填 */
     const powEl = document.getElementById('xx-role-pow');
@@ -11517,6 +11689,7 @@ function towerBossCompLetter(){
     renderSecret();
     renderArena();
     renderEvent();
+    renderToday();       /* 今日清单（P0）：不在场自动跳过；顶栏/主界面小钮红点同步 */
     renderEncounter();   /* 奇遇气泡：在场就显隐（弹窗不受影响，避免被全量重绘打掉） */
     renderGate();        /* 山门名册（不在宗门面板时自动跳过） */
     renderCouncil();     /* 山门议事（第 103 轮，不在场自动跳过） */
@@ -12071,6 +12244,19 @@ function towerBossCompLetter(){
     return '<div class="recipe-codex"><b>' + inkIco('📜') + '丹方 <span>' + got + ' / ' + DAN_VARIANT_COUNT + '</span></b>' +
       '<small>' + tip + '</small></div>';
   }
+  /* 第三批 P0：缺料「去哪弄」映射（只指路，不新增产出/数值） */
+  const MAT_GO = {
+    herb: ['dong', 'xx-field'], herb100: ['dong', 'xx-field'], herb10000: ['dong', 'xx-field'],
+    ore: ['dong', 'xx-mine'],
+    mat_core: ['tower'], mat_bone: ['tower'], mat_feather: ['tower'], mat_eye: ['tower'], mat_marrow: ['tower'],
+    boss_core: ['tower'], boss_pearl: ['tower'], boss_feather: ['tower'], boss_heart: ['tower']
+  };
+  function matGoHtml(t){
+    const go = MAT_GO[t];
+    if(!go) return '';
+    const label = go[0] === 'tower' ? '去镇妖塔' : go[0] === 'dong' ? '去洞府' : '去';
+    return ' <button type="button" class="mat-go" data-mat-go="' + go.join(':') + '">' + label + '</button>';
+  }
   function craftRow(rec, isAlt, hint){
     const lv = bldLevel(rec.bld);
     const reqM = rec.reqM || 1;
@@ -12084,7 +12270,7 @@ function towerBossCompLetter(){
     /* P1：缺料时把差什么、差多少写进行内（不只按钮置灰） */
     const miss = [];
     if(!stoneOk) miss.push('灵石差 ' + fmt(recipeStoneCost(rec) - S.stone));
-    rec.mats.forEach(m => { if(m.t !== 'stone' && !matHas(m.t, m.n)) miss.push(matName(m.t) + '差 ' + (m.n - Math.floor(matCount(m.t)))); });
+    rec.mats.forEach(m => { if(m.t !== 'stone' && !matHas(m.t, m.n)) miss.push(matName(m.t) + '差 ' + (m.n - Math.floor(matCount(m.t))) + matGoHtml(m.t)); });
     const missTxt = (!locked && miss.length) ? ' · 缺：' + miss.join('、') : '';
     const bagOk = S.bag.length < bagCap();
     const canDo = !locked && stoneOk && matOk && bagOk;
@@ -12108,7 +12294,8 @@ function towerBossCompLetter(){
           (bagOk ? '' : ' · 背包已满') +
           (hint ? '<span class="alt-hint">' + hint + '</span>' : '') + missTxt) + '</small></div>' +
       '<button type="button">' + (locked ? '未解锁' : (!stoneOk || !matOk) ? '缺料' : bagOk ? '炼制' : '背包满') + '</button>';
-    const btn = row.querySelector('button');
+    /* 行内还有「去哪弄」小钮；必须取行尾那颗动作按钮，不能用 querySelector('button') 误取第一颗 */
+    const btn = row.querySelector(':scope > button');
     btn.disabled = !canDo;
     if(!locked) btn.addEventListener('click', () => craftItem(rec.bld, rec.recipeId));
     row.dataset.recipe = rec.recipeId;
@@ -12286,7 +12473,7 @@ function towerBossCompLetter(){
     /* P1：缺料时把差什么、差多少写进行内 */
     const miss = [];
     if(!stoneOk) miss.push('灵石差 ' + fmt(sCost - S.stone));
-    rec.mats.forEach(m => { if(m.t !== 'stone' && !matHas(m.t, m.n)) miss.push(matName(m.t) + '差 ' + (m.n - Math.floor(matCount(m.t)))); });
+    rec.mats.forEach(m => { if(m.t !== 'stone' && !matHas(m.t, m.n)) miss.push(matName(m.t) + '差 ' + (m.n - Math.floor(matCount(m.t))) + matGoHtml(m.t)); });
     const missTxt = (!locked && miss.length) ? ' · 缺：' + miss.join('、') : '';
     const rate = craftRate(rec);
     const lockTxt = lv < rec.reqLv
@@ -12298,7 +12485,7 @@ function towerBossCompLetter(){
         ? lockTxt
         : mats + ' · 成功率 ' + Math.round(rate * 100) + '% · <span class="alt-hint">失败返还 ' + Math.round(CRAFT.failRefund * 100) + '% 材料（灵石不退）</span>' + missTxt) + '</small></div>' +
       '<button type="button">' + (owned ? '已装备' : locked ? '未解锁' : (stoneOk && matOk ? '炼制' : '缺料')) + '</button>';
-    const btn = row.querySelector('button');
+    const btn = row.querySelector(':scope > button');
     btn.disabled = owned || locked || !stoneOk || !matOk;
     if(!locked && !owned) btn.addEventListener('click', () => craftItem('forge', rec.recipeId));
     row.dataset.recipe = rec.recipeId;
@@ -13979,20 +14166,24 @@ function towerBossCompLetter(){
     }
   }
   /* 第三批 B6：被动产出的低频合并飘字（8 秒一窗，最多一条；不逐 tick 刷屏） */
-  let passFloatAt = 0;
+  let passFloatAt = 0, lastRipe = 0;
   const passAcc = { exp: 0, stone: 0, ore: 0 };
   function passFloatTick(){
     const now = Date.now();
     if(document.hidden) return;
     if(now - passFloatAt < 8000) return;
     const e = Math.floor(passAcc.exp), s = Math.floor(passAcc.stone), o = Math.floor(passAcc.ore);
-    if(e + s + o <= 0) return;
+    const ripe = ripeCount();
+    const ripeNew = ripe > lastRipe;         /* P0：灵田由「不可收」变「可收」时才提示一次 */
+    if(e + s + o <= 0 && !ripeNew){ lastRipe = ripe; return; }
     passFloatAt = now;
     passAcc.exp = 0; passAcc.stone = 0; passAcc.ore = 0;
     const parts = [];
     if(e > 0) parts.push('修为 +' + fmt(e));
     if(s > 0) parts.push('灵石 +' + fmt(s));
     if(o > 0) parts.push('矿石 +' + fmt(o));
+    if(ripeNew) parts.push('灵田 ' + ripe + ' 株可收');
+    lastRipe = ripe;
     gainChip('🌿 ' + parts.join(' · '), '');
   }
   function tickLoopBody(){
@@ -15037,16 +15228,18 @@ function towerBossCompLetter(){
     _dtTotals: dtTotals, _dtOpen: dtOpen, _dtCaves: DONGTIAN, _dtK: DT_K, _dtLevels: DT_LV_NAME,
     _bagCap: bagCap, _offlineCap: offlineCapSec,
     _addItem: addItem, _addItemEx: addItemEx, _claimOverflow: claimOverflow,
-    _showSettle: showSettle, _claimSign: claimSign,
+    _showSettle: showSettle, _claimSign: claimSign, _claimDailyToday: claimDailyToday,
+    _renderToday: renderToday, _nextResetMs: nextDayResetMs, _todayKey: todayKey, _todayNo: todayNo,
+    _todayKeyAt: todayKeyAt, _todayNoAt: todayNoAt,
     _passFloatState: () => ({ at: passFloatAt, acc: { exp: passAcc.exp, stone: passAcc.stone, ore: passAcc.ore } }),
     _ovEntries: ovEntries, _ovPending: ovPending, _ovLetter: () => (S.letters || []).filter(x => !x.open && ovEntries(x).length)[0] || null,
-    _arena: () => S.arena, _challengeArena: challengeArena, _arenaPick: arenaPick, _buyRep: buyRep, _tierOf: tierOf,
+    _arena: () => S.arena, _challengeArena: challengeArena, _arenaPick: arenaPick, _buyRep: buyRep, _doBuyRep: doBuyRep, _tierOf: tierOf,
     _arenaShop: ARENA_SHOP, _towerFight: towerFightCurrent, _towerBossCompLetter: towerBossCompLetter,
     _closeStance: closeStance,
     _stanceOpen: () => { const m = document.getElementById('stance-modal'); return !!m && !m.classList.contains('hidden'); },
     _secretProg: secretProg, _secretReward: secretReward, _challengeSecret: challengeSecret, _secretPick: secretPick, _sweepSecret: sweepSecret,
     _secretTotal: secretTotal, _secretPower: secretPower,
-    _market: () => S.market, _buyMarket: buyMarket, _sellMarket: sellMarket,
+    _market: () => S.market, _buyMarket: buyMarket, _doBuyMarket: doBuyMarket, _sellMarket: sellMarket,
     _sellAll: sellAllMats, _refreshMarket: refreshMarket, _sellPrice: sellPrice,
     _spendFloat: spendFloat, _flashEl: flashEl, _chip: gainChip,
     /* ===== 仙途道碑（里程碑） ===== */
@@ -15116,7 +15309,7 @@ function towerBossCompLetter(){
     _renderCharPreview: renderCharPreview, _confirmChar: confirmChar,
     _genderOf: genderOf, _sexOf: sexOf,
     /* ===== 闭关归来弹窗 + 入口红点（2026-10-24）===== */
-    _offlineModal: showOffline, _initDots: initEntryDots, _dots: renderDots,
+    _offlineModal: showOffline, _lastOffline: () => lastOfflineInfo, _initDots: initEntryDots, _dots: renderDots,
     _dailyClaimable: dailyClaimable,
     /* ===== 战利品浮现（2026-10-24）===== */
     _lootRowHTML: lootRowHTML, _showBattleLoot: showBattleLoot, _lootFloat: lootFloat,

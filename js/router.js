@@ -98,6 +98,34 @@
     h.querySelectorAll('[data-role-jump]').forEach(b => b.addEventListener('click', () => {
       open('role', b.dataset.roleJump);
     }));
+    /* 第三批 P0：缺料「去哪弄」跳转（炼丹/炼器行内的 .mat-go） */
+    ['#xx-alchemy', '#xx-forge'].forEach(sel => {
+      const box = h.querySelector(sel);
+      if(!box) return;
+      box.addEventListener('click', ev => {
+        const b = ev.target.closest ? ev.target.closest('[data-mat-go]') : null;
+        if(!b) return;
+        ev.preventDefault(); ev.stopPropagation();
+        const parts = String(b.dataset.matGo || '').split(':');
+        if(parts[0]) open(parts[0], parts[1] || undefined);
+      });
+    });
+    /* 第三批 P0：今日清单的领取/跳转（清单行由 renderToday 现建） */
+    const tl = h.querySelector('#today-list');
+    if(tl) tl.addEventListener('click', ev => {
+      const c = ev.target.closest ? ev.target.closest('[data-today-claim]') : null;
+      if(c){
+        const v = c.dataset.todayClaim;
+        if(v === 'sign'){ try{ XX._claimSign(); }catch(e){} }
+        else if(v.indexOf('daily:') === 0){ try{ XX._claimDailyToday(v.slice(6)); }catch(e){} }
+        return;
+      }
+      const g = ev.target.closest ? ev.target.closest('[data-today-go]') : null;
+      if(g){
+        const parts = String(g.dataset.todayGo || '').split(':');
+        if(parts[0]) open(parts[0], parts[1] || undefined);
+      }
+    });
     const le = h.querySelector('#xx-life-enable');
     if(le) le.addEventListener('click', () => {
       if(confirm('开启寿元？开了就关不掉：这一世会老、会坐化，只能转世续道统。')) XX._enableLife();
@@ -265,6 +293,9 @@
     /* 顶栏寿元 chip → 寿元 hub（第 96 轮，同为静态元素） */
     const lc = document.getElementById('sc-life-chip');
     if(lc) lc.addEventListener('click', () => open('life'));
+    /* 第三批 P0：主界面「今日」小钮 → 今日清单 */
+    const td = document.getElementById('sc-today');
+    if(td) td.addEventListener('click', () => open('today'));
     /* 入门八事纸签（第 105 轮）：同样常驻主 DOM，只绑一次 */
     const tr = document.getElementById('sc-trail');
     if(tr) tr.addEventListener('click', () => { try{ XX._trail.go(); }catch(e){} });

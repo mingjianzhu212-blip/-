@@ -1010,14 +1010,24 @@ const DIAG = `
     L('mkPrice', g0.price > 0 && g0.price < 200 ? 'ok' : g0.price);   // 价格锚定炼气一层需求
     const st1 = XX._s.stone;
     XX._buyMarket(0);
+    L('mkConfirm', !document.getElementById('stance-modal').classList.contains('hidden') ? 'yes' : 'no');
+    document.querySelector('#st-opts [data-st="ok"]').click();
     L('mkBought', XX._s.market.goods[0].bought ? 'yes' : 'no');
     L('mkStoneDown', XX._s.stone < st1 ? 'yes' : 'no');
     // 交易反馈：购入浮字（-N 灵石）+ 购入行墨晕（一次性，重绘即失效）
     XX._s.market.goods = [{ id:'dan1', price:50, bought:false }];
     XX._render();
     const mkBuyBtn = document.querySelector('#mk-goods [data-buy]');
+    const mkSt0 = XX._s.stone;
     L('mkBuyBtnLive', mkBuyBtn && !mkBuyBtn.disabled ? 'yes' : 'no');
     if(mkBuyBtn) mkBuyBtn.click();
+    /* P0：先确认再成交；取消不扣款 */
+    const mkSt = document.getElementById('stance-modal');
+    L('mkConfirm2', mkSt && !mkSt.classList.contains('hidden') ? 'yes' : 'no');
+    document.getElementById('st-close').click();
+    L('mkCancelKeeps', XX._s.market.goods[0].bought || XX._s.stone !== mkSt0 ? 'no' : 'yes');
+    if(mkBuyBtn) mkBuyBtn.click();
+    document.querySelector('#st-opts [data-st="ok"]').click();
     L('mkSpendFloat', document.querySelectorAll('.spend-float').length >= 1 ? 'yes' : 'no');
     const mkRow0 = document.querySelector('#mk-goods .mk-row');
     L('mkRowFlash', document.querySelectorAll('#mk-goods .mk-row.flash').length);
@@ -1414,7 +1424,7 @@ const DIAG = `
     L('artEffTxt', [].map.call(document.querySelectorAll('#xx-forge .craft[data-recipe="bg1"] .craft-eff, #xx-forge .craft[data-recipe="brk1"] .craft-eff, #xx-forge .craft[data-recipe="cai1"] .craft-eff'), e => e.textContent).join(' / '));
     L('artOwnedBtn', (function () { XX._s.weapon = 4; XX._s.art = { bg: 5, brk: 0, cai: 9 }; XX._render();
       return ['wp4', 'lq5', 'bg5', 'bg6', 'cai9'].map(function (id) {
-        return (document.querySelector('#xx-forge .craft[data-recipe="' + id + '"] button') || {}).textContent || '';
+        return ((document.querySelector('#xx-forge .craft[data-recipe="' + id + '"]') || {}).querySelector ? document.querySelector('#xx-forge .craft[data-recipe="' + id + '"]').querySelector(':scope > button').textContent : '') || '';
       }).join(','); })());
     L('artHeadOwn', (document.querySelectorAll('#xx-forge .dan-fam')[1] || {}).textContent || '');
     /* 四个钩子：灵器 = weaponMult、战器 = 战力乘区、破器 = 突破加算、财器 = 灵石乘区。
@@ -1490,13 +1500,13 @@ const DIAG = `
     XX._render();
     const lgDan = document.querySelector('#xx-alchemy .craft[data-recipe="dan1"]');
     L('lgDan', lgDan.querySelector('small').textContent);
-    L('lgDanBtn', lgDan.querySelector('button').textContent);
-    L('lgDanOff', lgDan.querySelector('button').disabled ? 'yes' : 'no');
+    L('lgDanBtn', lgDan.querySelector(':scope > button').textContent);
+    L('lgDanOff', lgDan.querySelector(':scope > button').disabled ? 'yes' : 'no');
     /* P0（2026-11-20 修复单）：设施页丹/器行降为镜像；材料账改由房内升级块承担 */
     L('lgUpRoom', (document.getElementById('xx-alchemy-up') || {}).textContent || '');
     window.switchTab('dong_forge');
     L('lgForge', document.querySelector('#xx-forge .craft[data-recipe="wp4"]').querySelector('small').textContent);
-    L('lgForgeBtn', document.querySelector('#xx-forge .craft[data-recipe="wp4"]').querySelector('button').textContent);
+    L('lgForgeBtn', document.querySelector('#xx-forge .craft[data-recipe="wp4"]').querySelector(':scope > button').textContent);
     window.switchTab('dong_ups');
     L('lgUpg', document.querySelectorAll('#xx-ups .upg')[4].querySelector('button').textContent);
     window.switchTab('dong_enhance');
@@ -1506,7 +1516,7 @@ const DIAG = `
     XX._render();
     const lgDan2 = document.querySelector('#xx-alchemy .craft[data-recipe="dan1"]');
     L('lgDanOk', lgDan2.querySelector('small').textContent.indexOf('（不足）') < 0 ? 'yes' : 'no');
-    L('lgDanBtnOk', lgDan2.querySelector('button').textContent);
+    L('lgDanBtnOk', lgDan2.querySelector(':scope > button').textContent);
     XX._s.bagSize = 1; XX._s.bag = [{ t: 'mat_core', n: '妖丹' }];
     XX._render();
     const lgDan3 = document.querySelector('#xx-alchemy .craft[data-recipe="dan1"]');
@@ -1599,6 +1609,8 @@ const DIAG = `
     L('shopHeart', Array.prototype.some.call(document.querySelectorAll('#xx-arena-shop .ar-row'), x => (x.textContent || '').indexOf('九尾心') >= 0) ? 'yes' : 'no');
     const bag0 = XX._s.bag.length;
     XX._buyRep(0);                                            // 上品丹药 30 声望
+    L('repConfirm', !document.getElementById('stance-modal').classList.contains('hidden') ? 'yes' : 'no');
+    document.querySelector('#st-opts [data-st="ok"]').click();
     L('repDown', XX._s.arena.rep);                            // 470
     L('repItem', XX._s.bag.length > bag0 ? 'yes' : 'no');
     XX._s.arena.rep = 100; L('tier1', XX._tierOf());          // 1 = 内门弟子
@@ -5821,7 +5833,7 @@ setTimeout(function(){done("timeout");},25000);</scr` + `ipt>`;
   const SECLUDE_TS = Date.now() + 600000;                 /* 闭关终点：未来 10 分钟，只作等值比对，不参与任何时间判定 */
   /* 当日键：迁移后 ensureDay() 会把空 key 补成本地今天；种旧档时也必须用今天，
      否则「2026-11-13」会被 ensureDay 判成跨天并把 expGain 清零（那是 W1 的自然日重置，不是迁移丢数据）。 */
-  const TODAY = (function(){ const d = new Date(), p = n => (n < 10 ? '0' : '') + n;
+  const TODAY = (function(){ const d = new Date(Date.now() - 8*3600*1000), p = n => (n < 10 ? '0' : '') + n;
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); })();
   const DAY_OLD = { name: '旧日课档', sex: 'm', gender: 'male', rank: 7, exp: 1234, stone: 5678,
     last: Date.now(), herb: 5, ore: 3,
@@ -5913,7 +5925,7 @@ setTimeout(function(){done("timeout");},25000);</scr` + `ipt>`;
        :5192-5300 attemptBreakthrough、:8945-8946 resetForNewLife、:12006-12007 resetAll。
      浮动值口径：secludeUntil 是墙钟毫秒，断言只锁「与 now+CD 的差 < 5 s」与「前后相等」，不锁具体毫秒；
        exp 只锁「闸门期这一拍不许减少」，不锁具体数额（破境本身要扣 need）。 */
-  const L3_TODAY = (function(){ const d = new Date(), p = n => (n < 10 ? '0' : '') + n;
+  const L3_TODAY = (function(){ const d = new Date(Date.now() - 8*3600*1000), p = n => (n < 10 ? '0' : '') + n;
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); })();
   const L3_H = 3600 * 1000;
   const L3_PAST = Date.now() - 3600 * L3_H;        /* 已过期的闸门（3600 小时 = ≈150 天前）：用来验「失败不触发、不延长」与段内不落闸 */
@@ -6124,8 +6136,8 @@ setTimeout(function(){done("timeout");},25000);</scr` + `ipt>`;
     'try{var S=o.S=[];' +
     'B=XX._activeBudget();' +
     'step(0.9*B);step(0.3*B);step(1000);step(1.6*B-s.day.expGain);step(1000);' +
-    'var yk=o.yk=(function(){var d=new Date(Date.now()-86400000),p=function(n){return (n<10?"0":"")+n;};' +
-    'return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());})();' +
+    'var yk=o.yk=XX._todayKeyAt(Date.now()-86400000);' +
+    
     'var k0=o.k0=s.day.key;s.day.key=yk;s.day.expGain=12345;s.day.sweepExp=999;' +
     'XX._ensureDay();' +
     'o.B=B;o.today=XX._s.day.key;' +

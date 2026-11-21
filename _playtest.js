@@ -428,7 +428,7 @@ const SCENARIOS = [
         var codex0 = (document.querySelector('.recipe-codex') || {}).textContent || '';
         var exp0 = S.mastery.alchemyExp;
         var real = Math.random; Math.random = function(){ return 0; };   /* 巡检不掷骰 */
-        var r1 = __click('#xx-alchemy .craft[data-recipe="dan1"] button');
+        var r1 = __click('#xx-alchemy .craft[data-recipe="dan1"] > button');
         setTimeout(function(){
           var alt1 = document.querySelectorAll('#xx-alchemy .craft.alt').length;
           var codex1 = (document.querySelector('.recipe-codex') || {}).textContent || '';
@@ -597,7 +597,7 @@ const SCENARIOS = [
         for (var ri = 0; ri < artRows.length; ri++) {
           var sm = artRows[ri].querySelector('.craft-main small');
           var t = sm ? String(sm.textContent).replace(/\s+/g, ' ').replace(/^\s*🔒?\s*/, '').trim() : '';
-          var bb = artRows[ri].querySelector('button');
+          var bb = artRows[ri].querySelector(':scope > button');
           if (t.indexOf('需炼器坊 ') === 0 || t.indexOf('需器师 ') === 0) {
             lockRows++;
             if (t.indexOf('（当前 ') >= 0) lockReasonOk++;
@@ -610,10 +610,10 @@ const SCENARIOS = [
           }
         }
         var pow0 = XX._power();
-        var btn0 = (document.querySelector('#xx-forge .craft[data-recipe="bg1"] button') || {}).textContent || '';
-        var lqBtn0 = (document.querySelector('#xx-forge .craft[data-recipe="wp1"] button') || {}).textContent || '';
+        var btn0 = (document.querySelector('#xx-forge .craft[data-recipe="bg1"] > button') || {}).textContent || '';
+        var lqBtn0 = (document.querySelector('#xx-forge .craft[data-recipe="wp1"] > button') || {}).textContent || '';
         var rnd = Math.random; Math.random = function () { return 0.01; };   /* 率 95% 上限，必成 */
-        var hit = __click('#xx-forge .craft[data-recipe="bg1"] button', '#panel-host');
+        var hit = __click('#xx-forge .craft[data-recipe="bg1"] > button', '#panel-host');
         Math.random = rnd;
         setTimeout(function(){
           var bd = XX._statBreakdown();
@@ -625,8 +625,8 @@ const SCENARIOS = [
             btn0: btn0, lqBtn0: lqBtn0, hit: hit,
             bg: S.art.bg, lq: S.weapon, name: XX._weaponName(0),
             head1: (pg.querySelectorAll('.dan-fam')[1] || {}).textContent || '',
-            btn1: (document.querySelector('#xx-forge .craft[data-recipe="bg1"] button') || {}).textContent || '',
-            lqBtn1: (document.querySelector('#xx-forge .craft[data-recipe="wp1"] button') || {}).textContent || '',
+            btn1: (document.querySelector('#xx-forge .craft[data-recipe="bg1"] > button') || {}).textContent || '',
+            lqBtn1: (document.querySelector('#xx-forge .craft[data-recipe="wp1"] > button') || {}).textContent || '',
             bgRow: bgRow ? bgRow.v : -1, pow0: pow0, powNow: XX._power(),
             logTop: ((S.log[0] || {}).t || ''), oreLeft: S.ore, boneLeft: S.bag.length
           });
@@ -685,17 +685,17 @@ const SCENARIOS = [
         var dan = document.querySelector('#xx-alchemy .craft[data-recipe="dan1"]');
         var first = {
           dan: (dan.querySelector('small') || {}).textContent || '',
-          danBtn: (dan.querySelector('button') || {}).textContent || '',
-          danOff: !!(dan.querySelector('button') || {}).disabled
+          danBtn: (dan.querySelector(':scope > button') || {}).textContent || '',
+          danOff: !!(dan.querySelector(':scope > button') || {}).disabled
         };
         ROUTER.open('dong_forge');
         /* 第 90 轮起炼器坊是四族 × 九阶 = 36 行，不再是「最后一行就是极品法宝」 */
         var forge = document.querySelector('#xx-forge .craft[data-recipe="wp4"]');
         first.forge = (forge.querySelector('small') || {}).textContent || '';
-        first.forgeBtn = (forge.querySelector('button') || {}).textContent || '';
+        first.forgeBtn = (forge.querySelector(':scope > button') || {}).textContent || '';
         ROUTER.open('dong_ups');
         var upg = document.querySelectorAll('#xx-ups .upg')[4];
-        first.upg = (upg.querySelector('button') || {}).textContent || '';
+        first.upg = (upg.querySelector(':scope > button') || {}).textContent || '';
         ROUTER.open('dong_enhance');
         var enh = document.querySelector('#xx-enhance .enh-cost');
         first.enh = (enh || {}).textContent || '';
@@ -705,14 +705,14 @@ const SCENARIOS = [
         setTimeout(function(){
           var dan2 = document.querySelector('#xx-alchemy .craft[data-recipe="dan1"]');
           var okTxt = (dan2.querySelector('small') || {}).textContent || '';
-          var okBtn = (dan2.querySelector('button') || {}).textContent || '';
+          var okBtn = (dan2.querySelector(':scope > button') || {}).textContent || '';
           S.bagSize = 1; S.bag = [{ t: 'mat_core', n: '妖丹' }];
           XX._render();
           var dan3 = document.querySelector('#xx-alchemy .craft[data-recipe="dan1"]');
           __ptDone({
             first: first,
             okTxt: okTxt, okBtn: okBtn,
-            bagBtn: (dan3.querySelector('button') || {}).textContent || '',
+            bagBtn: (dan3.querySelector(':scope > button') || {}).textContent || '',
             bagTxt: (dan3.querySelector('small') || {}).textContent || ''
           });
         }, 700);
@@ -758,7 +758,7 @@ const SCENARIOS = [
       }
       setInterval(__clearPopups, 200);
       var steps = [
-        ['坊市·买入', 'market_goods', function(){ return __click('[data-buy]'); }],
+        ['坊市·买入', 'market_goods', function(){ return __click('[data-buy]') + '/' + __click('#st-opts [data-st="ok"]', 'body'); }],
         ['论剑·切磋', 'arena_board',  function(){ return __click('[data-fight]') + '/' + __click('#st-opts [data-st="rush"]', 'body'); }],
         ['秘境·挑战', 'secret_ch0', function(){ return __click('[data-fight]') + '/' + __click('#st-opts [data-st="stone"]', 'body'); }],
         ['签到',      'event_sign',  function(){ return __click('[data-act="sign"]'); }],

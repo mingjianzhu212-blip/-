@@ -5842,3 +5842,54 @@ html,body{ background:var(--jx-paper); }
 .app > .scene-tabs .scene-tab{ position:relative; }
 .app > .scene-tabs .scene-tab .e-dot{ top:2px; right:calc(50% - 22px); }
 .app > .scene-tabs .scene-tab .sys-dot{ top:2px; right:calc(50% - 22px); }
+
+/* ===== 第三批 P0 · C1：「今日」常驻小钮（主界面，不碰顶栏两行） ===== */
+#page-scene .today-btn{
+  position:absolute; left:124px; top:88px; z-index:10;
+  width:44px; height:48px; padding:3px 0; cursor:pointer; font-family:inherit;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  color:#7a5a20; background:linear-gradient(180deg,#fdfbf6,#efe7d5);
+  border:1px solid rgba(181,137,46,.5); border-left:3px solid #c83e37;
+  border-radius:8px; box-shadow:0 3px 10px rgba(60,50,30,.12);
+}
+#page-scene .today-btn b{ font-size:15px; font-weight:600; line-height:1; }
+#page-scene .today-btn small{ font-size:9px; letter-spacing:0; line-height:1; }
+#page-scene .today-btn:hover{ color:#a5302a; }
+#page-scene.in-town .today-btn{ top:160px; }
+#page-scene .today-btn .e-dot.on{ opacity:1; transform:scale(1); }
+@media (max-width:430px){
+  #page-scene .today-btn{ left:122px; top:88px; width:40px; height:44px; }
+  #page-scene .today-btn b{ font-size:14px; }
+  #page-scene .today-btn small{ font-size:8px; }
+  #page-scene.in-town .today-btn{ top:160px; }
+}
+@media (max-width:380px){
+  #page-scene .today-btn{ left:120px; }
+}
+
+/* 今日清单行 */
+.today-list{ display:flex; flex-direction:column; gap:6px; }
+.today-row{
+  display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:8px;
+  padding:8px 10px; border-radius:9px; background:rgba(252,250,245,.88);
+  border:1px solid rgba(138,109,59,.2);
+}
+.today-row.done{ background:rgba(61,107,88,.07); border-color:rgba(61,107,88,.25); }
+.today-row .tr-main{ min-width:0; display:flex; flex-direction:column; gap:1px; }
+.today-row .tr-main b{ font-size:13px; color:#2b2720; font-weight:600; }
+.today-row .tr-main small{ font-size:10.5px; color:#6b6252; }
+.today-row .tr-state{ font-size:11px; color:#7a5a20; white-space:nowrap; }
+.today-row.done .tr-state{ color:#2e6b4f; }
+.today-row button{
+  padding:5px 10px; border-radius:7px; cursor:pointer; font-family:inherit; font-size:11px;
+  color:#f3efe6; background:linear-gradient(180deg,#b83a32,#a5302a); border:1px solid #8f2a24;
+}
+.today-row button.ghost{ color:#6b6252; background:rgba(247,243,233,.9); border-color:rgba(120,100,60,.22); box-shadow:none; }
+.today-row button:disabled{ color:#8a8172; background:rgba(247,243,233,.8); border-color:rgba(120,100,60,.2); cursor:default; }
+.today-row .tr-sec{ font-size:10px; color:#8a8172; }
+
+/* P0：缺料「去哪弄」小钮（行内，不撑高整行） */
+.mat-go{ display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px;
+  font-family:inherit; font-size:10px; line-height:1.5; cursor:pointer;
+  color:#a5302a; background:rgba(252,250,245,.95); border:1px solid rgba(165,48,42,.35); }
+.mat-go:hover{ background:rgba(165,48,42,.08); }

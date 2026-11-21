@@ -74,13 +74,20 @@
      任何"日期是否往后走了"的判定都会在 8~9 号与 10~31 号之间反过来。
      dayNo 把 Y-M-D 折成 YYYYMMDD 整数，兼容补零 / 不补零两种历史写入。 */
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  /* 2026-11-22 拍板 A1：全部每日系统以本地 08:00 为日界（与 game.js 的 DAY_RESET_HOUR 同口径）。
+     实现：时刻整体前移 8 小时再取本地日期；旧档自然日键同格式可解析。 */
+  const DAY_RESET_HOUR = 8;
+  function dayStamp(){
+    const d = new Date(Date.now() - DAY_RESET_HOUR * 3600 * 1000);
+    return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+  }
   function todayKey(){
-    const d = new Date();
-    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    const t = dayStamp();
+    return t.y + '-' + pad2(t.m) + '-' + pad2(t.d);
   }
   function todayNo(){
-    const d = new Date();
-    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    const t = dayStamp();
+    return t.y * 10000 + t.m * 100 + t.d;
   }
   function dayNo(s){
     const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s == null ? '' : s));

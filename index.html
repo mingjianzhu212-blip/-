@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1210">
 <title>九霄问道 · 放置挂机</title>
-<link rel="stylesheet" href="style.css?v=20261121b3e">
+<link rel="stylesheet" href="style.css?v=20261122b4">
 <script src="js/img_fallback.js"></script>  <!-- A6：全站图片失败/超时文字兜底（NPC 立绘走 npc_art） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -160,6 +160,11 @@
           <button class="act-card hb-act" data-bld="event"><b>七日签到</b></button>
         </div>
       </details>
+    <!-- 今日清单（第三批 P0 · C1）：主界面常驻小钮，不占顶栏两行资源条 -->
+    <button class="today-btn" id="sc-today" type="button" aria-label="今日清单">
+      <b>今</b><small>今日</small><i class="e-dot" id="sc-today-dot"></i>
+    </button>
+
     <!-- 右侧系统按钮：人物/背包已收进底部五签，这里只留功法/设置两枚 -->
     <aside class="sys-rail">
       <button class="sys-btn" data-bld="xiu">
@@ -582,13 +587,13 @@
 </div>
 
 <!-- 加载顺序：游戏核心 → 各建筑 view 模板 → 中央路由（启动时绑定场景/模态框） -->
-<script src="js/daily.js"></script>
+<script src="js/daily.js?v=20261122b4"></script>
 <script src="js/story.js"></script>
 <script src="js/net.js"></script>          <!-- 联机协议层（115 轮）：必须先于 game.js（其顶层挂结算钩子）；REST+SSE 客户端，纯逻辑不碰 DOM -->
 <script src="js/multi-ledger.js"></script> <!-- 联机结算幂等账（123 轮）：必须先于 game.js；纯逻辑，不碰 DOM/存储 -->
 <script src="js/multi-local.js"></script>  <!-- 阶段四 C3（D4 A2-LOCAL）：本地陪练五层引擎；必须先于 game.js；纯逻辑，常量逐项抄自 server/server.mjs，server/ 零改动 -->
 <script src="js/npc_art.js"></script>           <!-- NPC 立绘公共缓存（B3）：预加载 / 3 秒超时重试 / 本地兜底 / 四呈现位共用；缺失时各视图退回「碑」字块 -->
-<script src="js/game.js?v=20261121b3e"></script>
+<script src="js/game.js?v=20261122b4"></script>
 <script src="js/trib.js"></script>
 <script src="js/npc_memory.js"></script>       <!-- NPC 记忆存储（独立键 jxwd_npc_memory_v1，不碰主存档；缺失时对话静默回退） -->
 <script src="js/npc_memory_voice.js"></script> <!-- NPC 称呼语气（按记忆分档；缺失/异常时静默回退） -->
@@ -605,6 +610,7 @@
 <script src="js/views/chat.js"></script>
 <script src="js/views/bag.js"></script>
 <script src="js/views/role.js?v=20261121b3b"></script>
+<script src="js/views/today.js?v=20261122b4"></script>
 <script src="js/views/beast.js"></script>
 <script src="js/views/tower.js"></script>
 <script src="js/views/multi.js"></script>       <!-- 组队秘境 · 联机面板（115 轮）：三态空壳，内容 game.js 事件驱动现填 -->
@@ -619,7 +625,7 @@
      须置于 router.js 之前：router.js 末尾同步触发 boot() → finishBoot() 内的 Guide.init()。
      guide_taixu.js 为自包含 IIFE，加载时不依赖 DOM，前移安全。 -->
 <script src="js/guide_taixu.js?v=20261121b3e"></script>
-<script src="js/router.js?v=20261121b3b"></script>
+<script src="js/router.js?v=20261122b4"></script>
 
 </body>
 </html>
