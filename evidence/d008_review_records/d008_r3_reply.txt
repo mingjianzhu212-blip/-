@@ -1,0 +1,281 @@
+D-008 第三轮独立审查裁定
+CONDITIONAL · 尚有一项定点缺口
+
+本轮修复确实推进了第二轮遗留项，但还不能签发「审查通过 · 可交付」。
+
+问题不在 js/game.js，而在新增的类型校验器：validBoost、validRoll 本身能识别非法值，但调用它们的条件仍使用了真值判断，导致部分非法的嵌套值根本没有进入校验。
+
+一、唯一剩余阻断项：嵌套字段的 falsy 非法值仍会漏检
+
+当前 verify.js：
+
+JavaScript
+if(fx.boost){
+  if(!validBoost(fx.boost)) badType++;
+  // ...
+}
+
+if(fx.roll){
+  if(!validRoll(fx.roll)) badType++;
+  // ...
+}
+
+这里有一个明确的 JavaScript 语义问题：
+
+输入
+
+	
+
+if(fx.boost) / if(fx.roll)
+
+	
+
+实际结果
+
+
+
+
+null
+
+	
+
+false
+
+	
+
+跳过校验
+
+
+
+
+0
+
+	
+
+false
+
+	
+
+跳过校验
+
+
+
+
+false
+
+	
+
+false
+
+	
+
+跳过校验
+
+
+
+
+''
+
+	
+
+false
+
+	
+
+跳过校验
+
+
+
+
+{}
+
+	
+
+true
+
+	
+
+进入校验
+
+
+
+
+[]
+
+	
+
+true
+
+	
+
+进入校验
+
+例如：
+
+JavaScript
+{ fx: { boost: null } }
+{ fx: { roll: null } }
+{ fx: { boost: false } }
+{ fx: { roll: 0 } }
+
+这些值都能绕过当前 if，不会增加 badType。
+
+专项测试也存在同样的调用条件：
+
+JavaScript
+if(o.fx.boost) assert.ok(validBoost(o.fx.boost), ...);
+if(o.fx.roll) assert.ok(validRoll(o.fx.roll), ...);
+
+因此，虽然 validBoost(null) 和 validRoll(null) 各自能够返回 false，但目前测试没有证明字段存在时一定会调用它们。
+
+这正是第二轮要求的“嵌套结构明确约束”尚未完全闭环的地方。
+
+二、建议的最小修复
+
+不需要改产品代码，也不需要重做整个测试体系。只需把“字段是否存在”和“字段值是否合法”分开判断。
+
+例如：
+
+JavaScript
+if(Object.hasOwn(fx, 'boost')) {
+  if(!validBoost(fx.boost)) badType++;
+  else if(!inSet(ALLOW.mult, fx.boost.mult) ||
+          !inSet(ALLOW.sec, fx.boost.sec)) badTier++;
+}
+
+if(Object.hasOwn(fx, 'roll')) {
+  if(!validRoll(fx.roll)) badType++;
+  else fx.roll.forEach(b => {
+    if(typeof b.w === 'number' && !inSet(ALLOW.w, b.w)) badTier++;
+    chkFx(b.fx);
+  });
+}
+
+专项测试中的真实数据检查也应采用相同的字段存在性规则，而不是 if(o.fx.boost)。
+
+建议补充这些反例，至少覆盖：
+
+JavaScript
+{ boost: null }
+{ boost: false }
+{ boost: 0 }
+{ roll: null }
+{ roll: false }
+{ roll: 0 }
+
+并且验证它们在实际选项结构校验路径中被拒绝，而不仅仅是单独调用辅助函数时返回 false。
+
+{} 仍须合法；没有 boost 或 roll 字段也仍须合法。
+
+三、其余审查维度
+
+审查维度
+
+	
+
+本轮结论
+
+	
+
+说明
+
+
+
+
+高风险边界
+
+	
+
+通过
+
+	
+
+产品代码零改动；未见数值档位、存档、逻辑或 UI 范围扩张
+
+
+
+
+内存 / GC 泄漏
+
+	
+
+通过
+
+	
+
+仅增加静态契约检查，无新增定时器、监听器或动态资源
+
+
+
+
+解耦合规性
+
+	
+
+通过
+
+	
+
+未增加产品全局变量或 UI 耦合
+
+
+
+
+异步异常
+
+	
+
+通过
+
+	
+
+本轮不涉及异步产品逻辑
+
+
+
+
+留存体验
+
+	
+
+通过
+
+	
+
+34 条奇遇、18 条历练的内容扩容方向符合沉浸感目标；静态内容测试不等于实际留存验证
+
+四、证据与交付边界
+
+本轮我依据你提交的代码片段、测试回显和哈希记录进行审查：
+
+js/game.js SHA 与第二轮一致，按送审记录采信。
+
+tools/d008-content.test.mjs 15/15、verify.js 903/0，按送审记录采信。
+
+我没有直接读取项目磁盘、重新计算 SHA 或自行执行测试。
+
+当前没有证据表明 34 条实际奇遇内容存在非法 boost 或 roll；指出的是未来内容变更可能绕过契约测试的漏洞，不能将它描述成已发生的产品运行故障。
+
+五、最终签发意见
+
+D-008 暂维持 CONDITIONAL。
+
+只剩一个很小的闭环要求：修复 boost、roll 的字段存在性判断，并在专项测试中增加嵌套 falsy 非法值的实际拦截验证。
+
+完成后只需运行：
+
+node --test tools/d008-content.test.mjs
+
+node verify.js
+
+无需改动 js/game.js，无需重跑浏览器全套件，无需重做截图，也无需重开 D-004～D-007 的既有门禁。
+
+这次不要求扩大审查范围。把这最后一个真值判断漏洞补上，我认为就具备签发 D-008「审查通过 · 可交付」的条件。
+
+ChatGPT 可能会出错。请核查重要信息。
+最新一条回复
+
+
+
+
+思考

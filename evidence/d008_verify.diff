@@ -1,0 +1,115 @@
+--- js/D008_BACKUP_20261109_020957/verify.js	2026-11-09 02:09:57.726509500 +0800
++++ verify.js	2026-11-09 02:20:33.308633800 +0800
+@@ -576,7 +576,54 @@
+     window.ROUTER.showScene('cave');
+     L('encCfgChance', XX._encCfg.chance);                                      // 0.3
+     L('encCfgEvery', XX._encCfg.everySec);                                    // 60 秒
+-    L('encEvtN', Object.keys(XX._encounters).length);                         // 4 个事件
++    L('encEvtN', Object.keys(XX._encounters).length);                         // D-008 后 34 个事件
++    /* D-008：内容扩容后，把「内置 4 个事件」这种易碎魔数升级为运行时结构契约采集。
++       在真实 XX._encounters 对象上逐条校验，供下方断言做复合判定（不是把 4 改成 34 了事）：
++         每条都有 icon/name/text/opts[]；每个 opts 都有 label/fx/ok；fx 键只落在 encApplyFx
++         支持的 8 类白名单内；新增条目用到的 fx 数值全部落在既有 4 条用过的档位集合里；
++         roll 分支必须有 w/text/fx；text/label 不含 < （全部走 textContent）。 */
++    (function(){
++      const FXK = ['costStone','stone','wisdom','insight','exp','expLoss','boost','roll'];
++      const NUMK = ['costStone','stone','wisdom','insight','exp','expLoss'];
++      let meta = 0, html = 0, badKey = 0, badRoll = 0, badTier = 0, evt = 0;
++      /* 既有 4 条用过的数值档位全集（来自改前 ENCOUNTERS，逐字核对过源码） */
++      const ALLOW = {
++        costStone:[10,30], stone:[180], wisdom:[50], insight:[12,5], exp:[], expLoss:[0.08],
++        mult:[0.60,0.15], sec:[900], w:[6,4,5]
++      };
++      const inSet = (arr, v) => arr.indexOf(v) >= 0;
++      const chkFx = (fx) => {
++        if(!fx) return;
++        Object.keys(fx).forEach(k => { if(FXK.indexOf(k) < 0) badKey++; });
++        NUMK.forEach(k => { if(fx[k] !== undefined && !inSet(ALLOW[k], fx[k])) badTier++; });
++        if(fx.boost){
++          if(!inSet(ALLOW.mult, fx.boost.mult) || !inSet(ALLOW.sec, fx.boost.sec)) badTier++;
++        }
++        if(fx.roll) fx.roll.forEach(b => {
++          if(typeof b.w !== 'number' || !b.text || b.fx === undefined) badRoll++;
++          if(typeof b.w === 'number' && !inSet(ALLOW.w, b.w)) badTier++;
++          chkFx(b.fx);
++        });
++      };
++      Object.keys(XX._encounters).forEach(id => {
++        const e = XX._encounters[id]; evt++;
++        if(!e.icon || !e.name || !e.text || !Array.isArray(e.opts) || e.opts.length < 2) meta++;
++        if(/</.test(e.text || '')) html++;
++        (e.opts || []).forEach(o => {
++          if(!o.label || o.fx === undefined) meta++;
++          if(/</.test(o.label || '')) html++;
++          chkFx(o.fx);
++        });
++      });
++      L('encStructEvt', evt);
++      L('encStructMeta', meta);
++      L('encStructHtml', html);
++      L('encStructBadKey', badKey);
++      L('encStructBadRoll', badRoll);
++      L('encStructBadTier', badTier);
++      /* 既有 4 条逐字未改：气泡名 + 首个选项文案 + 结算数值，下面原有断言已覆盖，这里补 id 存在性 */
++      L('encStructOrig4', ['beggar','pouch','stele','amulet'].every(k => !!XX._encounters[k]) ? 'yes' : 'no');
++    })();
+     const bub = document.getElementById('enc-bubble');
+     L('encBubbleHidden0', bub.classList.contains('hidden') ? 'hidden' : 'shown');
+     XX._encSpawn('beggar');
+@@ -1806,7 +1853,23 @@
+     L('tribCapFont', getComputedStyle(document.getElementById('trib-cap')).fontFamily);
+ 
+     // ---- 历练 · 文字冒险 ----
+-    L('advEvents', XX._advEvents.length);                                    // ≥3 个随机事件
++    L('advEvents', XX._advEvents.length);                                    // D-008 后 18 个随机事件
++    /* D-008：历练池扩容后的运行时结构契约（真实 XX._advEvents 对象逐条校验） */
++    (function(){
++      let meta = 0, action = 0, dup = 0, html = 0, n = 0; const seen = {};
++      XX._advEvents.forEach(a => {
++        n++;
++        if(!a.desc || !Array.isArray(a.options) || a.options.length !== 2) meta++;
++        else a.options.forEach(o => { if(!o.text || ['battle','escape'].indexOf(o.action) < 0) action++; });
++        if(/</.test(a.desc || '')) html++;
++        if(seen[a.id]) dup++; seen[a.id] = 1;
++      });
++      L('advStructN', n);
++      L('advStructMeta', meta);
++      L('advStructAction', action);
++      L('advStructDup', dup);
++      L('advStructHtml', html);
++    })();
+     const advR0 = XX._s.rank, advE0 = XX._s.exp, advS0 = XX._s.stone, advA0 = XX._s.acts.train;
+     const ev1 = XX._act('train');                                            // 走真实入口（含次数/冷却）
+     L('advOpen', ev1 && ev1.desc && !document.getElementById('enc-modal').classList.contains('hidden') &&
+@@ -4023,7 +4086,18 @@
+   // 随机奇遇
+   ok(F.encCfgChance === '0.3', '奇遇每 60 秒 30% 概率触发（' + F.encCfgChance + '）', F.encCfgChance);
+   ok(F.encCfgEvery === '60', '奇遇判定间隔 60 秒', F.encCfgEvery);
+-  ok(F.encEvtN === '4', '内置 4 个奇遇事件（' + F.encEvtN + '）', F.encEvtN);
++  /* D-008：原断言是易碎魔数 `F.encEvtN === '4'`。内容池由 4 扩到 34 后，
++     这里不是把 4 改成 34 就完事，而是升级为「规模 + 全表结构 + 档位白名单」的复合契约：
++     34 条、既有 4 条仍在、每条字段完整、无 HTML 注入、fx 键合法、roll 分支完整、
++     新增数值不越出既有档位。这样内容扩容本身也受回归保护，后续抹掉/写坏任一条都会红。 */
++  ok(F.encEvtN === '34', 'D-008 奇遇池扩容到 34 条（' + F.encEvtN + '）', F.encEvtN);
++  ok(F.encStructOrig4 === 'yes', '既有 4 条 beggar/pouch/stele/amulet 仍在');
++  ok(F.encStructEvt === '34' && F.encStructMeta === '0' && F.encStructHtml === '0',
++     '全表 34 条字段完整、无 HTML 注入（meta坏=' + F.encStructMeta + ' html坏=' + F.encStructHtml + '）');
++  ok(F.encStructBadKey === '0' && F.encStructBadRoll === '0',
++     'fx 键全在 8 类白名单、roll 分支 w/text/fx 完整（坏键=' + F.encStructBadKey + ' 坏roll=' + F.encStructBadRoll + '）');
++  ok(F.encStructBadTier === '0',
++     '新增条目零新数值档位：fx 数值全部落在既有 4 条用过的档位集合内（越界=' + F.encStructBadTier + '）');
+   ok(F.encBubbleHidden0 === 'hidden', '平时气泡隐藏');
+   ok(F.encBubbleShown === 'shown', '刷出后气泡出现');
+   ok(F.encBubbleName === '路畔快饿死的散修', '气泡显示事件名（' + F.encBubbleName + '）', F.encBubbleName);
+@@ -4740,6 +4814,11 @@
+ 
+   // 历练 · 文字冒险
+   ok(F.advEvents >= 3, 'adventureEvents 随机事件 ' + F.advEvents + ' 个（≥3）', F.advEvents);
++  /* D-008：扩容后升级为「规模 18 + 全表结构 + action 合法 + id 唯一 + 无 HTML」契约 */
++  ok(F.advStructN === '18' && F.advStructMeta === '0' && F.advStructAction === '0' &&
++     F.advStructDup === '0' && F.advStructHtml === '0',
++     'D-008 历练池 18 条结构合法（n=' + F.advStructN + ' meta坏=' + F.advStructMeta +
++     ' action坏=' + F.advStructAction + ' 重复id=' + F.advStructDup + ' html坏=' + F.advStructHtml + '）');
+   ok(F.advOpen === 'ok', '点历练 → 古风弹窗显示事件描述');
+   ok(F.advOpts === '2', '事件展示 2 个选项');
+   ok(F.advActs === 'ok', '历练次数/冷却照常计数');

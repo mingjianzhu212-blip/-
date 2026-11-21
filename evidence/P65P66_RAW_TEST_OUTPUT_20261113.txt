@@ -1,0 +1,73 @@
+### node --check js/game.js
+GAMEJS_SYNTAX_OK
+### node P1C_MUSE_E2E.mjs
+===== 断言（真实求值） =====
+  ✓ sword 系数 = 1.00（剑修基准，无加成） = 1
+  ✓ body  系数 = 1.05（体修 +5%） = 1.05
+  ✓ dan   系数 = 1.04（丹修 +4%） = 1.04
+  ✓ array 系数 = 1.06（阵修 +6%） = 1.06
+  ✓ PATH_IDS 含 4 道途 = ["sword","body","dan","array"]
+  ✓ pathBonusFor('sword') === 1.00 = 1
+  ✓ pathBonusFor('body')  === 1.05 = 1.05
+  ✓ pathBonusFor('dan')   === 1.04 = 1.04
+  ✓ pathBonusFor('array') === 1.06 = 1.06
+  ✓ pathBonusFor('xxx非法') === 1（脏值无加成） = 1
+  ✓ pathBonusFor('') === 1（空值无加成） = 1
+  ✓ 守卫含 PATH_IDS.indexOf(charPath) >= 0 = true
+  ✓ 守卫含 已选合法道途不覆盖（typeof S.path !== string || indexOf<0） = true
+
+===== E2E 结果：PASS=13  FAIL=0 =====
+全部底层值对账通过。系数均为 game.js 中显式标注之平衡定版 v1 值（见下条）。
+
+[6] 定版声明（game.js:3850-3852 注释块）：
+    ✓ 源码注释确认：四道途伤害乘子已平衡定版 v1（祝授权「平衡pass」追认定版），上限≤8%
+
+--- 必查项结论提示 ---
+sword:1.00 = 基准无加成；四系数 sword/body/dan/array = 1.00/1.05/1.04/1.06
+经专项平衡 pass 首版定版（祝 2026-11-12 授权「平衡pass」追认），非实施方自定占位值；
+后续仍可按实战遥测微调（专项 pass 续推）。
+### node TOKEN_HARDEN_E2E.mjs
+    含网络/token 区分调用 = true ； 网络分支文案 = true ； token 失效分支文案 = true
+
+[5] multiLoadSession 含 TTL 过期判定 = true
+
+[6] 续接分支 log 实参不含 token（XSS 防护）= true
+
+===== 断言（真实求值） =====
+  ✓ TTL = 30 天 (2592000000ms) = 2592000000
+  ✓ multiIsNetworkError({code:'TIMEOUT'}) === true = true
+  ✓ multiIsNetworkError({code:'NETWORK'}) === true = true
+  ✓ multiIsNetworkError({code:'STREAM_FAIL'}) === true = true
+  ✓ multiIsNetworkError({code:'JOIN_FAIL'}) === false（服务器拒绝≠网络） = false
+  ✓ multiIsNetworkError({code:'LEGACY_DISABLED'}) === false（服务器拒登≠网络） = false
+  ✓ multiIsNetworkError({error:'服务没响应（超时）'}) === true = true
+  ✓ multiIsNetworkError(null) === false = false
+  ✓ multiLogout 已定义 = true
+  ✓ hookMultiStorage 已定义 = true
+  ✓ multiEnter 含 网络/token 区分调用 = true
+  ✓ multiEnter 含 网络分支文案 = true
+  ✓ multiEnter 含 token 失效分支文案 = true
+  ✓ multiLoadSession 含 TTL 过期判定 = true
+  ✓ 续接分支日志不泄漏 token（XSS） = true
+
+===== E2E 结果：PASS=15  FAIL=0 =====
+全部 token 客户端侧加固断言通过。说明：localStorage 注入可读风险属已知缺口，待服务端会话失效+HttpOnly 迁移（红线①服务端侧，另排期）。
+### node --test server/*.test.mjs
+  duration_ms: 0.1321
+  type: 'test'
+  ...
+# Subtest: grantRun 负数/NaN 层数视为 0
+ok 128 - grantRun 负数/NaN 层数视为 0
+  ---
+  duration_ms: 0.1184
+  type: 'test'
+  ...
+1..128
+# tests 128
+# suites 0
+# pass 119
+# fail 9
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6039.1262

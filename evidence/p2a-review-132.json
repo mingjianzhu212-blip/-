@@ -1,0 +1,2018 @@
+{
+  "auditedAt": "2026-11-04T03:58:02.918Z",
+  "rounds": 12,
+  "constants": {
+    "NEED": [
+      800,
+      1600,
+      3200,
+      6400,
+      12800
+    ],
+    "TOTAL_LAYERS": 5,
+    "TEAM_BONUS": 0.1,
+    "MAX_POWER": 10000000000,
+    "RANK_CAP": 25,
+    "RANK_STEP": 8000,
+    "AXIS_GRANTS": {
+      "sword": {
+        "weaponLv": 2,
+        "equipPower": 0,
+        "affixPct": 0,
+        "danPowPct": 0,
+        "wuPct": 0
+      },
+      "body": {
+        "weaponLv": 0,
+        "equipPower": 45,
+        "affixPct": 2.2,
+        "danPowPct": 0,
+        "wuPct": 0
+      },
+      "dan": {
+        "weaponLv": 0,
+        "equipPower": 0,
+        "affixPct": 0,
+        "danPowPct": 0.055,
+        "wuPct": 0
+      },
+      "array": {
+        "weaponLv": 0,
+        "equipPower": 0,
+        "affixPct": 0,
+        "danPowPct": 0,
+        "wuPct": 5.2
+      }
+    },
+    "MAX_SNAP": {
+      "rank": 25,
+      "gongLvs": [
+        10,
+        10,
+        10
+      ],
+      "weapon": 9,
+      "weaponLv": 20,
+      "affixPct": 22,
+      "wuPct": 52,
+      "artBgPct": 0.56,
+      "danPowPct": 0.55,
+      "dtPowPct": 22.5,
+      "petPower": 2160000,
+      "equipPower": 4500
+    }
+  },
+  "summary": {
+    "singleplayerFullPower": 1665108540,
+    "predictedFullPower": 1665108540,
+    "singleplayerFullPowerInEnforce": 1000,
+    "reportedVsRecomputed": {
+      "reported": 9990000000,
+      "recomputed": 1665108540,
+      "ratio": 0.16667753
+    },
+    "rejectReasons": [
+      {
+        "case": "无快照登录",
+        "code": "LEGACY_DISABLED"
+      },
+      {
+        "case": "快照格式非法",
+        "code": "BAD_SNAPSHOT"
+      },
+      {
+        "case": "道途 id 非法",
+        "code": "BAD_PATH"
+      }
+    ],
+    "ratioArchiveVsFull": 0.03033,
+    "singlePlayerCanStart": {
+      "ok": false,
+      "code": "MIN_PLAYERS"
+    },
+    "ceilings": {
+      "sword": {
+        "snapshot": {
+          "rank": 25,
+          "gongLvs": [
+            0,
+            0,
+            0
+          ],
+          "weapon": 0,
+          "weaponLv": 20,
+          "equipPower": 0,
+          "affixPct": 0,
+          "danPowPct": 0,
+          "wuPct": 0,
+          "artBgPct": 0,
+          "dtPowPct": 0,
+          "petPower": 0
+        },
+        "theoreticalCeiling": 50502336
+      },
+      "body": {
+        "snapshot": {
+          "rank": 25,
+          "gongLvs": [
+            0,
+            0,
+            0
+          ],
+          "weapon": 0,
+          "weaponLv": 0,
+          "equipPower": 4500,
+          "affixPct": 22,
+          "danPowPct": 0,
+          "wuPct": 0,
+          "artBgPct": 0,
+          "dtPowPct": 0,
+          "petPower": 0
+        },
+        "theoreticalCeiling": 30810925
+      },
+      "dan": {
+        "snapshot": {
+          "rank": 25,
+          "gongLvs": [
+            0,
+            0,
+            0
+          ],
+          "weapon": 0,
+          "weaponLv": 0,
+          "equipPower": 0,
+          "affixPct": 0,
+          "danPowPct": 0.55,
+          "wuPct": 0,
+          "artBgPct": 0,
+          "dtPowPct": 0,
+          "petPower": 0
+        },
+        "theoreticalCeiling": 39139310
+      },
+      "array": {
+        "snapshot": {
+          "rank": 25,
+          "gongLvs": [
+            0,
+            0,
+            0
+          ],
+          "weapon": 0,
+          "weaponLv": 0,
+          "equipPower": 0,
+          "affixPct": 0,
+          "danPowPct": 0,
+          "wuPct": 52,
+          "artBgPct": 0,
+          "dtPowPct": 0,
+          "petPower": 0
+        },
+        "theoreticalCeiling": 38381775
+      }
+    },
+    "scenarios": [
+      {
+        "label": "双人",
+        "pathIds": [
+          "sword",
+          "dan"
+        ],
+        "clearedAtRound": 7,
+        "finalMemberPowers": [
+          {
+            "path": "sword",
+            "power": 14963655
+          },
+          {
+            "path": "dan",
+            "power": 11596832
+          }
+        ],
+        "maxMemberPower": 14963655,
+        "finalRatioToNextNeed": 2282.542
+      },
+      {
+        "label": "三人",
+        "pathIds": [
+          "sword",
+          "body",
+          "dan"
+        ],
+        "clearedAtRound": 4,
+        "finalMemberPowers": [
+          {
+            "path": "sword",
+            "power": 50502336
+          },
+          {
+            "path": "body",
+            "power": 30808900
+          },
+          {
+            "path": "dan",
+            "power": 39139310
+          }
+        ],
+        "maxMemberPower": 50502336,
+        "finalRatioToNextNeed": 11292.239
+      },
+      {
+        "label": "四人",
+        "pathIds": [
+          "sword",
+          "body",
+          "dan",
+          "array"
+        ],
+        "clearedAtRound": 3,
+        "finalMemberPowers": [
+          {
+            "path": "sword",
+            "power": 50502336
+          },
+          {
+            "path": "body",
+            "power": 30808990
+          },
+          {
+            "path": "dan",
+            "power": 39139310
+          },
+          {
+            "path": "array",
+            "power": 38381775
+          }
+        ],
+        "maxMemberPower": 50502336,
+        "finalRatioToNextNeed": 16131.417
+      }
+    ],
+    "maxArchivePowerMeasured": 50502336,
+    "archiveVsMaxPower": 0.0050502336
+  },
+  "scenarios": [
+    {
+      "label": "双人",
+      "pathIds": [
+        "sword",
+        "dan"
+      ],
+      "clearedAtRound": 7,
+      "rounds": [
+        {
+          "round": 1,
+          "teamPowerBefore": 2200,
+          "passableLayersBefore": 2,
+          "layersThisRun": 2,
+          "cleared": false,
+          "teamPowerAfter": 2541,
+          "ratioToNextNeed": 0.794,
+          "nextNeed": 3200,
+          "members": [
+            {
+              "path": "sword",
+              "power": 1200,
+              "rank": 0,
+              "cultivation": 2400,
+              "weaponLv": 4,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 2
+            },
+            {
+              "path": "dan",
+              "power": 1110,
+              "rank": 0,
+              "cultivation": 2400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.11,
+              "wuPct": 0,
+              "layersCleared": 2
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "teamPowerBefore": 2541,
+          "passableLayersBefore": 2,
+          "layersThisRun": 2,
+          "cleared": false,
+          "teamPowerAfter": 2882,
+          "ratioToNextNeed": 0.225,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 1400,
+              "rank": 0,
+              "cultivation": 4800,
+              "weaponLv": 8,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 4
+            },
+            {
+              "path": "dan",
+              "power": 1220,
+              "rank": 0,
+              "cultivation": 4800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.22,
+              "wuPct": 0,
+              "layersCleared": 4
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "teamPowerBefore": 2882,
+          "passableLayersBefore": 2,
+          "layersThisRun": 2,
+          "cleared": false,
+          "teamPowerAfter": 3223,
+          "ratioToNextNeed": 0.252,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 1600,
+              "rank": 0,
+              "cultivation": 7200,
+              "weaponLv": 12,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 6
+            },
+            {
+              "path": "dan",
+              "power": 1330,
+              "rank": 0,
+              "cultivation": 7200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.33,
+              "wuPct": 0,
+              "layersCleared": 6
+            }
+          ]
+        },
+        {
+          "round": 4,
+          "teamPowerBefore": 3223,
+          "passableLayersBefore": 3,
+          "layersThisRun": 3,
+          "cleared": false,
+          "teamPowerAfter": 5601,
+          "ratioToNextNeed": 0.438,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 2850,
+              "rank": 1,
+              "cultivation": 12800,
+              "weaponLv": 18,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 9
+            },
+            {
+              "path": "dan",
+              "power": 2242,
+              "rank": 1,
+              "cultivation": 12800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.495,
+              "wuPct": 0,
+              "layersCleared": 9
+            }
+          ]
+        },
+        {
+          "round": 5,
+          "teamPowerBefore": 5601,
+          "passableLayersBefore": 3,
+          "layersThisRun": 3,
+          "cleared": false,
+          "teamPowerAfter": 8785,
+          "ratioToNextNeed": 0.686,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 4500,
+              "rank": 2,
+              "cultivation": 18400,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 12
+            },
+            {
+              "path": "dan",
+              "power": 3487,
+              "rank": 2,
+              "cultivation": 18400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 12
+            }
+          ]
+        },
+        {
+          "round": 6,
+          "teamPowerBefore": 8785,
+          "passableLayersBefore": 4,
+          "layersThisRun": 4,
+          "cleared": false,
+          "teamPowerAfter": 13179,
+          "ratioToNextNeed": 1.03,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 6750,
+              "rank": 3,
+              "cultivation": 30400,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 16
+            },
+            {
+              "path": "dan",
+              "power": 5231,
+              "rank": 3,
+              "cultivation": 30400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 16
+            }
+          ]
+        },
+        {
+          "round": 7,
+          "teamPowerBefore": 13179,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 44479,
+          "ratioToNextNeed": 3.475,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 22781,
+              "rank": 6,
+              "cultivation": 55200,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 21
+            },
+            {
+              "path": "dan",
+              "power": 17655,
+              "rank": 6,
+              "cultivation": 55200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 21
+            }
+          ]
+        },
+        {
+          "round": 8,
+          "teamPowerBefore": 44479,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 225181,
+          "ratioToNextNeed": 17.592,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 115330,
+              "rank": 10,
+              "cultivation": 80000,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 26
+            },
+            {
+              "path": "dan",
+              "power": 89380,
+              "rank": 10,
+              "cultivation": 80000,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 26
+            }
+          ]
+        },
+        {
+          "round": 9,
+          "teamPowerBefore": 225181,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 759988,
+          "ratioToNextNeed": 59.374,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 389239,
+              "rank": 13,
+              "cultivation": 104800,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 31
+            },
+            {
+              "path": "dan",
+              "power": 301660,
+              "rank": 13,
+              "cultivation": 104800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 31
+            }
+          ]
+        },
+        {
+          "round": 10,
+          "teamPowerBefore": 759988,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 2564962,
+          "ratioToNextNeed": 200.388,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 1313681,
+              "rank": 16,
+              "cultivation": 129600,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 36
+            },
+            {
+              "path": "dan",
+              "power": 1018103,
+              "rank": 16,
+              "cultivation": 129600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 36
+            }
+          ]
+        },
+        {
+          "round": 11,
+          "teamPowerBefore": 2564962,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 8656750,
+          "ratioToNextNeed": 676.309,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 4433675,
+              "rank": 19,
+              "cultivation": 154400,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 41
+            },
+            {
+              "path": "dan",
+              "power": 3436098,
+              "rank": 19,
+              "cultivation": 154400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 41
+            }
+          ]
+        },
+        {
+          "round": 12,
+          "teamPowerBefore": 8656750,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 29216535,
+          "ratioToNextNeed": 2282.542,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 14963655,
+              "rank": 22,
+              "cultivation": 179200,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 46
+            },
+            {
+              "path": "dan",
+              "power": 11596832,
+              "rank": 22,
+              "cultivation": 179200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 46
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "三人",
+      "pathIds": [
+        "sword",
+        "body",
+        "dan"
+      ],
+      "clearedAtRound": 4,
+      "rounds": [
+        {
+          "round": 1,
+          "teamPowerBefore": 3600,
+          "passableLayersBefore": 3,
+          "layersThisRun": 3,
+          "cleared": false,
+          "teamPowerAfter": 4399,
+          "ratioToNextNeed": 0.687,
+          "nextNeed": 6400,
+          "members": [
+            {
+              "path": "sword",
+              "power": 1300,
+              "rank": 0,
+              "cultivation": 5600,
+              "weaponLv": 6,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 3
+            },
+            {
+              "path": "body",
+              "power": 1201,
+              "rank": 0,
+              "cultivation": 5600,
+              "weaponLv": 0,
+              "equipPower": 135,
+              "affixPct": 6.6000000000000005,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 3
+            },
+            {
+              "path": "dan",
+              "power": 1165,
+              "rank": 0,
+              "cultivation": 5600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.165,
+              "wuPct": 0,
+              "layersCleared": 3
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "teamPowerBefore": 4399,
+          "passableLayersBefore": 3,
+          "layersThisRun": 3,
+          "cleared": false,
+          "teamPowerAfter": 7635,
+          "ratioToNextNeed": 0.596,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 2400,
+              "rank": 1,
+              "cultivation": 11200,
+              "weaponLv": 12,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 6
+            },
+            {
+              "path": "body",
+              "power": 1968,
+              "rank": 1,
+              "cultivation": 11200,
+              "weaponLv": 0,
+              "equipPower": 270,
+              "affixPct": 13.200000000000001,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 6
+            },
+            {
+              "path": "dan",
+              "power": 1995,
+              "rank": 1,
+              "cultivation": 11200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.33,
+              "wuPct": 0,
+              "layersCleared": 6
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "teamPowerBefore": 7635,
+          "passableLayersBefore": 4,
+          "layersThisRun": 4,
+          "cleared": false,
+          "teamPowerAfter": 13418,
+          "ratioToNextNeed": 1.048,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 4500,
+              "rank": 2,
+              "cultivation": 23200,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 10
+            },
+            {
+              "path": "body",
+              "power": 3195,
+              "rank": 2,
+              "cultivation": 23200,
+              "weaponLv": 0,
+              "equipPower": 450,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 10
+            },
+            {
+              "path": "dan",
+              "power": 3487,
+              "rank": 2,
+              "cultivation": 23200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 10
+            }
+          ]
+        },
+        {
+          "round": 4,
+          "teamPowerBefore": 13418,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 66008,
+          "ratioToNextNeed": 5.157,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 22781,
+              "rank": 6,
+              "cultivation": 48000,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 15
+            },
+            {
+              "path": "body",
+              "power": 14571,
+              "rank": 6,
+              "cultivation": 48000,
+              "weaponLv": 0,
+              "equipPower": 675,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 15
+            },
+            {
+              "path": "dan",
+              "power": 17655,
+              "rank": 6,
+              "cultivation": 48000,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 15
+            }
+          ]
+        },
+        {
+          "round": 5,
+          "teamPowerBefore": 66008,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 221127,
+          "ratioToNextNeed": 17.276,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 76886,
+              "rank": 9,
+              "cultivation": 72800,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 20
+            },
+            {
+              "path": "body",
+              "power": 47800,
+              "rank": 9,
+              "cultivation": 72800,
+              "weaponLv": 0,
+              "equipPower": 900,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 20
+            },
+            {
+              "path": "dan",
+              "power": 59587,
+              "rank": 9,
+              "cultivation": 72800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 20
+            }
+          ]
+        },
+        {
+          "round": 6,
+          "teamPowerBefore": 221127,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 744015,
+          "ratioToNextNeed": 58.126,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 259492,
+              "rank": 12,
+              "cultivation": 97600,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 25
+            },
+            {
+              "path": "body",
+              "power": 159415,
+              "rank": 12,
+              "cultivation": 97600,
+              "weaponLv": 0,
+              "equipPower": 1125,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 25
+            },
+            {
+              "path": "dan",
+              "power": 201106,
+              "rank": 12,
+              "cultivation": 97600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 25
+            }
+          ]
+        },
+        {
+          "round": 7,
+          "teamPowerBefore": 744015,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 2508122,
+          "ratioToNextNeed": 195.947,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 875787,
+              "rank": 15,
+              "cultivation": 122400,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 30
+            },
+            {
+              "path": "body",
+              "power": 535580,
+              "rank": 15,
+              "cultivation": 122400,
+              "weaponLv": 0,
+              "equipPower": 1350,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 30
+            },
+            {
+              "path": "dan",
+              "power": 678735,
+              "rank": 15,
+              "cultivation": 122400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 30
+            }
+          ]
+        },
+        {
+          "round": 8,
+          "teamPowerBefore": 2508122,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 8461341,
+          "ratioToNextNeed": 661.042,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 2955783,
+              "rank": 18,
+              "cultivation": 147200,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 35
+            },
+            {
+              "path": "body",
+              "power": 1804603,
+              "rank": 18,
+              "cultivation": 147200,
+              "weaponLv": 0,
+              "equipPower": 1575,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 35
+            },
+            {
+              "path": "dan",
+              "power": 2290732,
+              "rank": 18,
+              "cultivation": 147200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 35
+            }
+          ]
+        },
+        {
+          "round": 9,
+          "teamPowerBefore": 8461341,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 28552812,
+          "ratioToNextNeed": 2230.688,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 9975770,
+              "rank": 21,
+              "cultivation": 172000,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 40
+            },
+            {
+              "path": "body",
+              "power": 6087019,
+              "rank": 21,
+              "cultivation": 172000,
+              "weaponLv": 0,
+              "equipPower": 1800,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 40
+            },
+            {
+              "path": "dan",
+              "power": 7731221,
+              "rank": 21,
+              "cultivation": 172000,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 40
+            }
+          ]
+        },
+        {
+          "round": 10,
+          "teamPowerBefore": 28552812,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 96360885,
+          "ratioToNextNeed": 7528.194,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 33668224,
+              "rank": 24,
+              "cultivation": 196800,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 45
+            },
+            {
+              "path": "body",
+              "power": 20539641,
+              "rank": 24,
+              "cultivation": 196800,
+              "weaponLv": 0,
+              "equipPower": 2025,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 45
+            },
+            {
+              "path": "dan",
+              "power": 26092873,
+              "rank": 24,
+              "cultivation": 196800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 45
+            }
+          ]
+        },
+        {
+          "round": 11,
+          "teamPowerBefore": 96360885,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 144540385,
+          "ratioToNextNeed": 11292.218,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 50502336,
+              "rank": 25,
+              "cultivation": 221600,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 50
+            },
+            {
+              "path": "body",
+              "power": 30808675,
+              "rank": 25,
+              "cultivation": 221600,
+              "weaponLv": 0,
+              "equipPower": 2250,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 50
+            },
+            {
+              "path": "dan",
+              "power": 39139310,
+              "rank": 25,
+              "cultivation": 221600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 50
+            }
+          ]
+        },
+        {
+          "round": 12,
+          "teamPowerBefore": 144540385,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 144540655,
+          "ratioToNextNeed": 11292.239,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 50502336,
+              "rank": 25,
+              "cultivation": 246400,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 55
+            },
+            {
+              "path": "body",
+              "power": 30808900,
+              "rank": 25,
+              "cultivation": 246400,
+              "weaponLv": 0,
+              "equipPower": 2475,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 55
+            },
+            {
+              "path": "dan",
+              "power": 39139310,
+              "rank": 25,
+              "cultivation": 246400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 55
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "四人",
+      "pathIds": [
+        "sword",
+        "body",
+        "dan",
+        "array"
+      ],
+      "clearedAtRound": 3,
+      "rounds": [
+        {
+          "round": 1,
+          "teamPowerBefore": 5200,
+          "passableLayersBefore": 3,
+          "layersThisRun": 3,
+          "cleared": false,
+          "teamPowerAfter": 6268,
+          "ratioToNextNeed": 0.979,
+          "nextNeed": 6400,
+          "members": [
+            {
+              "path": "sword",
+              "power": 1300,
+              "rank": 0,
+              "cultivation": 5600,
+              "weaponLv": 6,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 3
+            },
+            {
+              "path": "body",
+              "power": 1201,
+              "rank": 0,
+              "cultivation": 5600,
+              "weaponLv": 0,
+              "equipPower": 135,
+              "affixPct": 6.6000000000000005,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 3
+            },
+            {
+              "path": "dan",
+              "power": 1165,
+              "rank": 0,
+              "cultivation": 5600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.165,
+              "wuPct": 0,
+              "layersCleared": 3
+            },
+            {
+              "path": "array",
+              "power": 1156,
+              "rank": 0,
+              "cultivation": 5600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 15.600000000000001,
+              "layersCleared": 3
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "teamPowerBefore": 6268,
+          "passableLayersBefore": 3,
+          "layersThisRun": 4,
+          "cleared": false,
+          "teamPowerAfter": 16797,
+          "ratioToNextNeed": 1.312,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 3825,
+              "rank": 2,
+              "cultivation": 17600,
+              "weaponLv": 14,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 7
+            },
+            {
+              "path": "body",
+              "power": 2911,
+              "rank": 2,
+              "cultivation": 17600,
+              "weaponLv": 0,
+              "equipPower": 315,
+              "affixPct": 15.400000000000002,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 7
+            },
+            {
+              "path": "dan",
+              "power": 3116,
+              "rank": 2,
+              "cultivation": 17600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.385,
+              "wuPct": 0,
+              "layersCleared": 7
+            },
+            {
+              "path": "array",
+              "power": 3069,
+              "rank": 2,
+              "cultivation": 17600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 36.400000000000006,
+              "layersCleared": 7
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "teamPowerBefore": 16797,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 62793,
+          "ratioToNextNeed": 4.906,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 15187,
+              "rank": 5,
+              "cultivation": 42400,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 12
+            },
+            {
+              "path": "body",
+              "power": 9804,
+              "rank": 5,
+              "cultivation": 42400,
+              "weaponLv": 0,
+              "equipPower": 540,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 12
+            },
+            {
+              "path": "dan",
+              "power": 11770,
+              "rank": 5,
+              "cultivation": 42400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 12
+            },
+            {
+              "path": "array",
+              "power": 11542,
+              "rank": 5,
+              "cultivation": 42400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 12
+            }
+          ]
+        },
+        {
+          "round": 4,
+          "teamPowerBefore": 62793,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 210558,
+          "ratioToNextNeed": 16.45,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 51257,
+              "rank": 8,
+              "cultivation": 67200,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 17
+            },
+            {
+              "path": "body",
+              "power": 32032,
+              "rank": 8,
+              "cultivation": 67200,
+              "weaponLv": 0,
+              "equipPower": 765,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 17
+            },
+            {
+              "path": "dan",
+              "power": 39724,
+              "rank": 8,
+              "cultivation": 67200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 17
+            },
+            {
+              "path": "array",
+              "power": 38955,
+              "rank": 8,
+              "cultivation": 67200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 17
+            }
+          ]
+        },
+        {
+          "round": 5,
+          "teamPowerBefore": 210558,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 708576,
+          "ratioToNextNeed": 55.358,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 172995,
+              "rank": 11,
+              "cultivation": 92000,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 22
+            },
+            {
+              "path": "body",
+              "power": 106517,
+              "rank": 11,
+              "cultivation": 92000,
+              "weaponLv": 0,
+              "equipPower": 990,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 22
+            },
+            {
+              "path": "dan",
+              "power": 134071,
+              "rank": 11,
+              "cultivation": 92000,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 22
+            },
+            {
+              "path": "array",
+              "power": 131476,
+              "rank": 11,
+              "cultivation": 92000,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 22
+            }
+          ]
+        },
+        {
+          "round": 6,
+          "teamPowerBefore": 708576,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 2388682,
+          "ratioToNextNeed": 186.616,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 583858,
+              "rank": 14,
+              "cultivation": 116800,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 27
+            },
+            {
+              "path": "body",
+              "power": 357368,
+              "rank": 14,
+              "cultivation": 116800,
+              "weaponLv": 0,
+              "equipPower": 1215,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 27
+            },
+            {
+              "path": "dan",
+              "power": 452490,
+              "rank": 14,
+              "cultivation": 116800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 27
+            },
+            {
+              "path": "array",
+              "power": 443732,
+              "rank": 14,
+              "cultivation": 116800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 27
+            }
+          ]
+        },
+        {
+          "round": 7,
+          "teamPowerBefore": 2388682,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 8058350,
+          "ratioToNextNeed": 629.559,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 1970522,
+              "rank": 17,
+              "cultivation": 141600,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 32
+            },
+            {
+              "path": "body",
+              "power": 1203458,
+              "rank": 17,
+              "cultivation": 141600,
+              "weaponLv": 0,
+              "equipPower": 1440,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 32
+            },
+            {
+              "path": "dan",
+              "power": 1527154,
+              "rank": 17,
+              "cultivation": 141600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 32
+            },
+            {
+              "path": "array",
+              "power": 1497597,
+              "rank": 17,
+              "cultivation": 141600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 32
+            }
+          ]
+        },
+        {
+          "round": 8,
+          "teamPowerBefore": 8058350,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 27192786,
+          "ratioToNextNeed": 2124.436,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 6650513,
+              "rank": 20,
+              "cultivation": 166400,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 37
+            },
+            {
+              "path": "body",
+              "power": 4058478,
+              "rank": 20,
+              "cultivation": 166400,
+              "weaponLv": 0,
+              "equipPower": 1665,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 37
+            },
+            {
+              "path": "dan",
+              "power": 5154147,
+              "rank": 20,
+              "cultivation": 166400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 37
+            },
+            {
+              "path": "array",
+              "power": 5054390,
+              "rank": 20,
+              "cultivation": 166400,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 37
+            }
+          ]
+        },
+        {
+          "round": 9,
+          "teamPowerBefore": 27192786,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 91770811,
+          "ratioToNextNeed": 7169.595,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 22445482,
+              "rank": 23,
+              "cultivation": 191200,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 42
+            },
+            {
+              "path": "body",
+              "power": 13693634,
+              "rank": 23,
+              "cultivation": 191200,
+              "weaponLv": 0,
+              "equipPower": 1890,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 42
+            },
+            {
+              "path": "dan",
+              "power": 17395249,
+              "rank": 23,
+              "cultivation": 191200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 42
+            },
+            {
+              "path": "array",
+              "power": 17058567,
+              "rank": 23,
+              "cultivation": 191200,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 42
+            }
+          ]
+        },
+        {
+          "round": 10,
+          "teamPowerBefore": 91770811,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 206481549,
+          "ratioToNextNeed": 16131.371,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 50502336,
+              "rank": 25,
+              "cultivation": 216000,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 47
+            },
+            {
+              "path": "body",
+              "power": 30808540,
+              "rank": 25,
+              "cultivation": 216000,
+              "weaponLv": 0,
+              "equipPower": 2115,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 47
+            },
+            {
+              "path": "dan",
+              "power": 39139310,
+              "rank": 25,
+              "cultivation": 216000,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 47
+            },
+            {
+              "path": "array",
+              "power": 38381775,
+              "rank": 25,
+              "cultivation": 216000,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 47
+            }
+          ]
+        },
+        {
+          "round": 11,
+          "teamPowerBefore": 206481549,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 206481841,
+          "ratioToNextNeed": 16131.394,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 50502336,
+              "rank": 25,
+              "cultivation": 240800,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 52
+            },
+            {
+              "path": "body",
+              "power": 30808765,
+              "rank": 25,
+              "cultivation": 240800,
+              "weaponLv": 0,
+              "equipPower": 2340,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 52
+            },
+            {
+              "path": "dan",
+              "power": 39139310,
+              "rank": 25,
+              "cultivation": 240800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 52
+            },
+            {
+              "path": "array",
+              "power": 38381775,
+              "rank": 25,
+              "cultivation": 240800,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 52
+            }
+          ]
+        },
+        {
+          "round": 12,
+          "teamPowerBefore": 206481841,
+          "passableLayersBefore": 5,
+          "layersThisRun": 5,
+          "cleared": true,
+          "teamPowerAfter": 206482134,
+          "ratioToNextNeed": 16131.417,
+          "nextNeed": 12800,
+          "members": [
+            {
+              "path": "sword",
+              "power": 50502336,
+              "rank": 25,
+              "cultivation": 265600,
+              "weaponLv": 20,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 57
+            },
+            {
+              "path": "body",
+              "power": 30808990,
+              "rank": 25,
+              "cultivation": 265600,
+              "weaponLv": 0,
+              "equipPower": 2565,
+              "affixPct": 22,
+              "danPowPct": 0,
+              "wuPct": 0,
+              "layersCleared": 57
+            },
+            {
+              "path": "dan",
+              "power": 39139310,
+              "rank": 25,
+              "cultivation": 265600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0.55,
+              "wuPct": 0,
+              "layersCleared": 57
+            },
+            {
+              "path": "array",
+              "power": 38381775,
+              "rank": 25,
+              "cultivation": 265600,
+              "weaponLv": 0,
+              "equipPower": 0,
+              "affixPct": 0,
+              "danPowPct": 0,
+              "wuPct": 52,
+              "layersCleared": 57
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+=== P1-C GPT 终审阻断项① 针对性测试（charPath 写入白名单守卫）===
+
+【A. 源码断言（verify_real_logic.mjs 4.2）】
+assert.ok(
+  /if\(PATH_IDS\.indexOf\(charPath\) >= 0 && \(typeof S\.path !== 'string' \|\| PATH_IDS\.indexOf\(S\.path\) < 0\)\) S\.path = charPath;/.test(src),
+  'confirmChar 写入未加 incoming charPath 白名单守卫（GPT 终审阻断项①）'
+);
+
+【B. 行为仿真测试（verify_real_logic.mjs 4.2c，复刻真实守卫逻辑）】
+function confirmCharWrite(charPath, SPath){
+  // 复刻真实守卫：写入前校验 incoming charPath 属 PATH_IDS，且本源尚未确定
+  let S = { path: SPath };
+  if(PATH_IDS.indexOf(charPath) >= 0 && (typeof S.path !== 'string' || PATH_IDS.indexOf(S.path) < 0)) S.path = charPath;
+  return S.path;
+}
+// A 未选本源 + 合法 charPath -> 写入
+assert.equal(confirmCharWrite('sword', ''), 'sword', 'A: 未选本源+合法 charPath 应写入');
+// B 未选本源 + 非法 charPath -> 不写入（守卫拦截，不污染本源）
+assert.equal(confirmCharWrite('evil123', ''), '', 'B: 非法 charPath 不得落入本源');
+// C 已选本源 sword + 不同合法 charPath body -> 不可转职（不覆盖）
+assert.equal(confirmCharWrite('body', 'sword'), 'sword', 'C: 已选道途不可被不同合法 charPath 覆盖（防转职）');
+// D 已选本源 sword + 同值 charPath -> 保持
+assert.equal(confirmCharWrite('sword', 'sword'), 'sword', 'D: 同值写入保持');
+// E 空 charPath（未选）-> 不写入
+assert.equal(confirmCharWrite('', ''), '', 'E: 空 charPath 不写入');
+
+【C. 测试运行结果】
+命令: node --test scratch/p1c_prototype/pathBonus.test.mjs scratch/p1c_prototype/verify_real_logic.mjs scratch/p1c_prototype/online_branches.test.mjs server/multi-p1c-online-regression.test.mjs
+输出: # tests 27  # pass 27  # fail 0
+（其中 verify_real_logic.mjs 含上述 A/B/C/D/E 五项针对性断言，全部 PASS）
+
+【D. 当前 js/game.js SHA-256】
+70a9a200e23cc618fff6d57feca27a2abb5cec2b4d9d2572fcff28d53eb26c34

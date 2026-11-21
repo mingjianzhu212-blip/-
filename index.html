@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1210">
+<title>九霄问道 · 放置挂机</title>
+<link rel="stylesheet" href="style.css?v=20261121b3d">
+<script src="js/img_fallback.js"></script>  <!-- A6：全站图片失败/超时文字兜底（NPC 立绘走 npc_art） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Long+Cang&family=Zhi+Mang+Xing&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="bg"></div>
+<div class="app">
+
+  <!-- ===== 主界面：洞府 / 城镇 双场景（对标一念逍遥） ===== -->
+  <section class="scene-page active" id="page-scene">
+    <div class="scene-bg"></div>
+    <div class="scene-vignette"></div>
+    <div class="scene-mist" aria-hidden="true"></div>
+    <div class="scene-particles" id="scene-particles"></div>
+
+    <!-- 顶部两行瘦条（第三批 B4）：上行身份＋突破，下行资源全常驻；「更多」折叠退役 -->
+    <header class="topbar">
+      <div class="tb-main">
+        <div class="tb-char" title="点击查看突破 / 人物">
+          <div class="tb-avatar" id="sc-avatar"></div>
+          <div class="tb-info">
+            <b id="sc-name">无名散修</b>
+            <span id="sc-rank">炼气一层</span>
+            <div class="tb-exp"><i id="sc-expbar"></i></div>
+          </div>
+          <button class="tb-break" id="sc-break" disabled>修为不足</button>
+        </div>
+      </div>
+      <div class="tb-res" role="group" aria-label="资源">
+        <div class="tb-chip" title="灵石"><i>灵石</i><b id="sc-stone">0</b></div>
+        <div class="tb-chip" title="修为"><i>修为</i><b id="sc-exp-num">0</b></div>
+        <button class="tb-chip tb-chip-btn" id="sc-life-chip" type="button" title="寿元 · 这一世还剩几年"><i>寿元</i><b id="sc-life">—</b></button>
+        <div class="tb-chip" title="灵草"><i>灵草</i><b id="sc-herb">0</b></div>
+        <div class="tb-chip" title="矿石"><i>矿石</i><b id="sc-ore">0</b></div>
+        <button class="tb-chip tb-chip-btn" id="sc-power-chip" type="button" title="道行拆账 · 看看战力怎么来的"><i>战力</i><b id="sc-power">0</b></button>
+      </div>
+    </header>
+
+    <!-- 入门八事 → 道途（第 105 / 106 轮）：唯一一直摆在眼前的纸签 —— 一次只亮一件事，点「去」直达。
+         先走八事（kicker「入门八事」、seal 报第几事），走完自动换成道途十二程（seal 固定「道」）。
+         教程弹窗在台上时由 renderTrail 收起；两轨都了才永久隐藏 -->
+    <button class="sc-trail" id="sc-trail" type="button" data-mode="ru" hidden>
+      <span class="st-seal" id="st-seal">一</span>
+      <span class="st-main">
+        <span class="st-top"><span class="st-kicker" id="st-kicker">入门八事</span><b class="st-name" id="st-name">打坐三炷香</b></span>
+        <small class="st-hint" id="st-hint">点下方【打坐】三次，先把气感养出来</small>
+        <span class="st-pips" id="st-pips" aria-hidden="true"></span>
+      </span>
+      <span class="st-go"><b id="st-prog">0/3</b><span>去 ›</span></span>
+    </button>
+
+    <!-- ===== 子场景一：洞府（天地大阵 · 灵气汇聚：中央法阵 + 符文玉简星象散布） ===== -->
+    <div class="sub-scene active" id="scene-cave">
+      <!-- 天地大阵背景：纯 CSS 同心八卦法阵暗纹（三层反向缓旋，暗青水墨） -->
+      <div class="grand-array" aria-hidden="true">
+        <i class="ga-ring ga-r1"></i>
+        <i class="ga-ring ga-r2"></i>
+        <i class="ga-ring ga-r3"></i>
+        <b class="ga-guas">
+          <span>☰</span><span>☱</span><span>☲</span><span>☳</span>
+          <span>☴</span><span>☵</span><span>☶</span><span>☷</span>
+        </b>
+        <i class="ga-haze"></i>
+      </div>
+      <!-- 中央打坐角色（法阵中心，立绘呼吸浮动，脚下太极阵） -->
+      <div class="scene-char">
+        <div class="sc-figure" id="sc-figure"></div>
+      </div>
+      <!-- 天地灵气：光点从屏幕四周缓缓向人物汇聚（纯 CSS 动画，pointer-events 穿透） -->
+      <div class="qi-field" id="qi-field" aria-hidden="true">
+        <i class="qi-mote"></i><i class="qi-mote"></i><i class="qi-mote"></i><i class="qi-mote"></i>
+        <i class="qi-mote"></i><i class="qi-mote"></i><i class="qi-mote"></i><i class="qi-mote"></i>
+      </div>
+      <!-- 修炼行动按钮：绝对定位在人物立绘正下方（不随人物容器缩放/移动） -->
+      <div class="cave-acts" id="sc-acts">
+        <button class="cave-act" data-k="sit" title="10 秒基础吐纳量与本层所需修为的 0.2% 取高，再乘今日主动效率（100%/50%/25%）"><b><img class="cave-ic" src="ui/icons/ic_sit2.png" alt="">打坐</b><small data-base="修为按当前境界结算">修为按当前境界结算</small></button>
+        <button class="cave-act" data-k="train"><b><img class="cave-ic" src="ui/icons/ic_blade.png" alt="">历练</b><small data-base="有风险">有风险</small></button>
+      </div>
+      <!-- 道号铭牌：绝对定位在按钮排正下方，不与按钮/木牌争位 -->
+      <div class="sc-plate" id="sc-plate"><span id="sc-char-name">无名散修</span><small id="sc-char-rank">炼气一层</small></div>
+      <!-- 法阵节点：符文玉简（不对称星象散布；悬停流光+介绍小字；点击右侧滑出对应面板） -->
+      <button class="node-jade" data-bld="dong" data-scroll="xx-alchemy" style="--nx:25%;--ny:40%;--jd:0s" aria-label="丹房">
+        <i class="nj-ring"><b>丹</b></i>
+        <span class="nj-name">丹房</span>
+        <span class="nj-tip">丹房 · 炼制破境丹，逆天改命</span>
+      </button>
+      <button class="node-jade" data-bld="dong" data-scroll="xx-forge" style="--nx:75%;--ny:40%;--jd:-1.6s" aria-label="器室">
+        <i class="nj-ring"><b>器</b></i>
+        <span class="nj-name">器室</span>
+        <span class="nj-tip">器室 · 锻造法宝，符纹镶魂</span>
+      </button>
+      <button class="node-jade" id="sc-field" data-bld="dong" data-scroll="xx-field" style="--nx:25%;--ny:62%;--jd:-2.8s" aria-label="灵田">
+        <i class="nj-ring"><b>田</b></i>
+        <span class="nj-name">灵田</span>
+        <span class="nj-badge" id="sc-field-badge"></span>
+        <span class="nj-tip">灵田 · 播种灵植，静待花开</span>
+      </button>
+      <button class="node-jade" data-bld="chong" style="--nx:75%;--ny:62%;--jd:-3.9s" aria-label="灵兽园">
+        <i class="nj-ring"><b>兽</b></i>
+        <span class="nj-name">灵兽园</span>
+        <span class="nj-tip">灵兽园 · 孵化灵兽，伴道同行</span>
+      </button>
+
+      <!-- 沈碑常驻横幅：静态引子，点开识人页；真实来访仍走原 #npc-visit（z-index 更高，会盖在它上面） -->
+      <button class="npc-banner" type="button" data-bld="role" data-scroll="xx-role-npc" aria-label="沈碑 · 打开识人页">
+        <span class="nb-ava" aria-hidden="true"><img class="nb-ava-img" data-npc-art="stele" src="ui/avatar/npc_stele_full.jpg" alt=""><span class="nb-seal">碑</span></span>
+        <span class="nb-main"><b>沈碑</b><small id="sc-npc-banner-text">山外有山。你登过的塔、走过的路，我都记在碑后。</small></span>
+        <span class="nb-go" aria-hidden="true">›</span>
+      </button>
+    </div>
+
+    <!-- ===== 子场景二：城镇 · 清虚观（坊市 / 天机阁 / 镇妖 / 论剑 / 秘境） ===== -->
+    <div class="sub-scene" id="scene-town">
+      <div class="town-title">清虚观 · 城镇</div>
+      <!-- 画卷散落式：每一座的坐标与倾角都写在 inline style 上（百分比绝对定位），
+           尺寸按功能主次分大/小两档（主玩法三座用 .btn-large）。刻意不对齐、不成环、不留中央空地
+           本体是 ui/icons/bld_*.png 水墨立绘，class 只留 bk-<座名> 一处给 CSS 认（第 88 轮） -->
+      <div class="town-blds">
+        <button class="bld art bk-market btn-large" data-bld="market" style="left:44%;top:62%;--rot:2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title"><i>坊</i><i>市</i></b></span></button>
+        <button class="bld art bk-tianji btn-small" data-bld="market" data-scroll="xx-tianji" style="left:86%;top:68%"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">天机阁</b></span></button>
+        <button class="bld art bk-pagoda btn-large" data-bld="tower" style="left:24%;top:27%;--rot:-3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">镇妖塔</b></span></button>
+        <button class="bld art bk-arena btn-small" data-bld="arena" style="left:12%;top:53%;--rot:4deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">论剑台</b></span></button>
+        <button class="bld art bk-rank btn-small" data-bld="rank" style="left:26%;top:84%;--rot:-2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">天骄榜</b><i class="bld-sub">群雄排名</i></span></button>
+        <button class="bld art bk-secret btn-small" data-bld="secret" style="left:77%;top:44%;--rot:3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title"><i>上</i><i>古</i><i>秘</i><i>境</i></b></span></button>
+        <button class="bld art bk-zong btn-small" data-bld="zong" style="left:60%;top:79%;--rot:-4deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">宗门</b><i class="bld-sub">互助探索</i></span></button>
+        <button class="bld art bk-xiu btn-large" data-bld="xiu" style="left:68%;top:20%;--rot:2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">藏经阁</b><i class="bld-sub">功法突破</i></span></button>
+        <button class="bld art bk-fu btn-small" data-bld="xiu" data-scroll="xx-quest" style="left:8%;top:72%;--rot:5deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">福缘</b><i class="bld-sub">日常任务</i></span></button>
+        <button class="bld art bk-vault btn-small" data-bld="event" style="left:40%;top:38%;--rot:-3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">宝藏阁</b><i class="bld-sub">签到领奖</i></span></button>
+      </div>
+    </div>
+
+      <!-- 仙途手札：低频入口收拢；原 id / data-bld / 点击事件一律不动 -->
+      <details class="handbook" id="sc-handbook">
+        <summary><b>仙途手札</b><span>活动 · 任务 · 传音</span></summary>
+        <div class="hb-body">
+          <p class="hb-head"><b>仙途手札</b><span>闲事收在此处</span></p>
+          <button class="sys-btn hb-btn" data-bld="xiu" data-scroll="xx-quest">
+            <img class="sys-ic" src="ui/icons/rail_quest.png" alt="">
+            <small>任务</small>
+          </button>
+          <button class="sys-btn hb-btn" data-bld="chat" id="sc-chat">
+            <img class="sys-ic" src="ui/icons/rail_chat.png" alt="">
+            <small>传音</small>
+            <i class="sys-dot" id="sc-chat-dot" hidden></i>
+          </button>
+          <button class="sys-btn hb-btn" id="sc-sfx">
+            <img class="sys-ic" src="ui/icons/rail_sfx.png" alt="">
+            <small>音效</small>
+          </button>
+          <button class="act-card hb-act" data-bld="event" data-scroll="xx-union"><b>仙盟争霸</b></button>
+          <button class="act-card hb-act" data-bld="event"><b>七日签到</b></button>
+        </div>
+      </details>
+    <!-- 右侧系统按钮：只留 4 个高频入口；其余低频已收进洞府「仙途手札」 -->
+    <aside class="sys-rail">
+      <button class="sys-btn" data-bld="role">
+        <img class="sys-ic" src="ui/icons/rail_role.png" alt="">
+        <small>人物</small>
+      </button>
+      <button class="sys-btn" data-bld="bag" id="sc-bag">
+        <img class="sys-ic" src="ui/icons/rail_bag.png" alt="">
+        <small>背包</small>
+        <i class="sys-dot" id="sc-bag-dot" hidden></i>
+      </button>
+      <button class="sys-btn" data-bld="xiu">
+        <img class="sys-ic" src="ui/icons/ic_scroll.png" alt="">
+        <small>功法</small>
+      </button>
+      <button class="sys-btn" id="sc-settings">
+        <img class="sys-ic" src="ui/icons/rail_settings.png" alt="">
+        <small>设置</small>
+      </button>
+    </aside>
+
+    <!-- 随机奇遇悬浮气泡：挂机每 60 秒 30% 概率刷出，点开古风弹窗选一项结算（双场景共用） -->
+    <button class="enc-bubble hidden" id="enc-bubble" aria-label="奇遇">
+      <span class="enc-bubble-ring" aria-hidden="true"></span>
+      <span class="enc-bubble-ico">❓</span>
+      <span class="enc-bubble-name">奇遇</span>
+      <span class="enc-bubble-q" aria-hidden="true">!</span>
+    </button>
+  </section>
+
+  <!-- 路由容器：各建筑面板由 router.js 动态注入，离开即清空，不再用 display:none 硬切 -->
+  <section class="panel-host" id="panel-host"></section>
+
+  <!-- 底部五签（第三批 B2）：人物 / 洞府 / 城镇 / 宗门 / 背包；全站常驻，压过面板页 -->
+  <nav class="scene-tabs" aria-label="主导航">
+    <button class="scene-tab" data-tab="role" aria-pressed="false"><b><img class="tab-ic" src="ui/icons/rail_role.png" alt=""></b><small>人物</small></button>
+    <button class="scene-tab active" data-tab="cave" aria-pressed="true"><b><img class="tab-ic" src="ui/icons/ic_cave.png" alt=""></b><small>洞府</small></button>
+    <button class="scene-tab" data-tab="town" aria-pressed="false"><b><img class="tab-ic" src="ui/icons/ic_gate.png" alt=""></b><small>城镇</small></button>
+    <button class="scene-tab" data-tab="zong" aria-pressed="false"><b><img class="tab-ic" src="ui/icons/ic_pagoda.png" alt=""></b><small>宗门</small></button>
+    <button class="scene-tab" data-tab="bag" aria-pressed="false"><b><img class="tab-ic" src="ui/icons/rail_bag.png" alt=""></b><small>背包</small></button>
+  </nav>
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- 设置 -->
+<div class="modal hidden" id="settings-modal">
+  <div class="m-card">
+    <h3>设置 <button class="m-close" id="m-close">×</button></h3>
+
+    <div class="m-row">
+      <label>角色外观</label>
+      <button class="btn-plain" id="m-char" style="width:100%"><img class="btn-ic" src="ui/icons/rail_role.png" alt="">改名 / 换装</button>
+    </div>
+
+    <div class="m-row">
+      <label>音乐音效（BGM + 按钮点击声）</label>
+      <button class="btn-plain" id="fileaudio-toggle" style="width:100%"><img class="btn-ic" src="ui/icons/rail_sfx.png" alt="">音频：开（点击静音）</button>
+    </div>
+
+    <div class="m-row">
+      <label>宗门服务地址（留空 = 自动连接；高级玩家可手填）</label>
+      <input id="m-sect" type="text" placeholder="留空自动连接">
+      <small id="m-sect-state">未连接</small>
+    </div>
+    <div class="m-row">
+      <label>道号（最多 12 字，同门会看到）</label>
+      <input id="m-nick" type="text" maxlength="12" placeholder="散修xxx">
+    </div>
+    <div class="m-btns">
+      <button class="btn-main" id="m-save">保存并重连</button>
+      <button class="btn-plain" id="m-cancel">取消</button>
+    </div>
+
+    <div class="m-row">
+      <label>存档备份（换设备 / 防清缓存）</label>
+      <button class="btn-plain" id="m-backup" style="width:100%">存档备份 · 导出 / 导入</button>
+    </div>
+
+    <div class="m-row">
+      <label>新手引导（重看太虚真人的开场）</label>
+      <button class="btn-plain" id="m-guide-replay" style="width:100%">重看新手引导</button>
+    </div>
+
+    <div class="m-row" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line)">
+      <label style="color:var(--red)">危险操作</label>
+      <button class="btn-plain" id="m-wipe" style="color:var(--red)">清空存档，重新开始</button>
+    </div>
+  </div>
+</div>
+
+<!-- 清档二次确认（2026-11-19 第一眼审查第 3 条）：独立确认层 + 危险样式 -->
+<div class="modal hidden" id="wipe-modal">
+  <div class="m-card">
+    <h3>清空存档 <button class="m-close" id="wipe-cancel-x" type="button">×</button></h3>
+    <p class="warn">这会<b>永久删除</b>当前角色的境界、修为、灵石、背包、法宝、洞府与全部 NPC 记忆。<br>删除后回到创角页，<b>无法撤销</b>。</p>
+    <p class="warn">若只是换设备或防清缓存，请先去「存档备份」导出一份。</p>
+    <div class="m-btns">
+      <button class="btn-plain" id="wipe-cancel" type="button" style="flex:1">取消</button>
+      <button class="btn-danger" id="wipe-ok" type="button" style="flex:1">清空并重开</button>
+    </div>
+  </div>
+</div>
+
+<!-- 存档备份：导出 / 导入（2026-10-26 第 78 节） -->
+<div class="modal hidden" id="save-modal">
+  <div class="m-card sv-card">
+    <h3>存档备份 <button class="m-close" id="sv-close" type="button">×</button></h3>
+    <p class="sv-lead">进度只存在这台设备的浏览器里。换设备、换浏览器、清缓存之前，先导出一份。</p>
+
+    <div class="sv-sec">
+      <div class="sv-h">当前存档</div>
+      <div class="sv-meta" id="sv-cur"></div>
+      <div class="m-btns">
+        <button class="btn-main" id="sv-download" type="button">下载存档文件</button>
+        <button class="btn-plain" id="sv-copy" type="button">复制存档文本</button>
+      </div>
+      <textarea class="sv-text hidden" id="sv-out" readonly></textarea>
+      <p class="sv-hint" id="sv-copy-hint"></p>
+      <p class="sv-hint">本备份包含角色主存档（境界、修为、灵石、背包、装备、法宝、宗门等），并附带本机记录：每日签到进度、守碑人与崔九的记忆、NPC 来访记录、新手引导完成状态、历史最高境界纪录。换设备导入后这些会一起迁移。</p>
+    </div>
+
+    <div class="sv-sec">
+      <div class="sv-h">导入存档</div>
+      <div class="m-btns">
+        <button class="btn-plain" id="sv-pick" type="button">选择存档文件</button>
+        <input type="file" id="sv-file" accept=".json,application/json,text/plain" hidden>
+        <button class="btn-plain" id="sv-check" type="button">读取粘贴内容</button>
+      </div>
+      <textarea class="sv-text" id="sv-in" placeholder="把导出的存档文本粘贴到这里……"></textarea>
+      <div class="sv-prev" id="sv-prev"></div>
+      <p class="sv-warn">覆盖当前进度不可撤销，建议先导出一份。</p>
+      <p class="sv-hint">角色主存档与本机记录（签到、NPC 记忆、来访记录、引导状态、最高境界）会一并覆盖；文件里没带本机记录时（例如旧版导出的备份），这几项保持不动。</p>
+      <div class="m-btns">
+        <button class="btn-main" id="sv-apply" type="button" disabled>覆盖并写入</button>
+        <button class="btn-plain" id="sv-cancel" type="button">取消</button>
+      </div>
+      <div class="sv-done" id="sv-done">
+        <b>已写入存档，重新载入后生效</b>
+        <span id="sv-done-meta"></span>
+        <button class="btn-main" id="sv-reload" type="button">立即重新载入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 创立角色（首次进入触发，向大型网游看齐） -->
+<div class="modal hidden" id="char-modal">
+  <div class="m-card char-card char-card-lg">
+    <h3>创立角色 <button class="m-close" id="char-close" type="button" style="display:none" aria-label="关闭">×</button></h3>
+    <!-- 立绘选择区：两张立绘并排居中，点击选中（放大 + 高亮），下方是道号输入 -->
+    <div class="char-picks" id="char-picks"></div>
+    <div class="m-row">
+      <label>道号（1~8 字）</label>
+      <input id="char-name" type="text" maxlength="8" placeholder="如：青玄子">
+    </div>
+    <button class="btn-main" id="char-confirm">踏入仙途</button>
+  </div>
+</div>
+
+<!-- 寻宝结果 -->
+<div class="modal hidden" id="treasure-modal">
+  <div class="m-card t-card">
+    <div class="t-ico" id="t-ico"><img src="ui/icons/ic_gift.png" alt=""></div>
+    <h3 id="t-name">下品丹药</h3>
+    <p class="t-desc" id="t-desc"></p>
+    <button class="btn-main" id="t-close">收下</button>
+  </div>
+</div>
+
+<!-- 背包物品详情（点背包格子弹出：先看清楚，再决定服食/寄售/丢弃） -->
+<div class="modal hidden" id="item-modal">
+  <div class="m-card item-card">
+    <div class="item-head">
+      <span class="item-ico" id="it-ico"><img src="ui/icons/ic_box.png" alt=""></span>
+      <h3 id="it-name">物品</h3>
+      <button class="m-close" id="it-close">×</button>
+    </div>
+    <p class="item-desc" id="it-desc"></p>
+    <div class="item-meta">
+      <div class="im-row"><span>用途</span><b id="it-usage"></b></div>
+      <div class="im-row"><span>来历</span><b id="it-source"></b></div>
+      <div class="im-row"><span>寄售价</span><b id="it-sell"></b></div>
+    </div>
+    <div class="item-acts" id="it-acts"></div>
+  </div>
+</div>
+
+<!-- 镇妖塔 · 回合制战斗演出（全屏遮罩；演出结束由 JS 结算并关闭） -->
+<div class="modal hidden" id="battle-modal">
+  <div class="battle-stage" id="bt-stage">
+    <button class="bt-skip" id="bt-skip">跳过 ›</button>
+    <div class="bt-title" id="bt-title">镇妖塔 · 第 <b id="bt-floor">1</b> 层</div>
+    <div class="bt-arena" id="bt-arena">
+      <!-- 双方形象是真素材：玩家按性别取立绘，妖兽取 BEASTS[].img（第 84 轮）。
+           图取不到时浏览器退回 alt 里那两个字（道号 / 妖名），面板不会空掉。
+           .bt-figwrap 是「壳」，只挂投影与换色皮；.bt-fig 是「芯」，只跑动画。 -->
+      <div class="bt-side" id="bt-pside">
+        <div class="bt-name">你 · <span id="bt-pname">散修</span></div>
+        <div class="bt-figure">
+          <i class="bt-halo"></i>
+          <span class="bt-figwrap"><img class="bt-fig p" id="bt-pavatar" src="ui/avatar/hero_male.png" alt="仙"></span>
+        </div>
+        <div class="bt-hpwrap">
+          <div class="bt-bar" id="bt-pbar"><i class="bt-trail p" id="bt-ptrail"></i><div class="bt-fill p" id="bt-php"></div></div>
+          <div class="bt-hpnum" id="bt-phpn">100%</div>
+        </div>
+      </div>
+      <!-- 中央剑气弧：半月剑意（纯 CSS，点击可切换三流派配色） -->
+      <div class="bt-vs" id="bt-vs" title="点击切换剑意流派">
+        <i class="bt-vs-arc"></i><b class="bt-vs-txt">对决</b>
+      </div>
+      <div class="bt-side" id="bt-mside">
+        <div class="bt-name" id="bt-mname">妖兽</div>
+        <div class="bt-figure">
+          <i class="bt-halo m"></i>
+          <span class="bt-figwrap m" id="bt-mwrap"><img class="bt-fig m" id="bt-mavatar" src="ui/icons/beast_rat.png" alt="妖"></span>
+        </div>
+        <div class="bt-hpwrap">
+          <div class="bt-bar" id="bt-mbar"><i class="bt-trail m" id="bt-mtrail"></i><div class="bt-fill m" id="bt-mhp"></div></div>
+          <div class="bt-hpnum" id="bt-mhpn">100%</div>
+        </div>
+      </div>
+      <div class="bt-slash" id="bt-slash"><i class="bt-slash-b"></i></div>
+    </div>
+    <div class="bt-battlelog" id="bt-log">&nbsp;</div>
+    <!-- 主动技条（第 100 轮）：由 openBattleAnim 的 opts.skills 填，没给就整条隐藏 -->
+    <div class="bt-skills hidden" id="bt-skills"></div>
+    <div class="bt-result-wrap hidden" id="bt-rwrap">
+      <div class="bt-result" id="bt-result">战斗胜利</div>
+      <!-- 战利品浮现：掉落行（图标+品质色名+数量 / 灵石行），JS 错峰填入 -->
+      <div class="bt-loot" id="bt-loot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 起手式（第 101 轮）：论剑/秘境在打之前先选一式，选完才掷骰与结算。
+     样式复用奇遇那套木牌卷轴（.m-card.enc-*），只多一条 .st-foot 的脚注。 -->
+<div class="modal hidden" id="stance-modal">
+  <div class="m-card enc-card stance-card">
+    <div class="enc-head">
+      <span class="enc-icon" id="st-ico">⚔</span>
+      <h3 id="st-title">起手式</h3>
+      <button class="m-close" id="st-close">×</button>
+    </div>
+    <p class="enc-text" id="st-text"></p>
+    <div class="enc-opts" id="st-opts"></div>
+    <div class="st-foot" id="st-foot"></div>
+  </div>
+</div>
+
+<!-- 战利品浮现 · 挂机飘字（猎妖掉落 toast：右上角堆叠，最多 3 枚，1.5s 自灭） -->
+<div class="loot-toast" id="loot-toast" aria-live="polite"></div>
+
+<!-- 妖踪（第 102 轮）：活体挂机里偶尔现身的限时机会，右下角浮片，15 秒不留就遁走。
+     状态只在内存（js/game.js 的 traceSpawn / traceChase / traceLet），不入档、不影响离线结算。 -->
+<div class="trace-bar hidden" id="trace-bar" aria-live="polite">
+  <div class="tb-row">
+    <img class="tb-img" id="tb-img" src="ui/icons/ic_gift.png" alt="">
+    <div class="tb-main">
+      <b id="tb-name">妖踪</b>
+      <small id="tb-desc"></small>
+    </div>
+    <span class="tb-t" id="tb-t">15s</span>
+  </div>
+  <div class="tb-bar" aria-hidden="true"><i id="tb-fill"></i></div>
+  <div class="tb-btns">
+    <button class="tb-go" id="tb-chase">追击</button>
+    <button class="tb-let" id="tb-let">放过</button>
+  </div>
+</div>
+
+<!-- 沈碑主动来访（切片 2a 展示 / 2c 点击）：非模态浮片，右下角 15 秒自灭；
+     点一下或 Enter / Space 进「人物 · 识人 · 沈碑」子页（路由 role_npc）。
+     状态只在内存（js/game.js 的 npcVisit*）；判定即消费，消费标记写在 S.npcs.stele 并即时落盘。 -->
+<div class="npc-visit hidden" id="npc-visit" role="button" tabindex="0"
+     aria-label="沈碑来访，点击查看" aria-live="polite" aria-atomic="true">
+  <div class="nv-row">
+    <span class="nv-ava" aria-hidden="true"><img class="nv-ava-img" data-npc-art="stele" src="ui/avatar/npc_stele_full.jpg" alt=""><span class="nv-seal">碑</span></span>
+    <div class="nv-main">
+      <b class="nv-name">沈碑</b>
+      <p class="nv-text" id="nv-text"></p>
+    </div>
+    <span class="nv-t" id="nv-t" aria-hidden="true">15s</span>
+  </div>
+  <div class="nv-bar" aria-hidden="true"><i id="nv-fill"></i></div>
+</div>
+
+<!-- 渡劫天象（突破全屏演出：墨云劫雷 → 破晓金霄/余烬；由 js/trib.js 驱动，可跳过） -->
+<div class="modal hidden" id="trib-modal">
+  <div class="trib-stage">
+    <button class="bt-skip trib-skip" id="trib-skip">跳过 ›</button>
+    <div class="trib-sky" aria-hidden="true">
+      <i class="trib-cloud c1"></i><i class="trib-cloud c2"></i><i class="trib-cloud c3"></i>
+      <i class="trib-bolt b1"></i><i class="trib-bolt b2"></i><i class="trib-bolt b3"></i>
+      <div class="trib-dawn"></div>
+      <div class="trib-ash" aria-hidden="true"><i style="left:14%;animation-delay:0s"></i><i style="left:31%;animation-delay:.5s"></i><i style="left:47%;animation-delay:.15s"></i><i style="left:62%;animation-delay:.8s"></i><i style="left:78%;animation-delay:.35s"></i><i style="left:90%;animation-delay:.65s"></i></div>
+    </div>
+    <div class="trib-cap" id="trib-cap">天劫降临</div>
+  </div>
+</div>
+
+<!-- 随机奇遇（气泡点开；选项与文案由 ENCOUNTERS 表注入） -->
+<div class="modal hidden" id="enc-modal">
+  <div class="m-card enc-card">
+    <div class="enc-head">
+      <span class="enc-icon" id="enc-icon">❓</span>
+      <h3 id="enc-name">奇遇</h3>
+      <button class="m-close" id="enc-close">×</button>
+    </div>
+    <p class="enc-text" id="enc-text"></p>
+    <div class="enc-opts" id="enc-opts"></div>
+  </div>
+</div>
+
+<!-- 法宝洗练（老虎机词条槽，纯 CSS 无图片；逻辑由 game.js 的 openReroll/doRerollSpin 驱动） -->
+<div class="modal hidden" id="reroll-modal">
+  <div class="m-card rr-card">
+    <div class="enc-head">
+      <span class="enc-icon"><img src="ui/icons/ic_die.png" alt=""></span>
+      <h3>法宝洗练</h3>
+      <button class="m-close" id="rr-close">×</button>
+    </div>
+    <div class="rr-weapon" id="rr-weapon">—</div>
+    <div class="rr-slots">
+      <div class="rr-slot" id="rr-slot-0"></div>
+      <div class="rr-slot" id="rr-slot-1"></div>
+      <div class="rr-slot" id="rr-slot-2"></div>
+      <div class="rr-slot" id="rr-slot-3"></div>
+    </div>
+    <p class="rr-lockhint" id="rr-lockhint"></p>
+    <button class="ev-btn" id="rr-go"><img class="btn-ic" src="ui/icons/ic_die.png" alt="">洗练词条（5000 灵石）</button>
+    <p class="hint">词条品质：凡·白 / 灵·绿 / 宝·蓝 / 仙·紫 / 神·金 —— 神品现世，宝光冲霄<br>点槽位右侧「锁」可保留该词条；锁得越多，灵石价越高（每多锁 1 条翻倍）。</p>
+  </div>
+</div>
+
+<!-- 道行拆账（第 77 节）：战力 / 修为 / 灵石逐项拆开，只读不改数值 -->
+<div class="modal hidden" id="power-modal">
+  <div class="m-card pw-card">
+    <div class="enc-head">
+      <span class="enc-icon pw-seal">账</span>
+      <h3>道行拆账 <small class="pw-sub" id="pw-sub"></small></h3>
+      <button class="m-close" id="pw-close">×</button>
+    </div>
+    <div class="pw-body" id="pw-body"></div>
+    <p class="hint">只拆账、不改数值：每一行都是当前生效的底、乘区与加区。</p>
+  </div>
+</div>
+
+<!-- 突破成功 -->
+<div class="modal hidden" id="break-modal">
+  <div class="m-card t-card">
+    <div class="t-ico" id="b-ico"><img src="ui/icons/ic_bolt.png" alt=""></div>
+    <h3 id="b-title" class="gold">突破成功</h3>
+    <p class="t-desc" id="b-desc"></p>
+    <button class="btn-main" id="b-close">继续修行</button>
+  </div>
+</div>
+
+<!-- 炼制结算（A1 先行版：炼器 / 炼丹成败都列账；只手动关闭，不自动消失） -->
+<div class="modal hidden" id="craft-settle">
+  <div class="m-card t-card cs-card">
+    <div class="t-ico" id="cs-ico">⚒️</div>
+    <h3 id="cs-title">炼制结算</h3>
+    <p class="t-desc" id="cs-sub"></p>
+    <div class="cs-rows" id="cs-rows"></div>
+    <p class="cs-note" id="cs-note"></p>
+    <button class="btn-main" id="cs-close" type="button">记下了</button>
+  </div>
+</div>
+
+<!-- 突破确认（阶段三 S2）：先把成功率拆账、失败代价、闭关状态摊开，再让玩家确认 -->
+<div class="modal hidden" id="break-confirm-modal">
+  <div class="m-card t-card bc-card">
+    <h3 class="gold" id="bc-title">破境</h3>
+    <p class="t-desc" id="bc-sub"></p>
+    <div class="bc-parts" id="bc-parts"></div>
+    <p class="hint" id="bc-cost"></p>
+    <p class="hint" id="bc-cd"></p>
+    <p class="hint" id="bc-pill"></p>
+    <div class="bc-actions">
+      <button class="btn-plain" id="bc-cancel" type="button">再等等</button>
+      <button class="btn-main" id="bc-ok" type="button" disabled>确认破境</button>
+    </div>
+  </div>
+</div>
+
+<!-- 闭关归来 · 离线收益结算（放置游戏核心反馈：重进游戏先看这一屏收获；离线 ≥5 分钟才弹） -->
+<div class="modal hidden" id="off-modal">
+  <div class="m-card t-card off-card">
+    <div class="t-ico moon">☾</div>
+    <h3 class="gold">闭关归来</h3>
+    <p class="t-desc" id="off-dur"></p>
+    <div class="off-rows" id="off-rows"></div>
+    <p class="off-note" id="off-note"></p>
+    <!-- 信匣：你不在的这些天，山里发生的事（逐封拆阅，拆开的才算领走） -->
+    <div class="off-letters" id="off-letters"></div>
+    <button class="btn-main" id="off-close">收入囊中</button>
+  </div>
+</div>
+
+<!-- 灵兽诞生 · 孵化演出（猎妖拾蛋 → 灵兽园孵化：蛋壳摇晃→裂开→灵兽亮相；纯 CSS 零新图片） -->
+<div class="modal hidden" id="hatch-modal">
+  <div class="m-card t-card hatch-card">
+    <div class="hatch-stage" id="hatch-stage">
+      <div class="hatch-egg">
+        <i class="hatch-shell hl"></i><i class="hatch-shell hr"></i>
+      </div>
+      <img class="hatch-beast" id="hatch-beast" alt="">
+    </div>
+    <h3 class="gold" id="hatch-name">灵兽诞生</h3>
+    <p class="t-desc" id="hatch-desc"></p>
+    <button class="btn-main" id="hatch-close">收下它</button>
+  </div>
+</div>
+
+<!-- 主线《断天门》：不是入口，是"修行到某一步，它自己找上门"的浮片。
+     12 秒无人理会自动收（正文永久留在人物面板的履历里），点任意处或「继续」即收。 -->
+<div class="modal hidden" id="story-modal">
+  <div class="m-card t-card sto-card">
+    <span class="sto-echo" id="sto-ch"></span>
+    <h3 class="sto-name" id="sto-name"></h3>
+    <p class="sto-text" id="sto-text"></p>
+    <p class="sto-list" id="sto-list"></p>
+    <p class="sto-gain" id="sto-gain"></p>
+    <p class="sto-more" id="sto-more"></p>
+    <button class="btn-sub" id="sto-jump" type="button">去看履历</button>
+    <button class="btn-main" id="sto-close">继续</button>
+  </div>
+</div>
+
+<!-- 加载顺序：游戏核心 → 各建筑 view 模板 → 中央路由（启动时绑定场景/模态框） -->
+<script src="js/daily.js"></script>
+<script src="js/story.js"></script>
+<script src="js/net.js"></script>          <!-- 联机协议层（115 轮）：必须先于 game.js（其顶层挂结算钩子）；REST+SSE 客户端，纯逻辑不碰 DOM -->
+<script src="js/multi-ledger.js"></script> <!-- 联机结算幂等账（123 轮）：必须先于 game.js；纯逻辑，不碰 DOM/存储 -->
+<script src="js/multi-local.js"></script>  <!-- 阶段四 C3（D4 A2-LOCAL）：本地陪练五层引擎；必须先于 game.js；纯逻辑，常量逐项抄自 server/server.mjs，server/ 零改动 -->
+<script src="js/npc_art.js"></script>           <!-- NPC 立绘公共缓存（B3）：预加载 / 3 秒超时重试 / 本地兜底 / 四呈现位共用；缺失时各视图退回「碑」字块 -->
+<script src="js/game.js?v=20261121b3d"></script>
+<script src="js/trib.js"></script>
+<script src="js/npc_memory.js"></script>       <!-- NPC 记忆存储（独立键 jxwd_npc_memory_v1，不碰主存档；缺失时对话静默回退） -->
+<script src="js/npc_memory_voice.js"></script> <!-- NPC 称呼语气（按记忆分档；缺失/异常时静默回退） -->
+<script src="js/npc_tower.js"></script>        <!-- 崔九 · 守塔老卒（塔页内联对话；缺失/异常时塔页其余功能不受影响） -->
+<script src="js/npc_visit.js"></script>       <!-- NPC 主动事件队列（独立键 jxwd_npc_visit_v1；装配层 push、塔页渲染 take；缺失时塔页不受影响） -->
+<script src="js/npc.js"></script>
+<script src="js/npc_tri.js"></script>          <!-- 记忆 NPC 框架第一步：话题三态（纯逻辑；缺失时 npcPick 静默回落选项原文） -->
+<script src="js/npc_act.js"></script>          <!-- 记忆 NPC 框架第一步：主动触发四类节点 + 日额度（纯逻辑；缺失时不主动现身） -->
+<script src="js/npc_rel.js"></script>          <!-- 记忆 NPC 框架第二步：关系事件化 / 可失去 / 状态机 / 托付（纯逻辑；缺失时按旧行为） -->
+<script src="js/views/kit.js"></script>
+<script src="js/views/scripture.js?v=20261121b3"></script>
+<script src="js/views/cave.js?v=20261121b3"></script>
+<script src="js/views/sect.js"></script>
+<script src="js/views/chat.js"></script>
+<script src="js/views/bag.js"></script>
+<script src="js/views/role.js?v=20261121b3b"></script>
+<script src="js/views/beast.js"></script>
+<script src="js/views/tower.js"></script>
+<script src="js/views/multi.js"></script>       <!-- 组队秘境 · 联机面板（115 轮）：三态空壳，内容 game.js 事件驱动现填 -->
+<script src="js/views/event.js"></script>
+<script src="js/views/arena.js"></script>
+<script src="js/views/rank.js"></script>
+<script src="js/views/secret.js"></script>
+<script src="js/views/market.js"></script>
+<script src="js/views/life.js"></script>
+<script src="js/audio.js"></script>
+<!-- 太虚真人引导 V1（2026-11-11）：替换原 tutorial.js（其捕获点击监听是旧引导卡死根因）。
+     须置于 router.js 之前：router.js 末尾同步触发 boot() → finishBoot() 内的 Guide.init()。
+     guide_taixu.js 为自包含 IIFE，加载时不依赖 DOM，前移安全。 -->
+<script src="js/guide_taixu.js?v=20261120fix2"></script>
+<script src="js/router.js?v=20261121b3b"></script>
+
+</body>
+</html>

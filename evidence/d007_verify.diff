@@ -1,0 +1,22 @@
+--- js/D007_BACKUP_20261108_225456/verify.js	2026-11-08 23:42:04.518251900 +0800
++++ verify.js	2026-11-08 23:39:16.247375200 +0800
+@@ -652,6 +652,7 @@
+     L('itemNameMat', document.getElementById('it-name').textContent);
+     L('itemHasSell', !!document.querySelector('#it-acts [data-do="sell"]'));
+     L('itemSellTxt', (document.querySelector('#it-acts [data-do="sell"]') || {}).textContent || '');
++    L('itemSellDyn', XX._sellPrice('mat_core'));   /* A31：冻结打开详情那一刻的动态价，供后面同源校验 */
+     L('itemHasNoEat', !document.querySelector('#it-acts [data-do="eat"]'));
+     /* ---- 第 83 轮：物品详情四钮换水墨 PNG ----
+        img 数量 ≥3（装备/服食/寄售/丢弃 里材料档有 3 个）且按钮文字里不再夹 emoji：
+@@ -4057,7 +4058,10 @@
+   ok(F.itemModalClosed === 'yes', '详情框可关闭');
+   ok(F.itemNameMat === '妖丹', '材料详情显示「妖丹」');
+   ok(F.itemHasSell === 'true', '材料详情有「寄售」按钮');
+-  ok(/30/.test(F.itemSellTxt), '寄售按钮显示售价（' + F.itemSellTxt + '）');
++  /* A31：寄售按钮改显示坊市实收价（sellPrice，随境界/行情浮动），不再写 ITEMS 的固定标价。
++     断言同步升级为「与当时 _sellPrice 同源」的精确校验，而非硬编码 30。 */
++  ok(Number((((F.itemSellTxt || '').match(/[\d,]+/) || [''])[0]).replace(/,/g, '')) === Number(F.itemSellDyn),
++     '寄售按钮显示坊市实收价（与 _sellPrice 同源）', F.itemSellTxt + ' / ' + F.itemSellDyn);
+   ok(F.itemHasNoEat === 'true', '材料详情不显示「服食」');
+ 
+   /* ===== 第 83 轮 · 水墨图标（结构位去 emoji / 层序 / 查表兜底 / 文件存在） ===== */

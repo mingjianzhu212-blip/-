@@ -1,0 +1,8 @@
+{
+  "party": "Qoder CN",
+  "wakeAttemptAt": "2026-11-11T16:52:06.673Z",
+  "endpoint": "http://127.0.0.1:7331/jsonrpc",
+  "error": "Error: connect ECONNREFUSED 127.0.0.1:7331",
+  "callId": null,
+  "result": "WAKE_FAILED"
+}

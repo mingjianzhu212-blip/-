@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: K11-1 consign 成功：物品 LISTED、listings 可见、灵石未动
+ok 1 - K11-1 consign 成功：物品 LISTED、listings 可见、灵石未动
+  ---
+  duration_ms: 184.9402
+  type: 'test'
+  ...
+# Subtest: K11-2 buy 成功：余额变更 + 物品转移 + 挂单关闭
+ok 2 - K11-2 buy 成功：余额变更 + 物品转移 + 挂单关闭
+  ---
+  duration_ms: 0.371
+  type: 'test'
+  ...
+# Subtest: K11-3 幂等：同 idempotencyId 重复购买只生效一次
+ok 3 - K11-3 幂等：同 idempotencyId 重复购买只生效一次
+  ---
+  duration_ms: 0.1546
+  type: 'test'
+  ...
+# Subtest: K11-4 余额不足：购买被拒且不改账
+ok 4 - K11-4 余额不足：购买被拒且不改账
+  ---
+  duration_ms: 0.3984
+  type: 'test'
+  ...
+# Subtest: K11-5 并发购买同挂单：至多一次成交
+ok 5 - K11-5 并发购买同挂单：至多一次成交
+  ---
+  duration_ms: 0.2413
+  type: 'test'
+  ...
+# Subtest: K11-6 撤单：物品回 IDLE、挂单关闭、不可再购
+ok 6 - K11-6 撤单：物品回 IDLE、挂单关闭、不可再购
+  ---
+  duration_ms: 0.2136
+  type: 'test'
+  ...
+# Subtest: K11-7 越界：物品不存在/非持有人挂单/非持有人撤单一律拒绝
+ok 7 - K11-7 越界：物品不存在/非持有人挂单/非持有人撤单一律拒绝
+  ---
+  duration_ms: 0.1607
+  type: 'test'
+  ...
+# Subtest: K11-HTTP 路由接线：listings 返回 ok、consign 无物品被拒、buy 无挂单被拒
+ok 8 - K11-HTTP 路由接线：listings 返回 ok、consign 无物品被拒、buy 无挂单被拒
+  ---
+  duration_ms: 15.635
+  type: 'test'
+  ...
+# Subtest: K11-HTTP 鉴权：无 token 的 consign 被拒
+ok 9 - K11-HTTP 鉴权：无 token 的 consign 被拒
+  ---
+  duration_ms: 2.0686
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 439.7878

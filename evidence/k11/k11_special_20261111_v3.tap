@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: K11-1 consign 成功：物品 LISTED、listings 可见、灵石未动
+ok 1 - K11-1 consign 成功：物品 LISTED、listings 可见、灵石未动
+  ---
+  duration_ms: 183.766
+  type: 'test'
+  ...
+# Subtest: K11-2 buy 成功：余额变更 + 物品转移 + 挂单关闭
+ok 2 - K11-2 buy 成功：余额变更 + 物品转移 + 挂单关闭
+  ---
+  duration_ms: 0.6781
+  type: 'test'
+  ...
+# Subtest: K11-3 幂等：同 idempotencyId 重复购买只生效一次
+ok 3 - K11-3 幂等：同 idempotencyId 重复购买只生效一次
+  ---
+  duration_ms: 0.186
+  type: 'test'
+  ...
+# Subtest: K11-4 余额不足：购买被拒且不改账
+ok 4 - K11-4 余额不足：购买被拒且不改账
+  ---
+  duration_ms: 0.4058
+  type: 'test'
+  ...
+# Subtest: K11-5 并发购买同挂单：至多一次成交
+ok 5 - K11-5 并发购买同挂单：至多一次成交
+  ---
+  duration_ms: 0.2081
+  type: 'test'
+  ...
+# Subtest: K11-6 撤单：物品回 IDLE、挂单关闭、不可再购
+ok 6 - K11-6 撤单：物品回 IDLE、挂单关闭、不可再购
+  ---
+  duration_ms: 0.1969
+  type: 'test'
+  ...
+# Subtest: K11-7 越界：物品不存在/非持有人挂单/非持有人撤单一律拒绝
+ok 7 - K11-7 越界：物品不存在/非持有人挂单/非持有人撤单一律拒绝
+  ---
+  duration_ms: 0.1616
+  type: 'test'
+  ...
+# Subtest: K11-8 幂等键绑定身份：不同买家复用同客户 ID 各自独立成交
+ok 8 - K11-8 幂等键绑定身份：不同买家复用同客户 ID 各自独立成交
+  ---
+  duration_ms: 0.3264
+  type: 'test'
+  ...
+# Subtest: K11-9 严格整数校验：非正整数价格/数量被拒
+ok 9 - K11-9 严格整数校验：非正整数价格/数量被拒
+  ---
+  duration_ms: 0.4198
+  type: 'test'
+  ...
+# Subtest: K11-9b 严格类型：字符串型价格/数量被拒
+ok 10 - K11-9b 严格类型：字符串型价格/数量被拒
+  ---
+  duration_ms: 0.2647
+  type: 'test'
+  ...
+# Subtest: K11-10 失败原子回滚：入账异常后一致态可重试，不双扣不免费物品
+ok 11 - K11-10 失败原子回滚：入账异常后一致态可重试，不双扣不免费物品
+  ---
+  duration_ms: 0.2565
+  type: 'test'
+  ...
+# Subtest: K11-11 幂等记录容量受控：超限自动回收最旧键（真实 LRU）
+ok 12 - K11-11 幂等记录容量受控：超限自动回收最旧键（真实 LRU）
+  ---
+  duration_ms: 1.6187
+  type: 'test'
+  ...
+# Subtest: K11-12 补偿失败不重开：卖家扣回失败时挂单进入 failed 且卖家余额未回退
+ok 13 - K11-12 补偿失败不重开：卖家扣回失败时挂单进入 failed 且卖家余额未回退
+  ---
+  duration_ms: 0.3009
+  type: 'test'
+  ...
+# Subtest: K11-13 部分写入后异常：余额守卫补偿使资金完全恢复，挂单回到 open
+ok 14 - K11-13 部分写入后异常：余额守卫补偿使资金完全恢复，挂单回到 open
+  ---
+  duration_ms: 0.2468
+  type: 'test'
+  ...
+# Subtest: K11-14 总容量边界：挂单总数严格 ≤ MAX_LISTINGS(1000)，超限回收最旧非在售记录
+ok 15 - K11-14 总容量边界：挂单总数严格 ≤ MAX_LISTINGS(1000)，超限回收最旧非在售记录
+  ---
+  duration_ms: 13.7913
+  type: 'test'
+  ...
+# Subtest: K11-14b 在售容量与全满拒绝：open 达 500 拒挂；全为非 evictable 时拒挂
+ok 16 - K11-14b 在售容量与全满拒绝：open 达 500 拒挂；全为非 evictable 时拒挂
+  ---
+  duration_ms: 4.3561
+  type: 'test'
+  ...
+# Subtest: K11-15 部分数量出售：挂 3/10，买 3 后整栈归属买家、剩余 7 归买家持有
+ok 17 - K11-15 部分数量出售：挂 3/10，买 3 后整栈归属买家、剩余 7 归买家持有
+  ---
+  duration_ms: 0.2113
+  type: 'test'
+  ...
+# Subtest: K11-HTTP 路由接线：listings 返回 ok、consign 无物品被拒、buy 无挂单被拒
+ok 18 - K11-HTTP 路由接线：listings 返回 ok、consign 无物品被拒、buy 无挂单被拒
+  ---
+  duration_ms: 16.1326
+  type: 'test'
+  ...
+# Subtest: K11-HTTP 鉴权：无 token 的 consign 被拒
+ok 19 - K11-HTTP 鉴权：无 token 的 consign 被拒
+  ---
+  duration_ms: 2.0648
+  type: 'test'
+  ...
+# Subtest: K11-HTTP-P1-4 真实端到端：seed→挂单→购买→余额/归属核对 + 公开 DTO 无 token
+ok 20 - K11-HTTP-P1-4 真实端到端：seed→挂单→购买→余额/归属核对 + 公开 DTO 无 token
+  ---
+  duration_ms: 17.9428
+  type: 'test'
+  ...
+# Subtest: K11-HTTP-R3 生产隔离：无 TEST_MODE 时 seed/grant/ownership 均 404
+ok 21 - K11-HTTP-R3 生产隔离：无 TEST_MODE 时 seed/grant/ownership 均 404
+  ---
+  duration_ms: 217.8102
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 659.8421

@@ -1,0 +1,32 @@
+# ===== 红线：绝不进仓 =====
+server/data/
+server/config.json
+*.zip
+
+# ===== 本机生成物 / 临时产物（整树备份在 D:/xx-scratch/backup，不进仓） =====
+scratch/
+screenshot/
+tools/evidence/
+tools/ui-accept-shots/
+._*
+*.tmp
+*.log
+cloudflared*.log
+
+# ===== 历史备份（源码以当前文件为准） =====
+*.bak
+*.bak_*
+*_BACKUP*/
+D_PHASE_BACKUP_*/
+D0*_BACKUP_*/
+pre_*/**
+
+# ===== 系统杂项 =====
+.DS_Store
+Thumbs.db
+# Windows 保留名文件（历史误落盘，不删不搬，忽略）
+/nul
+
+# 冒烟/验收截图目录（生成物）
+.smoke/
+shot/

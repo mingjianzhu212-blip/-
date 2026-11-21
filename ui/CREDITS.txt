@@ -1,0 +1,13 @@
+九霄问道 第三方资源说明（CREDITS）
+================================
+字体：
+  Ma Shan Zheng / ZCOOL XiaoWei
+    ← Google Fonts · SIL Open Font License 1.1（可免费商用，无需署名）
+
+背景图 bg.jpg：用户自有素材
+
+物品图标（ui/icons/*.svg）：
+  丹丸 / 功法书 / 灵石 / 法宝 / 灵草 / 矿石 / 丹炉 等
+    ← 用户原创 SVG（中国风描金手绘），完全归用户所有，可商用、无需署名。
+
+（此前使用的 Kyrise 16x16 RPG Icon Pack 像素图标已弃用，CC-BY 署名义务随之解除。）

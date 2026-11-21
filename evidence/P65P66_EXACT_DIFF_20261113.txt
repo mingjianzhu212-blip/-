@@ -1,0 +1,129 @@
+--- js/game.js.bak_20261112_p1c_domfix	2026-11-12 14:55:58.976907900 +0800
++++ js/game.js	2026-11-12 21:28:57.038840000 +0800
+@@ -3847,8 +3847,12 @@
+     try{ log('⚠️ 已导入新存档，但页面尚未重新载入：现在的进度不会被保存。请尽快刷新页面（Ctrl+R）。', 'bad'); }catch(e){}
+     try{ if(typeof window.showToast === 'function') window.showToast('⚠️ 导入后需刷新才生效，当前进度不会保存'); }catch(e){}
+   }
+-  /* P1-C（D1=(a)，2026-11-12）：单机道途 ID 与伤害乘子。ID 对齐联机枚举；乘子为机制占位（≤8%），
+-     最终平衡待专项 pass。PATH_BONUS 独立于 server AXIS_GRANTS（不同系统不混用，GPT 审查①）。
++  /* P1-C（D1=(a)，2026-11-12 → 2026-11-13 平衡定版 v1）：单机道途 ID 与伤害乘子。
++     ID 对齐联机枚举；乘子经专项平衡 pass 首版定版（祝 2026-11-12 授权「平衡pass」追认定版）。
++     上限 ≤8%，实际区间 [0%, +6%]（sword 基准 0%，body/dan/array 依次 +5%/+4%/+6%），
++     刻意压窄以避免单一道途在伤害轴上严格占优；道途差异主要通过技能/共鸣体系体现，
++     本乘子仅作身份微调，不压倒 combatPower/共鸣缩放。后续仍可按实战遥测微调（专项 pass 续推）。
++     PATH_BONUS 独立于 server AXIS_GRANTS（不同系统不混用，GPT 审查①）。
+      冻结于模块作用域：load()/multiLoadPath()/openBattleAnim() 均可见且不可变（GPT 审查⑥）。 */
+   const PATH_IDS = Object.freeze(['sword','body','dan','array']);
+   const PATH_BONUS = Object.freeze({ sword: 1.00, body: 1.05, dan: 1.04, array: 1.06 });
+@@ -7323,11 +7327,30 @@
+   function multiSrvRemember(addr){
+     try{ addr ? localStorage.setItem(MULTI_SRV_KEY, addr) : localStorage.removeItem(MULTI_SRV_KEY); }catch(e){}
+   }
+-  /* P0-C：联机会话持久化（独立键，不进主存档）。刷新后能凭 token 回原队。
+-     只在 connect 成功与进出房间时落地；主动离开/转世/重开清空。 */
++  /* 红线①（2026-11-13 安全加固，客户端侧）：联机会话持久化（独立键，不进主存档）。
++     刷新后能凭 token 回原队；只在 connect 成功与进出房间时落地；主动离开/转世/重开清空。
++     安全约束（依据 evidence/TOKEN_SECURITY_DESIGN_20261112.md，客户端侧可落地部分）：
++       - savedAt + TTL：写入带时间戳，超过最大续接窗口（30 天）视为失效，不再发死 token、不无限重试。
++       - 续接失败区分网络错误（TIMEOUT/NETWORK/STREAM_FAIL）与 token 失效：网络错不清凭据、允许稍后重试；
++         token 失效才清键并提示重登（防「死 token 无限重试」循环，Muse 原件点名）。
++       - 登出清理顺序：先 post leave 通知服务端，再清本地键（disconnect/多标签一致）；绝不删除游戏主存档/角色数据（红线③）。
++       - 多标签竞态：监听 storage 事件，任一标签清键后其它标签同步断连，避免死 token 被另一标签续上。
++       - 不把 token 写进日志/调试输出（XSS 防护：localStorage 本身仍可被注入读走，属已知缺口，待服务端会话失效+HttpOnly 迁移）。 */
+   const MULTI_SESSION_KEY = 'jxwd_multi_session_v1';
++  const MULTI_SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 天最大续接窗口（红线①）
+   function multiLoadSession(){
+-    try{ const s = localStorage.getItem(MULTI_SESSION_KEY); return s ? JSON.parse(s) : null; }catch(e){ return null; }
++    try{
++      const s = localStorage.getItem(MULTI_SESSION_KEY);
++      if(!s) return null;
++      const o = JSON.parse(s);
++      if(!o || typeof o !== 'object') return null;
++      /* 过期（写入过久）即视为失效，等同缺失——不发旧 token 续接、不无限重试 */
++      if(typeof o.savedAt === 'number' && Date.now() - o.savedAt > MULTI_SESSION_TTL){
++        try{ localStorage.removeItem(MULTI_SESSION_KEY); }catch(e){}
++        return null;
++      }
++      return o;
++    }catch(e){ return null; }
+   }
+   function multiSaveSession(partial){
+     try{
+@@ -7336,12 +7359,49 @@
+       if(partial.name !== undefined) s.name = partial.name;
+       if(partial.base !== undefined) s.base = partial.base;
+       if(partial.roomId !== undefined) s.roomId = partial.roomId;
++      s.savedAt = Date.now();   // 每次落地刷新时间戳（红线① TTL）
+       localStorage.setItem(MULTI_SESSION_KEY, JSON.stringify(s));
+     }catch(e){}
+   }
+   function multiClearSession(){
+     try{ localStorage.removeItem(MULTI_SESSION_KEY); }catch(e){}
+   }
++  /* 续接失败是否属网络层错误（不清凭据）；其余（token 失效/被踢/拒绝）应清键重登 */
++  function multiIsNetworkError(r){
++    if(!r) return false;
++    if(r.code === 'TIMEOUT' || r.code === 'NETWORK' || r.code === 'STREAM_FAIL') return true;
++    if(typeof r.error === 'string' && (r.error.indexOf('超时') >= 0 || r.error.indexOf('没响应') >= 0)) return true;
++    return false;
++  }
++  /* 红线①：登出/清会话统一入口，按原因区分但不混为同一种清理。
++     顺序：先通知服务端 leave（若在线），再清本地键；绝不删游戏主存档/角色数据。
++     reason: 'logout'(主动登出) | 'expired'(过期) | 'revoked'(被撤销) | 'lifecycle'(转世/重开) */
++  function multiLogout(reason){
++    reason = reason || 'logout';
++    const finish = function(){ try{ multiClearSession(); }catch(e){} };
++    if(window.Net && Net.state && Net.state() !== 'offline' && Net.me && Net.me()){
++      try{
++        /* 先 leave 通知服务端，再清本地（顺序约束）；leave 失败不阻塞清理 */
++        Net.api('/api/room/leave').catch(function(){}).then(function(){ finish(); });
++        return;
++      }catch(e){ /* 落到 finish */ }
++    }
++    finish();
++  }
++  /* 红线①：多标签竞态保护。任一标签登出/清会话后，其它标签同步断连，
++     避免「死 token 被另一未察觉的标签续上」。storage 事件只在发生变更的"其它"标签触发。 */
++  let multiStorageHooked = false;
++  function hookMultiStorage(){
++    if(multiStorageHooked || typeof window === 'undefined' || !window.addEventListener) return;
++    multiStorageHooked = true;
++    window.addEventListener('storage', function(e){
++      if(e && e.key === MULTI_SESSION_KEY && (!e.newValue || e.newValue === '')){
++        if(window.Net && Net.state && Net.state() !== 'offline'){
++          try{ Net.disconnect(); }catch(_){}
++        }
++      }
++    });
++  }
+   /* P1-A：道途偏好（只是"下次连服务时报哪个"，不是权威值；权威在服务器 player.path） */
+   function multiLoadPath(){
+     // P1-C：本源为 S.path；未选('')返回 ''（触发补选），不回退旧缓存、不默认 sword（GPT 审查矛盾 A）
+@@ -7381,6 +7441,7 @@
+   }
+ 
+   function multiEnter(){
++    hookMultiStorage();   // 红线①：多标签竞态保护（幂等注册；存储变更在其它标签触发）
+     if(window.Net && Net.state() !== 'offline' && !multiNetHooked){ hookMultiNet(); }
+     /* P0-C：刷新后若仍有"在房间内"的上次联机会话，自动续接回原队（不再让用户重登重进） */
+     if(window.Net && Net.state() === 'offline'){
+@@ -7388,7 +7449,18 @@
+       if(s && s.token && s.base && s.roomId){
+         log('📡 正在重接连机服务，回到上次的队伍…', 'note');
+         Net.connect(s.base, s.name || '道友', multiPower(), s.token, multiSnapshot(), multiLoadPath()).then(r => {
+-          if(!r.ok){ multiClearSession(); log('📡 重连失败：' + (r.error || '服务没响应') + '（点登录可重新连）', 'note'); renderMulti(); bindMultiDom(); return; }
++          if(!r.ok){
++            /* 红线①：区分网络错误与 token 失效。
++               网络层错误（TIMEOUT/NETWORK/服务暂不可达）不清凭据——允许稍后重连，不无限重试死 token；
++               token 失效（服务器拒绝续接）才清键并提示重登。 */
++            if(multiIsNetworkError(r)){
++              log('📡 重连未成功（网络/服务暂不可达）：' + (r.error || '服务没响应') + '，稍后再试。', 'note');
++            } else {
++              multiClearSession();
++              log('📡 联机会话已失效，请重新登录。', 'bad');
++            }
++            renderMulti(); bindMultiDom(); return;
++          }
+           hookMultiNet();
+           if(r.me && r.me.path){
+             /* GPT 代码审查③：r.me.path 先白名单校验；冲突须实际登记、不污染缓存 */

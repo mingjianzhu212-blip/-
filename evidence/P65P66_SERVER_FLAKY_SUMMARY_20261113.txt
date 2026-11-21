@@ -1,0 +1,57 @@
+# P65/P66 服务端测试独立复跑汇总（2026-11-13）
+# 命令：node --test server/*.test.mjs（每次独立进程、完整输出分别留存 P65P66_SERVER_FLAKY1/2/3.txt）
+
+--- RUN1 ---
+# tests 128
+# suites 0
+# pass 128
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6371.7203
+not_ok_count=0
+--- RUN2 ---
+# tests 128
+# suites 0
+# pass 128
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6381.9414
+not_ok_count=0
+--- RUN3 ---
+# tests 128
+# suites 0
+# pass 128
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6665.1091
+not_ok_count=0
+
+--- 全量复跑 P65P66_SERVER_FULL_20261113.txt ---
+# tests 128
+# pass 128
+# fail 0
+# duration_ms 6433.8565
+
+--- 首次异常（P65P66_RAW_TEST_OUTPUT_20261113.txt 第 55-70 行，如实保留）---
+### node --test server/*.test.mjs
+  duration_ms: 0.1321
+  type: 'test'
+  ...
+# Subtest: grantRun 负数/NaN 层数视为 0
+ok 128 - grantRun 负数/NaN 层数视为 0
+  ---
+  duration_ms: 0.1184
+  type: 'test'
+  ...
+1..128
+# tests 128
+# suites 0
+# pass 119
+# fail 9
+# cancelled 0

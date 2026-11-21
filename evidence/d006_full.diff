@@ -1,0 +1,1381 @@
+############ index.html
+# 基线SHA256 088093e5d20db5807e485022895820aed1d28912dd0d96ecfc60c1d20abd304d  当前SHA256 f67d9ac3d1e71ff4405b92c05f4b8d2ff5d00a672448e96ffcf35b115d4536c1
+--- index.html.bak_20261108_182924_preD006	2026-11-08 17:54:05.298469400 +0800
++++ index.html	2026-11-08 18:31:40.188523100 +0800
+@@ -552,8 +552,13 @@
+ <script src="js/views/market.js"></script>
+ <script src="js/views/life.js"></script>
+ <script src="js/audio.js"></script>
+-<script src="js/router.js"></script>
++<!-- tutorial.js 必须在 router.js 之前：router.js 末尾是同步执行的 XX.boot()，
++     有存档时它会直接走到 finishBoot() 里的 `if(window.Tutorial) window.Tutorial.start()`。
++     原先顺序反过来 → 那一刻 Tutorial 还没被解析 → 静默跳过（全库仅此一个 start 调用点）。
++     后果：引导中途刷新/关页重开，引导永不再出现、hasFinishedTutorial 永不写入、
++     连同兜底的 100 灵石一起丢失。tutorial.js 是自包含 IIFE、加载时不碰 DOM，前移安全。 -->
+ <script src="js/tutorial.js"></script>
++<script src="js/router.js"></script>
+ 
+ </body>
+ </html>
+############ js/daily.js
+# 基线SHA256 4ecc3378d9f344e22ea94d5214ad58b13a4ca7b8b59248e017b02b74b73004e6  当前SHA256 69967aa10ea448f9c17dafa3f3a08d532c133fbb4c889054f0b225235b245393
+--- js/daily.js.bak_20261108_182924_preD006	2026-10-20 00:31:04.000000000 +0800
++++ js/daily.js	2026-11-08 20:35:20.097887800 +0800
+@@ -5,6 +5,15 @@
+      prog    各任务当日进度（封顶 goal，不会溢出）
+      claimed 当日已领取奖励的任务 id（防重复领取）
+    接入：动作发生处 Daily.bump(kind)；UI 处 Daily.list() / Daily.claim(id)
++   ===========================================================================
++   ⚠️ 系统时间防护的【保证范围】——请按这个说法对外描述，别写成"防作弊"：
++
++   这套"严格递增日期"（todayNo/dayNo）只解决两件事：
++     1) 把系统日期**往回**改，不会白拿一次重置（旧实现用 `!==`，回拨即重置）；
++     2) 同一天内重复触发不会反复重置。
++   它**不能**阻止玩家把系统时间连续向未来推进（8→9→10→11…每次都是"更晚的一天"）。
++   客户端无法证明现实真的过了一天 —— 要真正防这一类，必须由服务端或其他可信时间源下发时间；
++   单机档在离线状态下做不到。所以本模块的定位是「防误操作 / 防回拨」，不是「防作弊」。
+    =========================================================================== */
+ (function(){
+   'use strict';
+@@ -18,27 +27,71 @@
+   const DAILY_TASKS = [
+     { id:'sit',   name:'打坐练气',   icon:'🧘', goal:10, stoneK:0.8, wisdom:50 },
+     { id:'train', name:'外出历练',   icon:'⚔️', goal:3,  stoneK:1.2, wisdom:50 },
+-    { id:'tower', name:'挑战镇妖塔', icon:'🗼', goal:1,  stoneK:2.0, wisdom:80 }
++    /* 文案与机制对齐：game.js 只在 trunEnd 的胜利分支 bump('tower')，
++       输几场永远 0/1。任务名原写「挑战镇妖塔」承诺的是"参与"，改成通关口径。 */
++    { id:'tower', name:'通关镇妖塔', icon:'🗼', goal:1,  stoneK:2.0, wisdom:80 }
+   ];
+ 
+   /* ---- 依赖注入：game.js boot 时传入，避免加载顺序耦合 ---- */
+   let H = null;
+   function init(hooks){
+     H = hooks || {};
++    /* ⚠️ load / ensureDay / recoverPending 必须**整段**在同一把锁里。
++       只给 recoverPending 加锁是不够的：load() 与 ensureDay() 一样会读写 st（跨天时还会 save()），
++       两个标签页同时启动、其中一个正在领取时，它们仍可能与领取的存储更新交错，
++       甚至用旧状态盖掉刚写下的新状态。 */
++    const p = withClaimLock(() => {
++      load();
++      ensureDay();
++      return recoverPending();
++    });
++    if(p) return p.catch(() => 0);
++    /* 无 Web Locks：**只 load()，一个字节都不写**。
++       不能在这里调 ensureDay() —— 它跨天时会 save()，那就成了"无锁条件下写共享状态"，
++       与 claim() 在该环境下的 NO_LOCK 拒绝策略自相矛盾（一边禁写一边在启动时写）。
++       跨天后的展示由 list()/allClaimed() 用只读快照处理（见 dayRolled），不落盘。 */
+     load();
+-    ensureDay();
++    return Promise.resolve(0);
+   }
+ 
+-  /* ---- 日期键（本地时区 年-月-日） ---- */
++  /* 所有会碰 st 的入口共用这一把锁（init / claim / 启动恢复），避免出现两套锁逻辑。 */
++  function withClaimLock(fn){
++    const nav = (typeof navigator !== 'undefined') ? navigator : null;
++    if(!(nav && nav.locks && typeof nav.locks.request === 'function')) return null;
++    return nav.locks.request(CLAIM_LOCK, fn);
++  }
++  /* 只读的跨天判定：不改 st、不写盘。true = 按今日口径应视为"已重置"。
++     顺带做一次只读自愈：未 init 时先 load()（load 只读盘、不 save），
++     免得渲染路径因为 st 还是 null 而抛错。 */
++  function dayRolled(){
++    if(!st) load();
++    if(!st) return false;
++    return dayNo(st.day) < todayNo();
++  }
++
++  /* ---- 日期键与可比日序号 ----
++     todayKey 必须补零：旧实现输出 `2026-11-8`，字符串比较时 '2026-11-8' > '2026-11-10'，
++     任何"日期是否往后走了"的判定都会在 8~9 号与 10~31 号之间反过来。
++     dayNo 把 Y-M-D 折成 YYYYMMDD 整数，兼容补零 / 不补零两种历史写入。 */
++  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+   function todayKey(){
+     const d = new Date();
+-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
++    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
++  }
++  function todayNo(){
++    const d = new Date();
++    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
++  }
++  function dayNo(s){
++    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s == null ? '' : s));
++    if(!m) return 0;
++    return (+m[1]) * 10000 + (+m[2]) * 100 + (+m[3]);
+   }
+ 
+   /* ---- 状态读写 ---- */
+   let st = null;
+   function blank(){
+-    const s = { day: todayKey(), prog: {}, claimed: [] };
++    const s = { day: todayKey(), prog: {}, claimed: [], pending: {} };
+     DAILY_TASKS.forEach(t => { s.prog[t.id] = 0; });
+     return s;
+   }
+@@ -50,74 +103,215 @@
+     sanitize();
+   }
+   function save(){
+-    try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){}
++    try{ localStorage.setItem(KEY, JSON.stringify(st)); return true; }catch(e){ return false; }
+   }
+-  /* 脏数据清洗：prog 只认非负整数（封顶 goal），claimed 只认合法任务 id */
++  /* 脏数据清洗：prog 只认非负有限整数（封顶 goal），claimed 只认合法且不重复的任务 id */
+   function sanitize(){
+-    if(!st || typeof st !== 'object'){ st = blank(); return; }
++    if(!st || typeof st !== 'object' || Array.isArray(st)){ st = blank(); return; }
+     if(typeof st.day !== 'string') st.day = '';
+     if(!st.prog || typeof st.prog !== 'object') st.prog = {};
+     if(!Array.isArray(st.claimed)) st.claimed = [];
+     DAILY_TASKS.forEach(t => {
+       const v = st.prog[t.id];
+-      st.prog[t.id] = (typeof v === 'number' && v >= 0) ? Math.min(t.goal, Math.floor(v)) : 0;
++      /* 必须 Number.isFinite：JSON.parse('{"sit":1e999}') 得到 Infinity，
++         而 typeof 仍是 'number'、v >= 0 也成立 → 旧写法会让三个任务立刻显示"可领"。
++         侧车导入路径 restoreSidecar 对内容零校验、原样 setItem，这条必须自己挡住。 */
++      st.prog[t.id] = (typeof v === 'number' && Number.isFinite(v) && v >= 0) ? Math.min(t.goal, Math.floor(v)) : 0;
++    });
++    /* 去重：claimed 里出现重复 id 会让 allClaimed()（旧实现按数组长度判定）谎报"今日已完成" */
++    st.claimed = st.claimed.filter((id, i, arr) =>
++      DAILY_TASKS.some(t => t.id === id) && arr.indexOf(id) === i);
++    /* 待入账记录（崩溃补发用）：这里只校验**键的格式**。
++       "任务 id 是否真的存在"留给 recoverPending 判定 —— 那边清掉时会留一条控制台记录，
++       若在这里一并删掉，就永远看不到"有过一条认不出的记录"这条线索了。 */
++    if(!st.pending || typeof st.pending !== 'object' || Array.isArray(st.pending)) st.pending = {};
++    Object.keys(st.pending).forEach(cid => {
++      if(!/^[a-z]{2,8}@\d{4}-\d{1,2}-\d{1,2}$/.test(cid)) delete st.pending[cid];
+     });
+-    st.claimed = st.claimed.filter(id => DAILY_TASKS.some(t => t.id === id));
+   }
+ 
+-  /* ---- 跨天重置：日期键与今天不同 → 进度与领取记录全部清零 ---- */
++  /* ---- 跨天重置：只有"日期确实往后走了"才清零 ----
++     旧实现只判 `!==`，于是把系统日期往前/往后改一下就能反复触发重置 → 日常奖励无限刷；
++     而且主档的行动次数（S.actDay）用的是同一套键，连"打坐 30 次/天"的日上限都会一起复位。
++     现在的规则：
++       · 同一天（含旧格式补零差异）→ 只规范化 day 字段，不重置
++       · 日期读不出来（脏档）→ 只记今天，不重置（绝不白送一次重置）
++       · 今天晚于记录日 → 正常重置
++       · 今天早于记录日（系统时间回拨）→ 不重置、也不覆盖记录日，已得进度原样保留 */
+   function ensureDay(){
+-    if(st.day !== todayKey()){
+-      st.day = todayKey();
++    /* 自愈：未 init（或 st 被外部置空）时先读一次盘。
++       否则 renderEvent → Daily.list() 会直接 TypeError，整块 render 崩掉 ——
++       目前靠"Daily.init 排在一切 render 之前"这条隐性约定兜着，太脆。 */
++    if(!st) load();
++    const tk = todayKey();
++    const tn = todayNo();
++    const sd = dayNo(st.day);
++    if(sd === tn){
++      if(st.day !== tk){ st.day = tk; save(); }
++      return;
++    }
++    if(sd === 0){ st.day = tk; save(); return; }
++    if(tn > sd){
++      st.day = tk;
+       DAILY_TASKS.forEach(t => { st.prog[t.id] = 0; });
+       st.claimed = [];
+       save();
+     }
+   }
+ 
+-  /* ---- 进度累加：动作发生时调用；kind 不在任务表中则忽略 ---- */
++  /* ---- 进度累加：动作发生时调用；kind 不在任务表中则忽略 ----
++     这是会改 st 并落盘的路径，必须与 claim / init 走**同一把锁**：
++     否则会出现"A 页 claim 读旧进度 → B 页 bump 写新进度 → A 页用旧状态把领取结果写回"，
++     把 B 刚写下的进度覆盖掉。 */
+   function bump(kind, n){
+-    ensureDay();
+     const t = DAILY_TASKS.find(x => x.id === kind);
+-    if(!t) return;
+-    const add = (typeof n === 'number' && n > 0) ? Math.floor(n) : 1;
+-    st.prog[kind] = Math.min(t.goal, (st.prog[kind] || 0) + add);
+-    save();
++    if(!t) return Promise.resolve({ ok:false, msg:'任务不存在' });
++    const add = (typeof n === 'number' && Number.isFinite(n) && n > 0) ? Math.floor(n) : 1;
++    const doBump = () => {
++      load();                       /* 锁内重读，以磁盘为准 */
++      ensureDay();
++      st.prog[kind] = Math.min(t.goal, (st.prog[kind] || 0) + add);
++      save();
++      return { ok:true, prog: st.prog[kind] };
++    };
++    const p = withClaimLock(doBump);
++    if(p) return p.catch(() => ({ ok:false, msg:'进度记录失败，请重试' }));
++    /* 无 Web Locks：**不做无保护写入**。
++       "load → 改 → save" 是读改写序列，跨标签页不是原子操作：两个标签页同时累积同一任务时，
++       后写者会用旧基数覆盖前者（进度静默变少）。bump 函数本身同步执行并不能让这段变成原子。
++       所以这里明确拒绝，把结果交给 UI 提示一次 —— 不假装已经记下。 */
++    return Promise.resolve({
++      ok:false,
++      code:'NO_LOCK',
++      msg:'当前浏览器不支持安全的多窗口记录，本次任务进度未保存。'
++    });
+   }
+ 
+-  /* ---- 任务状态查询（供 UI 渲染） ---- */
++  /* ---- 任务状态查询（供 UI 渲染） ----
++     ⚠️ 渲染路径**一律只读**，绝不在这里调 ensureDay()（它跨天会 save()）。
++     `hasLock()` 只能说明"浏览器支持 Web Locks"，不能说明"当前已在临界区"——
++     所以不能用 hasLock() 当"可以安全写盘"的判据。跨天重置只发生在
++     init / claim / bump 这三个锁内路径里；这里只用只读快照把展示值按今日口径呈现。 */
+   function list(){
+-    ensureDay();
++    const rolled = dayRolled();
+     return DAILY_TASKS.map(t => ({
+       id: t.id, name: t.name, icon: t.icon, goal: t.goal,
+-      prog: st.prog[t.id] || 0,
+-      done: (st.prog[t.id] || 0) >= t.goal,
+-      claimed: st.claimed.indexOf(t.id) >= 0
++      prog: rolled ? 0 : (st.prog[t.id] || 0),
++      done: rolled ? false : (st.prog[t.id] || 0) >= t.goal,
++      claimed: rolled ? false : st.claimed.indexOf(t.id) >= 0
+     }));
+   }
+ 
+   /* ---- 领取奖励：进度满且未领 → 灵石 + 悟道值 ----
+-     校验顺序：任务存在 → 未领取 → 进度满 → 发奖 → 记账 */
+-  function claim(id){
++     ⚠️ 跨标签页必须互斥，且互斥要盖住「读盘 → 检查 → 发奖 → 写盘」整段。
++     只在开头多调一次 load() 是不够的：两个标签页可以同时读到"未领取"、
++     同时通过检查、各发一次奖（localStorage 单次 get/set 是同步的，但整段不是原子的）。
++     实现见下面 claim()。*/
++  function doClaim(id){
++    /* 锁内重读：以磁盘为准，不用本页可能过期的内存态 */
++    load();
+     ensureDay();
++    /* 先把上次"标记已落盘、奖励未入账"的补上（同一把锁内，不会与并发领取交错） */
++    recoverPending();
+     const t = DAILY_TASKS.find(x => x.id === id);
+     if(!t) return { ok:false, msg:'任务不存在' };
+     if(st.claimed.indexOf(id) >= 0) return { ok:false, msg:'今日已领取' };
+     if((st.prog[id] || 0) < t.goal) return { ok:false, msg:'进度未满' };
+-    /* 灵石 = 境界需求 × stoneK；悟道值 = wisdomGain(基础值)（×境界系数） */
+-    const stone  = Math.floor(H.needOf(H.rank()) * t.stoneK);
+-    const wisdom = H.wisdomGain(t.wisdom);
+-    H.grant({ stone: stone, wisdom: wisdom });
++    const claimId = id + '@' + todayKey();
++
++    /* 第 1 次写盘：把「已领取」和「这笔待入账」写进**同一个** jxwd_daily_v1（单次 setItem）。
++       ⚠️ 待入账记录里**只存"哪一笔、什么时候"**，不存金额：
++       金额是发钱的依据，绝不能来自可被改档的磁盘数据。真正发多少在 settle() 里按配置重算。 */
+     st.claimed.push(id);
+-    save();
+-    H.log('✅ 日常任务「' + t.name + '」达成：灵石 +' + stone + '、悟道值 +' + wisdom, 'gold');
++    if(!st.pending || typeof st.pending !== 'object') st.pending = {};
++    st.pending[claimId] = { at: Date.now() };
++    if(!save()){
++      st.claimed.pop();
++      delete st.pending[claimId];
++      return { ok:false, msg:'领取记录写入失败（存储可能已满），清一下本机存储再试' };
++    }
++
++    /* 第 2 次写盘：主存档（奖励数值 + 入账凭据在同一次 setItem 里）。
++       失败时**故意不回滚 claimed**：保留 pending，下次启动补发，
++       这样"扣了标记却没给奖励"不会发生。 */
++    if(!settle(claimId)){
++      return { ok:false, msg:'奖励暂未入账（本机存储异常），下次进入游戏会自动补上' };
++    }
++    const t2 = taskOfClaim(claimId);
++    const stone  = t2 ? Math.floor(H.needOf(H.rank()) * t2.stoneK) : 0;
++    const wisdom = t2 ? H.wisdomGain(t2.wisdom) : 0;
++    delete st.pending[claimId];
++    save();     /* 清待入账记录；这一步失败也无妨 —— 下次靠 isApplied 判重，不会重复发 */
++    H.log('✅ 日常任务「' + (t2 ? t2.name : id) + '」达成：灵石 +' + stone + '、悟道值 +' + wisdom, 'gold');
+     return { ok:true, stone: stone, wisdom: wisdom };
+   }
+ 
+-  /* ---- 今日三个任务是否全部领完（供 UI 显示「今日已完成」） ---- */
++  /* 'sit@2026-11-08' → 任务配置；认不出来返回 null（脏键不解出钱） */
++  function taskOfClaim(claimId){
++    const id = String(claimId).split('@')[0];
++    return DAILY_TASKS.find(x => x.id === id) || null;
++  }
++
++  /* 把一笔待入账奖励写进主存档。
++     · 金额按**配置**重算，不读 pending 里可能被改过的数字；
++     · 幂等：凭据已在（H.isApplied）就直接算完成，不再发 —— 补发不重复的唯一依据；
++     · 任何异常都当作"没入账"（pending 留着，下次再来）。 */
++  function settle(claimId){
++    if(!st.pending || !st.pending[claimId]) return true;
++    try{
++      if(typeof H.isApplied === 'function' && H.isApplied(claimId)) return true;
++      const t = taskOfClaim(claimId);
++      if(!t) return false;                       /* 认不出的键：不发、留着等 sanitize 清 */
++      const stone  = Math.floor(H.needOf(H.rank()) * t.stoneK);
++      const wisdom = H.wisdomGain(t.wisdom);
++      return H.grant({ stone: stone, wisdom: wisdom, claimId: claimId }) !== false;
++    }catch(e){ return false; }
++  }
++
++  /* 崩溃恢复：补发上次「标记已落盘、奖励未入账」的记录。
++     判重靠 H.isApplied(claimId) —— 凭据与奖励是同一次主存档写入，
++     所以「已入账但没来得及清 pending」只会被清掉，不会二次发奖。 */
++  function recoverPending(){
++    if(!st.pending || typeof st.pending !== 'object') return 0;
++    let n = 0, changed = false, dropped = 0;
++    Object.keys(st.pending).forEach(cid => {
++      if(!taskOfClaim(cid)){
++        /* 认不出的任务 id：既发不了、也不该永久滞留（否则每次启动都重试同一条死记录）。
++           一律清掉并留一条控制台记录 —— 选择"清掉"而不是"隔离"，是因为它没有任何可发的东西。 */
++        delete st.pending[cid]; changed = true; dropped++; return;
++      }
++      if(settle(cid)){ delete st.pending[cid]; changed = true; n++; }
++    });
++    if(dropped){ try{ console.warn('[daily] 清理了 ' + dropped + ' 条认不出任务的待入账记录'); }catch(e){} }
++    if(changed) save();
++    return n;
++  }
++
++  /* 跨标签页互斥：**只走 Web Locks**（同源标签页真正串行）。
++     不支持 Web Locks 时直接拒绝领取，不做"租约锁尽力而为"的降级 ——
++     租约（localStorage setItem + 回读）不是原子互斥，而灵石/悟道是可累积的经济资源，
++     宁可明确拒绝，也不放进一个已知存在竞态的路径。
++     提示里给出可操作指引（用新版浏览器 / 只开一个窗口），避免玩家以为是游戏坏了。 */
++  const CLAIM_LOCK = 'jxwd_daily_claim_v1';
++  function claim(id){
++    if(!H) return Promise.resolve({ ok:false, msg:'未初始化' });
++    const p = withClaimLock(() => doClaim(id));
++    if(!p){
++      return Promise.resolve({
++        ok:false,
++        code:'NO_LOCK',
++        msg:'当前浏览器不支持安全的跨窗口领取。请换用新版浏览器，或只开一个窗口后再试。'
++      });
++    }
++    return p.catch(() => ({ ok:false, msg:'领取失败（跨窗口锁异常），请重试' }));
++  }
++
++  /* ---- 今日三个任务是否全部领完（供 UI 显示「今日已完成」） ----
++     按 id 逐个判定，不用 claimed.length：脏档里重复 id 会让长度虚高、谎报"已完成"。 */
+   function allClaimed(){
+-    ensureDay();
+-    return st.claimed.length >= DAILY_TASKS.length;
++    /* 与 list() 同一口径：只读，不写盘 */
++    if(dayRolled()) return false;
++    return DAILY_TASKS.every(t => st.claimed.indexOf(t.id) >= 0);
+   }
+ 
+   /* ---- 调试 / 测试入口 ---- */
+@@ -132,6 +326,8 @@
+     allClaimed: allClaimed,
+     tasks: DAILY_TASKS,
+     _state: _state,
+-    _reset: _reset
++    _reset: _reset,
++    /* 测试口：手动触发一次崩溃补发（生产路径由 init 与 claim 内部自动调用） */
++    _recover: recoverPending
+   };
+ })();
+############ js/game.js
+# 基线SHA256 d5a53938e5fb1cf03107a1c4761170e09b7abdd9fd807792f5fb70941fcb49ab  当前SHA256 a77c5b17d7ecc4fcf37a5ad063bfceea1dbc176b5b071a1bd8a3428ca5255cd6
+--- js/game.js.bak_20261108_182924_preD006	2026-11-08 18:09:15.106206200 +0800
++++ js/game.js	2026-11-08 20:35:32.874529600 +0800
+@@ -213,6 +213,11 @@
+     arena: { day: '', left: 0, foes: [], tier: 0, win: 0, lose: 0, rep: 0 },
+     /* 限时活动：七日签到（断签重置）+ 仙盟争霸（7 天赛季，战功换强化材料） */
+     sign: { days: 0, last: '' },
++    /* 每日任务奖励的「已入账凭据」（D-006 J-1）：形如 'sit@2026-11-08'。
++       作用：把「发了多少奖」和「这笔奖发过没有」写在**同一次主存档写入**里，
++       这样"标记已落盘、奖励还没入账就崩了"能被下次启动识别并补发，且补发不会重复
++       （详见 js/daily.js 的 pending / recoverPending）。只留最近 40 条，够跨很久的补发窗口。 */
++    dailyApplied: [],
+     union: { start: 0, day: '', left: 0, merit: 0, claimed: [], season: 1 },
+     /* 山门 · 弟子（第 61 节）：lv=品阶 0~5（0=未立山门）；disciples 是山门名册
+        [{id, name, apt 1~5, task ''|seclude|herb|patrol, t0 出发时间戳, ret 回山时间, svc 已做差事数,
+@@ -1550,15 +1555,23 @@
+     { merit: 1500, txt: '兽王精魄 ×1（强化材料）' },
+     { merit: 3000, txt: '蛟龙珠 ×1（强化材料）' }
+   ];
+-  function ydayKey(){
+-    const d = new Date(Date.now() - 86400000);
+-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+-  }
++  /* 原 ydayKey()（昨天的未补零日期键）在断签判定改用 dayNo 比较后已无调用点，随本次一并删除——
++     留着会让人以为它还在参与签到判定。 */
+   const signIdx = () => S.sign.days % SIGN_REWARD.length;
+-  const signCanClaim = () => S.sign.last !== todayKey();
++  /* 只能"日期往后走"才能再签。原为 `!==`：把系统日期改成明天就能再签一次、
++     连签天数照涨，改回去再改一次还能继续 —— 七天大奖可以无限刷。
++     dayNo 兼容历史未补零的 last（'2026-11-8'）。 */
++  const signCanClaim = () => dayNo(S.sign.last) < todayNo();
+   function claimSign(){
+     if(!signCanClaim()){ log('今日已签到，明日再来。', 'bad'); return; }
+-    if(S.sign.last !== ydayKey() && S.sign.last !== '') S.sign.days = 0;   /* 断签重置 */
++    /* 断签重置：除空值外，只有"上次签到正好是昨天"才保留连签，
++       其余（含系统时间往前/往后跳）一律从头算。昨天用真实日期差求得，
++       不用 dayNo 做减法（YYYYMMDD 减 1 在月初会算出非法日期）。 */
++    if(S.sign.last !== ''){
++      const yd = new Date(Date.now() - 86400000);
++      const yNo = yd.getFullYear() * 10000 + (yd.getMonth() + 1) * 100 + yd.getDate();
++      if(dayNo(S.sign.last) !== yNo) S.sign.days = 0;
++    }
+     const rw = SIGN_REWARD[signIdx()];
+     if(rw.stone){
+       const v = Math.floor(needOf(S.rank) * rw.stone);
+@@ -1605,7 +1618,8 @@
+       S.union.day = ''; S.union.left = 0;
+       log('🏆 仙盟争霸赛季结算，第 ' + S.union.season + ' 季开打。', 'gold');
+     }
+-    if(S.union.day !== todayKey()){ S.union.day = todayKey(); S.union.left = 1; }
++    /* 严格递增判定（原为 !==）：改系统日期不再赠送每日出战次数 */
++    if(dayNo(S.union.day) < todayNo()){ S.union.day = todayKey(); S.union.left = 1; }
+   }
+   function unionFight(){
+     resetUnion();
+@@ -1676,7 +1690,18 @@
+         dBox.dataset.d_binded = '1';
+         dBox.addEventListener('click', ev => {
+           const b = ev.target.closest('[data-daily]');
+-          if (b) { ev.stopPropagation(); const r = Daily.claim(b.dataset.daily); if(r.ok){ sfx.win(); render(); renderEvent(); renderBag(); } else log(r.msg, 'bad'); }
++          if (!b) return;
++          ev.stopPropagation();
++          /* Daily.claim 现在返回 Promise：它要在跨标签页互斥锁内完成「读盘→检查→发奖→写盘」，
++             Web Locks 只有异步 API。这里按住按钮防连点，结果回来再放行。
++             （不支持 Web Locks 的环境走 localStorage 租约锁，同样返回 Promise，调用方式一致。） */
++          if (b.disabled) return;
++          b.disabled = true;
++          Promise.resolve(Daily.claim(b.dataset.daily)).then(r => {
++            b.disabled = false;
++            if (r && r.ok) { sfx.win(); render(); renderEvent(); renderBag(); }
++            else log((r && r.msg) || '领取失败', 'bad');
++          }, () => { b.disabled = false; log('领取失败，请重试。', 'bad'); });
+         });
+       }
+     }
+@@ -1774,7 +1799,8 @@
+     return t;
+   };
+   function resetArenaDay(){
+-    if(S.arena.day === todayKey() && S.arena.foes && S.arena.foes.length) return;
++    /* >= ：当天（或时钟回拨）就沿用已有对手，只有日期往后走才重掷 */
++    if(dayNo(S.arena.day) >= todayNo() && S.arena.foes && S.arena.foes.length) return;
+     S.arena.day = todayKey();
+     S.arena.left = BAL.arenaDaily;
+     rollArenaFoes();
+@@ -1855,7 +1881,9 @@
+     S.arena.rep += rep;
+     if(win) S.arena.win++; else S.arena.lose++;
+     /* NPC 记忆（T-506 接入）：沈碑看门人视角，论剑台胜负落账；记忆系统缺失/异常一律静默，绝不影响结算 */
+-    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', win ? '玩家在论剑台赢了一场' : '玩家在论剑台输了一场', 'combat'); }catch(e){}
++    /* 记忆短语用第二人称：这句会被 npc.js 拼进沈碑的开场白
++       （「（他顿了顿，像是想起了…）」），写"玩家在论剑台赢了一场"会把 UI 术语漏进 NPC 口中。 */
++    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', win ? '你在论剑台赢了一场' : '你在论剑台输了一场', 'combat'); }catch(e){}
+     const stTxt = stance === 'rush' ? '（抢攻）' : stance === 'guard' ? '（守拙）' : '';
+     log(win ? '⚔️ 论剑胜 ' + f.name + stTxt + '（战力 ' + fmt(f.power) + '），声望 +' + rep + '、灵石 +' + fmt(stone)
+             : '⚔️ 不敌 ' + f.name + stTxt + '（战力 ' + fmt(f.power) + '），声望 +' + rep + '、灵石 +' + fmt(stone), win ? 'good' : 'bad');
+@@ -2057,7 +2085,8 @@
+     };
+   }
+   function resetSecretDay(){
+-    if(S.secret.day !== todayKey()){ S.secret.day = todayKey(); S.secret.swept = 0; }
++    /* 严格递增：改系统时间刷不出新的扫荡次数 */
++    if(dayNo(S.secret.day) < todayNo()){ S.secret.day = todayKey(); S.secret.swept = 0; }
+   }
+   function secretTotal(){
+     return SECRET_CH.reduce((a, _, ci) => a + secretProg(ci), 0);
+@@ -2832,7 +2861,7 @@
+     /* 记忆（第 67 节）：被点化过这件事要被弟子记住——bless 记次数，出师告别语看它 */
+     d.bless = ((typeof d.bless === 'number' && isFinite(d.bless)) ? Math.floor(d.bless) : 0) + 1;
+     /* NPC 记忆（T-506 接入）：沈碑记得玩家点化过哪个弟子；缺失/异常一律静默 */
+-    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', '玩家点化了弟子「' + d.name + '」', 'sect'); }catch(e){}
++    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', '你点化了弟子「' + d.name + '」', 'sect'); }catch(e){}
+     log('🌀 你以指作笔，替 ' + d.name + ' 洗了一遍经脉：' + GATE_APTS[apt - 1].n + ' → ' + GATE_APTS[apt].n + '。',
+       apt + 1 >= 4 ? 'gold' : 'sys');
+     /* 当场开口：人就在山上，被洗完经脉总得有点反应。log 后 unshift → 他的话在系统行上方 */
+@@ -3047,7 +3076,7 @@
+       ] }
+   ];
+   const councilIssue = () => COUNCIL[Math.max(0, S.council.n | 0) % COUNCIL.length];
+-  const councilDone  = () => S.council.day === todayKey();
++  const councilDone  = () => dayNo(S.council.day) >= todayNo();   /* 当天已议（回拨也算已议） */
+   const councilIdle  = () => gateList().find(d => !gateBusy(d)) || null;
+   /* 代价与所得都按 needOf(rank) 现算，面板上写的就是真正会入账的数 */
+   function councilCostOf(o){
+@@ -3441,10 +3470,26 @@
+       return false;
+     }
+   }
+-  /* 今日日期键（本地时区），用于跨天重置每日行动次数 */
++  /* 今日日期键（本地时区）。补零输出：旧实现是 `2026-11-8`，
++     字符串比较时 '2026-11-8' > '2026-11-10'，任何"日期是否往后走了"的判定都会错。
++     旧的未补零值仍能被 dayNo() 正确解析，所以历史存档无需迁移。 */
+   function todayKey(){
+     const d = new Date();
+-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
++    const p = n => (n < 10 ? '0' : '') + n;
++    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
++  }
++  /* 可比日序号 YYYYMMDD：只用它做"跨天了吗"的大小判定，不做日期加减（月份边界会错）。
++     ⚠️ 保证范围（与 js/daily.js 同一口径，别写成"防作弊"）：
++     严格递增判定只防「回拨」与「同日重复触发」，**不防把系统时间连续向未来推进**
++     （8→9→10…每次都是更晚的一天）。客户端没有可信时间源，离线单机档做不到；
++     要真正防这一类必须有服务端下发时间。 */
++  function todayNo(){
++    const d = new Date();
++    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
++  }
++  function dayNo(s){
++    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s == null ? '' : s));
++    return m ? ((+m[1]) * 10000 + (+m[2]) * 100 + (+m[3])) : 0;
+   }
+   function resetActs(){
+     /* ⚠️ 这里也是"新增行动"必须同步的三个地方之一（另两个是 S 初值与 load 的合并）。
+@@ -3453,7 +3498,9 @@
+     S.actDay = todayKey();
+   }
+   function ensureActs(){
+-    if(S.actDay !== todayKey()) resetActs();
++    /* 严格递减判定（原为 `!==`）：把系统日期往回改不会再触发一次重置，
++       往前改也不再"每改一次给一整套新的行动次数"。行动次数是资源，不能由系统时间决定。 */
++    if(dayNo(S.actDay) < todayNo()) resetActs();
+   }
+   /* 「当没存档」= 从头开始：引导完成标记（tutorial.js 的 KEY）要一起清，否则重开/脏档后
+      新角色会跳过引导。load() 跑在 tutorial.js 之前，不能调 Tutorial.reset()。 */
+@@ -3546,6 +3593,21 @@
+          否则"读档清洗"与"运行期认领"会漂移。缺模块时退回空表（最坏结果是旧局重投补一次）。 */
+       S.multiCreditedRuns = Array.isArray(o.multiCreditedRuns) ? o.multiCreditedRuns.slice() : [];
+       try{ if(window.MultiLedger) window.MultiLedger.hist(S); else S.multiCreditedRuns = []; }catch(e){ S.multiCreditedRuns = []; }
++      /* 每日任务「已入账凭据」（D-006 J-1）：只收 'id@YYYY-M-D' 形式的短串，去重，最多 40 条。
++         它是"这笔奖发过没有"的唯一凭据 —— 崩在"标记已落盘、奖励未入账"之间时，
++         下次启动靠它判断该不该补发（见 js/daily.js 的 recoverPending）。 */
++      S.dailyApplied = [];
++      if(Array.isArray(o.dailyApplied)){
++        const seenApplied = {};
++        o.dailyApplied.forEach(v => {
++          if(typeof v !== 'string' || v.length > 40) return;
++          if(!/^[a-z]{2,8}@\d{4}-\d{1,2}-\d{1,2}$/.test(v)) return;
++          if(seenApplied[v]) return;
++          seenApplied[v] = 1;
++          S.dailyApplied.push(v);
++        });
++        S.dailyApplied = S.dailyApplied.slice(-40);
++      }
+       /* 组队首次通关计数：不持久化的话每次刷新都从 undefined 起算，
+          第一局通关必然又是 ===1 → 崔九的「首次闯通」记忆与主动来访每次会话重放一遍。 */
+       S.multiWins = (typeof o.multiWins === 'number' && isFinite(o.multiWins)) ? Math.max(0, o.multiWins | 0) : 0;
+@@ -4235,6 +4297,19 @@
+     render();
+   }
+   const ACT_NAMES = { sit: '打坐', herb: '采药', train: '历练', enlight: '顿悟', ponder: '参悟' };
++  /* 每日任务进度上报：Daily.bump 现在返回 Promise（要进跨窗口锁）。
++     无 Web Locks 的环境下它会明确拒绝写入（"load→改→save" 跨标签页不安全），
++     这里把"没记下"如实告诉玩家一次 —— 不要让他以为进度已经保存。 */
++  let dailyNoLockWarned = false;
++  function dailyBump(kind){
++    if(typeof Daily === 'undefined') return;
++    Promise.resolve(Daily.bump(kind)).then(r => {
++      if(r && r.ok === false && r.code === 'NO_LOCK' && !dailyNoLockWarned){
++        dailyNoLockWarned = true;
++        log('⚠️ ' + r.msg + '（日常任务进度本次不记，其他玩法不受影响）', 'bad');
++      }
++    }, () => {});
++  }
+   function act(kind){
+     ensureActs();
+     if(cdLeft(kind) > 0) return;
+@@ -4251,7 +4326,7 @@
+     }
+     S.acts[kind] = (S.acts[kind] | 0) + 1;      /* |0 兜底：老档/异常态没有这个键时不能变 NaN */
+     S.stats[kind] = (S.stats[kind] || 0) + 1;   /* 累计行动次数（任务进度） */
+-    if(typeof Daily !== 'undefined') Daily.bump(kind);   /* 每日任务进度（sit/train 有效，herb/enlight 自动忽略） */
++    if(typeof Daily !== 'undefined') dailyBump(kind);   /* 每日任务进度（sit/train 有效，herb/enlight 自动忽略） */
+     if(kind === 'sit'){
+       setCd(kind, 8000);
+       gainExp(10, '🧘 打坐一炷香，', 0.002);   /* [PLACEHOLDER] 0.2%/次：30 次正好一层 6%，一天点完也不会把一层的进度吃掉太多 */
+@@ -4409,6 +4484,11 @@
+    */
+   function attemptBreakthrough(opts){
+     opts = opts || {};
++    /* 这里刻意**不**加"天劫演出期间禁止突破"的锁：
++       #trib-modal 是 pointer-events:none（不挡点击，是有意设计），所以玩家确实能在 4.6 秒演出里
++       再破一次。那属于"连续破境"的节奏问题，是玩法取舍，不是缺陷 —— 加锁等于凭空给突破加了
++       4.6 秒冷却，会改变玩家的操作手感，要由制作人裁定。
++       真正的缺陷是"第二次的结算卡被丢掉了"，那一半已在 js/trib.js 修好（pendingDone 补发）。 */
+     if(S.rank >= TOP){ log('已经飞升，人间再无可破之境。', 'gold'); return; }
+     const need = needOf(S.rank);
+     if(S.exp < need){ log('修为不足，先攒到 ' + fmt(need) + '。', 'bad'); return; }
+@@ -5208,7 +5288,7 @@
+   /* 跨天自动换一批货架 + 重掷行情（买价和卖价分开，今天适合买还是卖由行情决定） */
+   function resetMarket(){
+     const k = todayKey();
+-    if(S.market.day === k && S.market.goods && S.market.goods.length) return;
++    if(dayNo(S.market.day) >= todayNo() && S.market.goods && S.market.goods.length) return;
+     S.market.day = k;
+     S.market.buyRate = 0.85 + Math.random() * 0.35;    /* 0.85 ~ 1.20 */
+     S.market.sellRate = 0.80 + Math.random() * 0.45;   /* 0.80 ~ 1.25 */
+@@ -6892,7 +6972,7 @@
+             S.multiWins = (S.multiWins || 0) + 1;
+             if(S.multiWins === 1){
+               /* 崔九听闻你的组队事迹（只记头一回，老卒不重复道贺） */
+-              try{ if(window.NpcMemory) NpcMemory.record('cuijiu', '玩家与道友们合力闯通了组队秘境五层', 'story'); }catch(e){}
++              try{ if(window.NpcMemory) NpcMemory.record('cuijiu', '你与道友们合力闯通了组队秘境五层', 'story'); }catch(e){}
+               try{ if(window.NpcVisitQueue) NpcVisitQueue.push('cuijiu', 'multi_first', '听说你带了道友闯那道封门？好，妖物再多，也怕人多。'); }catch(e){}
+             }
+           }
+@@ -6967,8 +7047,13 @@
+     const me = window.Net ? Net.me() : null;
+     if(!window.Net){ offC.hidden = false; hall.hidden = true; roomC.hidden = true; runC.hidden = true; if(settleC) settleC.hidden = true; return; }
+     offC.hidden = st !== 'offline';
+-    /* 大厅（服务地址/报号/进入）只在还没进屋时才有用；进了队伍或副本就收起，别把首屏让给登录表单 */
+-    hall.hidden = st !== 'lobby';
++    /* 大厅（服务地址/报号/进入）只在还没进屋时才有用；进了队伍或副本就收起，别把首屏让给登录表单。
++       ⚠️ offline 也必须露出大厅卡：全库唯一能填服务地址的输入框（#xx-multi-srv）就在这张卡里，
++       而 state 只会被 Net.connect 改成 lobby、connect 又只由卡内的 #xx-multi-join 触发。
++       原先这里写 `st !== 'lobby'` → offline 把整张卡藏掉 → 玩家能看到的只有纯文字说明卡，
++       填不了地址、点不到登入 → 新玩家永远进不去联机（闭环死锁，且 online 态自洽所以没人报错）。
++       下面 offline 分支还会主动给 #xx-multi-srv 填默认值，也正说明这张卡本该可见。 */
++    hall.hidden = !(st === 'lobby' || st === 'offline');
+     roomC.hidden = !(st === 'room');
+     runC.hidden = st !== 'run';
+     if(st === 'offline'){
+@@ -7093,7 +7178,9 @@
+           });
+         }
+       }
+-      if(logBox) logBox.innerHTML = (run.log || []).map(t => '<p class="npc-greet-line">' + t + '</p>').join('');
++      /* run.log 的每条都含玩家自填道号（服务器 server.mjs 的 apiJoin 只校验长度、不过滤字符集），
++         这里直拼 innerHTML 就是一个未转义的 sink。房间成员列表与聊天都已走 escHtml，只漏了这一处。 */
++      if(logBox) logBox.innerHTML = (run.log || []).map(t => '<p class="npc-greet-line">' + escHtml(t) + '</p>').join('');
+     }
+     if(settleC){
+       const s = Net.data().lastSettle;
+@@ -7140,6 +7227,17 @@
+       /* 先记地址再等道号：地址合法就切到道号行（connect 放到 login 一步） */
+       const addr = srv.trim() || ('http://127.0.0.1:7730');
+       multiCheckAddr(addr);
++      /* 注释承诺的"切到道号行"必须真的做（原先只探活）：否则玩家点「进入」后屏幕毫无变化，
++         因为 multiCheckAddr 的反馈写进了 S.log，而 S.log 只在修行日志页可见。
++         这里把地址行收起、道号行展开，并给一句确认文案。 */
++      const cr = document.getElementById('xx-multi-connrow');
++      const nr = document.getElementById('xx-multi-namerow');
++      if(cr) cr.hidden = true;
++      if(nr) nr.hidden = false;
++      const msg = document.getElementById('xx-multi-hallmsg');
++      if(msg){ msg.hidden = false; msg.textContent = '地址记下了（' + addr + '）。报个道号，就推门。'; }
++      const nm = document.getElementById('xx-multi-name');
++      if(nm && nm.focus){ try{ nm.focus(); }catch(e){} }
+       return;
+     }
+     if(act === 'login'){
+@@ -7187,19 +7285,31 @@
+     if(act === 'ready'){
+       const room = Net.data().room || {};
+       const mineReady = ((room.members || [])).find(m => { const me = Net.me(); return me && m.id === me.id; });
+-      Net.api('/api/room/ready', { ready: !(mineReady && mineReady.ready) }).then(() => { renderMulti(); });
++      multiCall('/api/room/ready', { ready: !(mineReady && mineReady.ready) });
++      return;
++    }
++    if(act === 'start'){ multiCall('/api/room/start'); return; }
++    if(act === 'strike'){ multiCall('/api/run/strike'); return; }
++    if(act === 'leave'){ multiCall('/api/run/leave'); return; }
++    if(act === 'leaveroom'){
++      multiCall('/api/room/leave', null, r => {
++        if(!r || !r.ok) return;
++        multiSaveSession({ roomId: null });
++        /* 服务器不会给自己发 room:null（它先把自己从 members 移除，再只广播 lobby），
++           而 net.js 的 lobby 事件既不清 data.room 也不改 state →
++           玩家点完「回大厅」后仍停在房间态，看到一张成员已不存在的房间卡，点什么都报 NOT_IN_ROOM。
++           确认成功后在此本地归位。 */
++        if(window.Net && typeof Net.clearRoom === 'function') Net.clearRoom();
++      });
+       return;
+     }
+-    if(act === 'start'){ Net.api('/api/room/start').then(r => { if(!r.ok) multiToastErr(r); renderMulti(); }); return; }
+-    if(act === 'strike'){ Net.api('/api/run/strike').then(() => { renderMulti(); }); return; }
+-    if(act === 'leave'){ Net.api('/api/run/leave').then(() => { renderMulti(); }); return; }
+-    if(act === 'leaveroom'){ Net.api('/api/room/leave').then(() => { multiSaveSession({ roomId: null }); renderMulti(); bindMultiDom(); }); return; }
+     if(act === 'chat'){
+       const inp = document.getElementById('xx-multi-chatin');
+       const text = ((inp || {}).value || '').trim();
+       if(!text) return;
+       if(inp) inp.value = '';
+-      Net.api('/api/room/chat', { text }).then(() => { renderMulti(); });
++      /* 发失败把原话填回去，别让玩家白打一遍 */
++      multiCall('/api/room/chat', { text }, r => { if((!r || !r.ok) && inp) inp.value = text; });
+       return;
+     }
+   }
+@@ -7211,10 +7321,43 @@
+       }).catch(() => { log('📡 探不到这个地址（服务还没起？），可以直接填道号试。', 'note'); });
+     }catch(e){}
+   }
++  /* 联机动作统一出口（ready/strike/leave/leaveroom/chat）。
++     这五个动作原先各自 `.then(() => renderMulti())`，完全不看 r.ok / r.code ——
++     服务器拒绝（BAD_PHASE / ALREADY_STRUCK / NOT_IN_ROOM）与传输失败
++     （NOT_CONNECTED / NETWORK / TIMEOUT）全部静默：玩家只看到"重绘一下，什么都没变"，
++     既不知道被拒也不愿意重试。统一到这里：失败一律提示，成功才重绘。 */
++  function multiCall(path, body, after){
++    return Net.api(path, body).then(r => {
++      if(!r || !r.ok) multiToastErr(r);
++      if(typeof after === 'function'){ try{ after(r); }catch(e){} }
++      renderMulti(); bindMultiDom();
++      return r;
++    });
++  }
+   function multiToastErr(r){
+-    const MSG = { ROOM_FULL: '那间队伍满了。', ROOM_RUNNING: '他们已经在秘境里了。', ROOM_NOT_FOUND: '没找到那间队伍（可能刚散了）。', MIN_PLAYERS: '至少要两位道友同行。', READY_MISSING: '还有道友没备好。', NOT_HOST: '只有队首能推门。', BAD_PHASE: '现在不是做这个的时候。', BAD_PATH: '没有这条道途。', NOT_IN_ROOM: '你还没进队伍。' };
+-    const m = document.getElementById('xx-multi-hallmsg') || document.getElementById('xx-multi-roommsg');
+-    if(m){ m.hidden = false; m.textContent = MSG[r && r.code] || ('没成：' + ((r && r.code) || '未知原因')); }
++    const MSG = { ROOM_FULL: '那间队伍满了。', ROOM_RUNNING: '他们已经在秘境里了。', ROOM_NOT_FOUND: '没找到那间队伍（可能刚散了）。', MIN_PLAYERS: '至少要两位道友同行。', READY_MISSING: '还有道友没备好。', NOT_HOST: '只有队首能推门。', BAD_PHASE: '现在不是做这个的时候。', BAD_PATH: '没有这条道途。', NOT_IN_ROOM: '你还没进队伍。',
++      /* 传输层失败码：原先没有对应文案 → 一律落到"没成：NETWORK"这种玩家看不懂的兜底 */
++      NOT_CONNECTED: '还没连上服务，先在大厅填地址登入。', NETWORK: '网络断了，这条没发出去。', TIMEOUT: '服务没响应（超时），过会儿再试。', ALREADY_STRUCK: '这一层你已经出手了，等队友。', NO_SKILL_USES: '这一招本局用尽了。' };
++    const txt = MSG[r && r.code] || ('没成：' + ((r && r.code) || '未知原因'));
++    /* 容器必须按当前状态挑：房间卡/副本卡显示时 #xx-multi-hallmsg 与 #xx-multi-roommsg
++       都被 hidden 掉了，原先只写这两个 → 在副本里点出错的按钮，屏幕上一个字都不出现。 */
++    const st = window.Net ? Net.state() : 'offline';
++    const id = (st === 'run') ? 'xx-multi-runinfo' : (st === 'room' ? 'xx-multi-roommsg' : 'xx-multi-hallmsg');
++    const m = document.getElementById(id) || document.getElementById('xx-multi-hallmsg');
++    if(m){
++      m.hidden = false;
++      if(id === 'xx-multi-runinfo'){
++        /* runinfo 是整块信息区（renderMulti 每次重写），所以追加一行而不是覆盖整段 */
++        const line = document.createElement('div');
++        line.className = 'npc-greet-line';
++        line.style.color = '#a33';
++        line.textContent = '⚠️ ' + txt;
++        m.appendChild(line);
++      }else{
++        m.textContent = txt;
++      }
++    }
++    try{ log('📡 ' + txt, 'bad'); }catch(e){}
+   }
+   /* 顶层即挂：结算入账/崔九记忆不依赖玩家进过联机页（net.js 先于本文件加载） */
+   try{ hookMultiNet(); }catch(e){ try{ window.__hookErr = e.message; }catch(e2){} }
+@@ -7265,9 +7408,14 @@
+     save();
+     if(topicId === 'first') npcUi.first = false;   /* 初见结算完就切到话题视图 */
+     else npcUi.topic = topicId;
++    /* D-006 M 项：把"这段记忆没落盘"如实告诉玩家（低干扰：一行小字 + 一条日志）。
++       不改台词、不拦对话 —— 只是不把"只存在内存里"说成"永久记住了"。 */
++    const memWarn = (r.memPersisted === false);
++    if(memWarn) log('⚠️ 这段记忆只留在本次会话里（本机存储写入失败），刷新后会淡去。', 'bad');
+     npcUi.reply = {
+       ok: true, topic: topicId, option: optionId, text: r.reply,
+-      relDelta: r.relDelta, rel: r.rel, stage: r.stage, firstTime: r.firstTime
++      relDelta: r.relDelta, rel: r.rel, stage: r.stage, firstTime: r.firstTime,
++      memWarn: memWarn
+     };
+     renderNpcPage();
+     /* 回复在选项下方：窄屏点完可能刚好落在视口外，顺手带到眼前（已在视野内则不动） */
+@@ -7444,7 +7592,7 @@
+     S.miles[o.mile] = Date.now();
+     if(S.milesNew) S.milesNew.push(o.mile);
+     /* NPC 记忆（T-506 接入）：W2 三线收尾各自落账；缺失/异常一律静默 */
+-    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', k === 'open' ? '玩家描完了碑背那个「同」字' : (k === 'self' ? '玩家把那半枚石屑收进了袖中' : '玩家按约定敲了三下，底下有人应声'), 'story'); }catch(e){}
++    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', k === 'open' ? '你描完了碑背那个「同」字' : (k === 'self' ? '你把那半枚石屑收进了袖中' : '你按约定敲了三下，底下有人应声'), 'story'); }catch(e){}
+     log(o.log, 'gold');
+     if(m) mileToast([m]);
+     renderMileDot();
+@@ -7486,7 +7634,7 @@
+     const gained = encApplyFx(fx);
+     S.worldFoot = k;
+     /* NPC 记忆（T-506 接入）：塔底碑座是沈碑的线，三种终态各自落账；缺失/异常一律静默 */
+-    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', k === 'open' ? '玩家请他亲手开了塔底的碑座' : (k === 'self' ? '玩家自己撬开了塔底的石头' : '玩家封好石头，把这一趟如实说了'), 'story'); }catch(e){}
++    try{ if(window.NpcMemory) NpcMemory.record('shen_bei', k === 'open' ? '你请他亲手开了塔底的碑座' : (k === 'self' ? '你自己撬开了塔底的石头' : '你封好石头，把这一趟如实说了'), 'story'); }catch(e){}
+     log(o.log, 'gold');
+     save(); render(); renderTower();
+     return { k, gained };
+@@ -7635,6 +7783,16 @@
+     }
+   }
+   /* 整页重填：全部动态文本走 textContent / createElement，不拼 innerHTML */
++  /* 沈碑「已听」分母：话题表里除 noHear（道别）之外的数量。
++     原先四处都写死 /6，但 stele6 是 noHear、heard 永远不会包含它 →
++     玩家最好也只能看到 5/6，像是漏做了一段内容。按真实可听话题数算，增删话题自动跟上。 */
++  function npcHeardTotal(){
++    try{
++      const ts = (window.Npc && Npc.NPC_STELE && Npc.NPC_STELE.topics) || [];
++      const n = ts.filter(t => t && !t.noHear).length;
++      return n > 0 ? n : 6;
++    }catch(e){ return 6; }
++  }
+   function renderNpcPage(){
+     const root = document.getElementById('xx-role-npc-root');
+     if(!root || !npcUi) return;
+@@ -7655,8 +7813,8 @@
+         .filter(t => st.heard.indexOf(t.id) >= 0).map(t => t.name);
+       mem.appendChild(npcNode('b', 'npc-mem-k', '记忆 '));
+       mem.appendChild(npcNode('span', 'npc-mem-v',
+-        (heardNames.length ? '已听 ' + heardNames.join('、') + '（' + st.heard.length + '/6）'
+-                           : '还没听他讲过旧事（0/6）') +
++        (heardNames.length ? '已听 ' + heardNames.join('、') + '（' + st.heard.length + '/' + npcHeardTotal() + '）'
++                           : '还没听他讲过旧事（0/' + npcHeardTotal() + '）') +
+         (st.choice.listened ? ' · 耐心听 ×' + st.choice.listened : '') +
+         (st.choice.showoff ? ' · 炫耀 ×' + st.choice.showoff : '') +
+         (st.choice.promise ? ' · 承诺 ×' + st.choice.promise : '')));
+@@ -7690,7 +7848,7 @@
+         box.appendChild(row);
+       });
+     }
+-    setTxt('npc-topics-sub', st.heard.length + '/6 已听');
++    setTxt('npc-topics-sub', st.heard.length + '/' + npcHeardTotal() + ' 已听');
+     /* 当前话题正文 + 选项：初见没有话题，直接给三个初见选项 */
+     const lines = document.getElementById('npc-topic-lines');
+     const opts = document.getElementById('npc-opts');
+@@ -7736,6 +7894,12 @@
+         rep.appendChild(npcNode('small', 'npc-reply-d',
+           '关系 ' + (npcUi.reply.relDelta >= 0 ? '+' : '') + npcUi.reply.relDelta +
+           ' → ' + npcUi.reply.rel + ' · ' + (NPC_STAGE_NAME[npcUi.reply.stage] || '')));
++        /* 记忆没落盘时补一行小字：不打断对话，也不谎称"已经记住了" */
++        if(npcUi.reply.memWarn){
++          const warn = npcNode('small', 'npc-reply-d', '（这段记忆未能留存 · 本机存储写入失败）');
++          warn.style.color = '#a33';
++          rep.appendChild(warn);
++        }
+       }else if(npcUi.reply){
+         rep.hidden = false;
+         rep.classList.add('bad');
+@@ -9019,8 +9183,8 @@
+       seal('xx-hub-role-miles', milesDone() + '/' + MILE_TOTAL + ' 碑');
+       seal('xx-hub-role-wu', fmt(moneyInt(S.wisdom || 0)) + ' 悟');
+       seal('xx-hub-role-story', (typeof Story !== 'undefined' ? Story._done() : 0) + ' 段');
+-      /* 识人 · 沈碑（切片 2b）：印章 = 已听话题数 n/6 */
+-      seal('xx-hub-role-npc', ((S.npcs && S.npcs.stele && S.npcs.stele.heard) || []).length + '/6');
++      /* 识人 · 沈碑（切片 2b）：印章 = 已听话题数 n / 可听话题数（原写死 /6） */
++      seal('xx-hub-role-npc', ((S.npcs && S.npcs.stele && S.npcs.stele.heard) || []).length + '/' + npcHeardTotal());
+     }
+     if(document.getElementById('xx-hub-zong-gate')){
+       const gl = gateLv();
+@@ -9485,13 +9649,11 @@
+     stone: Math.floor(needOf(S.rank) * (0.6 + n * 0.08)),
+     mat: n % 5 === 0 ? 'mat_core' : 'mat_bone'   /* 每 5 层给妖丹，其余给兽骨 */
+   });
+-  function todayKey(){
+-    const d = new Date();
+-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+-  }
++  /* 每日扫荡重置。用 dayNo() 严格递减判定（原为 `!==`）：
++     只要"日期没往后走"就不重置，改系统时间刷不出新的扫荡次数与每日行动次数。 */
+   function resetTowerDay(){
+     const tk = todayKey();
+-    if(S.towerDay !== tk){ S.towerDay = tk; S.towerSwept = 0; }
++    if(dayNo(S.towerDay) < todayNo()){ S.towerDay = tk; S.towerSwept = 0; }
+   }
+ 
+   /* ---------- 镇妖塔 · 一局五步（第 100 轮：把「点一下自动赢」换成每次都要选） ----------
+@@ -9638,13 +9800,13 @@
+     }
+     log('⚔️ 第 ' + floor + ' 层通关 · 灵石 +' + fmt(loot.stone) + (got > 0 ? '，' + meta.n + ' ×' + got : '') + '。', 'gold');
+     if(window.playLevelUpSound) playLevelUpSound();
+-    if(typeof Daily !== 'undefined') Daily.bump('tower');     /* 每日任务：爬塔 1 次 */
++    if(typeof Daily !== 'undefined') dailyBump('tower');     /* 每日任务：爬塔 1 次 */
+     sfx.win();
+     S.tower += 1;
+     if(S.tower - 1 > S.towerMax){
+       S.towerMax = S.tower - 1;
+       /* NPC 记忆（T-506 接入）：崔九守塔人视角，只在破纪录层落账（不逐层刷屏）；缺失/异常一律静默 */
+-      try{ if(window.NpcMemory) NpcMemory.record('cuijiu', '玩家登塔破了第 ' + S.towerMax + ' 层', 'combat'); }catch(e){}
++      try{ if(window.NpcMemory) NpcMemory.record('cuijiu', '你登塔破了第 ' + S.towerMax + ' 层', 'combat'); }catch(e){}
+       /* 主动事件（第 114 轮）：破纪录当口老卒贺喜；NpcVisitQueue 按 npc+id 幂等，重复破纪录不堆叠 */
+       try{ if(window.NpcVisitQueue) NpcVisitQueue.push('cuijiu', 'congrats_max', '听闻你破了塔中纪录。老朽守塔几十年，少见这样的身手。'); }catch(e){}
+     }
+@@ -10134,6 +10296,9 @@
+     save();
+     cuijiuUi.greet = NpcTower.npcSay(st, npcCtx()).greeting;
+     cuijiuUi.reply = r.text + (r.relDelta > 0 ? '（关系 +' + r.relDelta + '）' : '');
++    /* D-006 M 项：记忆只进内存没落盘时如实说明（与沈碑同一口径，不改台词） */
++    cuijiuUi.replyWarn = (r.memPersisted === false);
++    if(cuijiuUi.replyWarn) log('⚠️ 这段记忆只留在本次会话里（本机存储写入失败），刷新后会淡去。', 'bad');
+     renderCuijiu();
+     const rep = document.getElementById('xx-cuijiu-reply');
+     if(rep && !rep.hidden && rep.scrollIntoView){ try{ rep.scrollIntoView({ block:'nearest' }); }catch(e){} }
+@@ -10168,7 +10333,7 @@
+       });
+       vis.hidden = list.length === 0;
+     }
+-    if(sub) sub.textContent = ((st.heard || []).length) + '/6 已听 · 关系 ' + (st.rel | 0);
++    if(sub) sub.textContent = ((st.heard || []).length) + '/' + ((window.NpcTower && NpcTower.TOPICS) ? NpcTower.TOPICS.length : 6) + ' 已听 · 关系 ' + (st.rel | 0);
+     topics.textContent = '';
+     const say = NpcTower.npcSay(st, npcCtx());
+     (say.topics || []).forEach(t => {
+@@ -10181,6 +10346,11 @@
+     if(cuijiuUi && typeof cuijiuUi.reply === 'string' && cuijiuUi.reply){
+       rep.hidden = false;
+       rep.textContent = cuijiuUi.reply;
++      if(cuijiuUi.replyWarn){
++        const warn = npcNode('small', 'npc-reply-d', '（这段记忆未能留存 · 本机存储写入失败）');
++        warn.style.color = '#a33';
++        rep.appendChild(warn);
++      }
+     } else {
+       rep.hidden = true;
+       rep.textContent = '';
+@@ -10654,10 +10824,35 @@
+         needOf: r => needOf(r),
+         wisdomGain: b => wisdomGain(b),
+         grant: rw => {
++          /* ⚠️ 先存旧值，写盘失败必须把**内存**也回滚。
++             否则 isApplied() 读到的是内存里那份被改过的 S.dailyApplied（已含这笔 claimId），
++             同一个会话里再跑 recoverPending 就会误判"已入账" → 删掉 pending，
++             而磁盘上根本没有这笔奖励 —— 那是静默丢奖，比不补发更糟。 */
++          const oldStone  = S.stone;
++          const oldEarned = S.stats.stoneEarned;
++          const oldWisdom = S.wisdom;
++          const oldApplied = Array.isArray(S.dailyApplied) ? S.dailyApplied.slice() : [];
+           if(rw.stone){ S.stone += rw.stone; S.stats.stoneEarned += rw.stone; }
+           if(rw.wisdom){ S.wisdom = moneyInt(S.wisdom) + rw.wisdom; }
+-          save();
++          /* D-006 J-1：奖励与「这笔发过没有」的凭据落在同一次 save() 里 */
++          if(rw.claimId && typeof rw.claimId === 'string'){
++            if(!Array.isArray(S.dailyApplied)) S.dailyApplied = [];
++            if(S.dailyApplied.indexOf(rw.claimId) < 0){
++              S.dailyApplied.push(rw.claimId);
++              if(S.dailyApplied.length > 40) S.dailyApplied = S.dailyApplied.slice(-40);
++            }
++          }
++          if(save() === false){
++            S.stone = oldStone;
++            S.stats.stoneEarned = oldEarned;
++            S.wisdom = oldWisdom;
++            S.dailyApplied = oldApplied;
++            return false;
++          }
++          return true;
+         },
++        /* 查询某笔领取是否已真的入账（跨崩溃恢复时用，避免重复发奖） */
++        isApplied: claimId => Array.isArray(S.dailyApplied) && S.dailyApplied.indexOf(claimId) >= 0,
+         log: (t, k) => log(t, k)
+       });
+     }
+@@ -10768,6 +10963,7 @@
+        「崔九首次闯通」的叙事永远不再触发（把上面 NpcMemory._reset 的效果抵消掉）；
+        multiCreditedRuns 留着旧 runId 属残留，也一并清。 */
+     S.multiWins = 0; S.multiCreditedRuns = [];
++    S.dailyApplied = [];        /* 每日任务入账凭据也是本世数据，重开一并清 */
+     resetActs();
+     S.dao = 0; S.log = [];
+     S.name = ''; S.sex = 'm'; S.gender = 'male'; S.robe = 'bai';
+@@ -11045,6 +11241,15 @@
+       if(typeof v !== 'string' || !v.length || v.length > 512 * 1024) return;
+       try{ localStorage.setItem(k, v); n++; }catch(e){ /* 配额满等：跳过，不阻断主档恢复 */ }
+     });
++    /* 磁盘变了，常驻内存必须跟着重读：
++       NpcMemory 的 st 与 NpcVisitQueue 的 st.q 都是加载时读一次的模块级状态，
++       上面只改了 localStorage。若不重读，玩家导入后继续玩时任何一次 record()/push()
++       都会用"导入前的旧内存"整体覆盖刚写进来的记忆 —— D-005 侧车打包等于白做。
++       load() 各自带 fail-closed 保护，失败只会禁写、不会用空态覆盖磁盘。 */
++    if(n){
++      try{ if(window.NpcMemory && typeof window.NpcMemory.load === 'function') window.NpcMemory.load(); }catch(e){}
++      try{ if(window.NpcVisitQueue && typeof window.NpcVisitQueue.load === 'function') window.NpcVisitQueue.load(); }catch(e){}
++    }
+     return n;
+   }
+   function downloadSave(){
+############ js/net.js
+# 基线SHA256 a2a294e9e7976bf01538f144a3a350ad1dd1bc54469defba4ec3d2f62248197d  当前SHA256 419154bbea7050773d95522e3fa076ff9cb655e602eec375a2079fdd6f98d6ce
+--- js/net.js.bak_20261108_182924_preD006	2026-11-04 00:05:18.338260200 +0800
++++ js/net.js	2026-11-08 18:31:27.235470900 +0800
+@@ -61,10 +61,40 @@
+     if (!arr) return;
+     arr = arr.slice();
+     for (var i = 0; i < arr.length; i++) {
+-      try { arr[i](payload); } catch (e) { /* 订阅者异常不拖垮协议层 */ }
++      /* 订阅者异常不拖垮协议层——但也不能彻底吞掉：
++         结算入账回调里若抛错（S.stats 未定义 / save 抛错 / render 抛错），
++         原先连 console 都没有一行，玩家看到"结算卡出来了但灵石没到账"，
++         维护者事后完全无从追查。这里至少留一条控制台记录。 */
++      try { arr[i](payload); } catch (e) {
++        try { console.error('[net] listener error @' + type, e); } catch (_) {}
++      }
+     }
+   }
+ 
++  /* 请求超时护栏：服务器假死 / NAT 半开时 fetch 既不 resolve 也不 reject，
++     调用方的 .then/.catch 全都永远等不到 → 玩家点「出手/备好/登入」后
++     界面毫无反应也没有报错，只能刷新。4.5 秒（join 6 秒）无响应即判超时并 abort。 */
++  function fetchJson(url, opts, ms) {
++    var D = deps;
++    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
++    var o = {};
++    if (opts) { for (var k in opts) o[k] = opts[k]; }
++    if (ctrl) o.signal = ctrl.signal;
++    var timedOut = false;
++    return new Promise(function (resolve, reject) {
++      var timer = setTimeout(function () {
++        timedOut = true;
++        if (ctrl) { try { ctrl.abort(); } catch (e) {} }
++        reject(new Error('TIMEOUT'));
++      }, ms || 4500);
++      D.fetch(url, o).then(function (r) {
++        clearTimeout(timer); resolve(r);
++      }, function (e) {
++        clearTimeout(timer); reject(timedOut ? new Error('TIMEOUT') : e);
++      });
++    });
++  }
++
+   function setState(s) {
+     if (state === s) return;
+     state = s;
+@@ -124,12 +154,15 @@
+     var payload = {};
+     if (me && me.token) payload.token = me.token;
+     if (body) { for (var k in body) payload[k] = body[k]; }
+-    return D.fetch(base + path, {
++    return fetchJson(base + path, {
+       method: 'POST',
+       headers: { 'content-type': 'application/json' },
+       body: JSON.stringify(payload)
+     }).then(function (r) { return r.json(); })
+-      .catch(function (e) { return { ok: false, code: 'NETWORK', error: String(e && e.message || e) }; });
++      .catch(function (e) {
++        var msg = String(e && e.message || e);
++        return { ok: false, code: (msg === 'TIMEOUT' ? 'TIMEOUT' : 'NETWORK'), error: msg };
++      });
+   }
+ 
+   window.Net = {
+@@ -150,11 +183,11 @@
+          #75（第 122 轮）：服务器 legacy 回退**默认关闭**，无快照会被拒（LEGACY_DISABLED）；
+          因此正式客户端必须始终带快照。power 字段仍照旧发送，仅 legacy 模式(显式开启)才被读取。 */
+       if (snapshot && typeof snapshot === 'object') joinBody.snapshot = snapshot;
+-      return D.fetch(b + '/api/join', {
++      return fetchJson(b + '/api/join', {
+         method: 'POST',
+         headers: { 'content-type': 'application/json' },
+         body: JSON.stringify(joinBody)
+-      }).then(function (r) { return r.json(); }).then(function (j) {
++      }, 6000).then(function (r) { return r.json(); }).then(function (j) {
+         /* 优先用服务器给的可读 error（如 LEGACY_DISABLED 的中文提示），退回错误码 */
+         if (!j || !j.ok) return { ok: false, code: (j && j.code) || 'JOIN_FAIL', error: (j && (j.error || j.code)) || 'JOIN_FAIL' };
+         me = j.player;
+@@ -191,7 +224,8 @@
+           }, 5000);
+         });
+       }).catch(function (e) {
+-        return { ok: false, error: String(e && e.message || e) };
++        var msg = String(e && e.message || e);
++        return { ok: false, code: (msg === 'TIMEOUT' ? 'TIMEOUT' : 'JOIN_FAIL'), error: (msg === 'TIMEOUT' ? '服务没响应（超时）' : msg) };
+       });
+     },
+     api: function (path, body) {
+@@ -207,9 +241,21 @@
+       });
+     },
+     disconnect: function () {
+-      if (me && me.token) { try { post('/api/room/leave'); } catch (e) {} }
++      /* post 返回 Promise，永远不会同步抛异常——原来的 try/catch 抓不到任何东西
++         （包括 deps.fetch 缺失那种异步 reject），最终变成无人处理的静默失败。
++         这里用 .catch 兜住，且不断言"服务端一定收到"（发不出去时服务端会走 60 秒离线踢人）。 */
++      if (me && me.token) { try { post('/api/room/leave').catch(function () {}); } catch (e) {} }
+       hardReset();
+     },
++    /* 主动离开房间后的本地归位。服务器不会给离场者本人发 room:null
++       （它先把自己从 members 移除，再只广播 lobby），而 applyEvent 的 lobby 分支
++       既不清 data.room 也不改 state → 客户端会永久卡在房间态。
++       由 UI 在 /api/room/leave 确认成功后调用。 */
++    clearRoom: function () {
++      data.room = null;
++      data.run = null;
++      setState('lobby');
++    },
+     state: function () { return state; },
+     me: function () { return me ? { id: me.id, name: me.name, token: me.token, power: me.power, path: me.path } : null; },
+     data: function () { return data; },
+############ js/npc.js
+# 基线SHA256 0b8ee175fd46b08b90943ced2f733714a07a5b54f85a0fabb591282599fef7b3  当前SHA256 43de02877bf10ea05d803439160ea2f90c68642d13381fbe955aea51d6a7f035
+--- js/npc.js.bak_20261108_182924_preD006	2026-11-06 14:45:26.830875200 +0800
++++ js/npc.js	2026-11-08 19:21:46.302057400 +0800
+@@ -236,9 +236,11 @@
+   /* 记记忆：仅当 NpcMemory 就绪且 record 可用才调用；任何异常静默忽略、不返回 */
+   function memRecord(text){
+     try{
+-      if(typeof window === 'undefined') return;
+-      if(!window.NpcMemory || typeof window.NpcMemory.record !== 'function') return;
+-      window.NpcMemory.record(MEM_ID, text);
++      if(typeof window === 'undefined') return null;
++      if(!window.NpcMemory || typeof window.NpcMemory.record !== 'function') return null;
++      /* 把记录结果回传：persisted === false 表示只进了内存、没落盘（配额满/隐私模式）。
++         UI 据此给一句低干扰说明，而不是让玩家以为这段记忆已经永久留下。 */
++      return window.NpcMemory.record(MEM_ID, text) || null;
+     }catch(e){
+       /* 静默忽略：记忆失败绝不影响对话 */
+     }
+@@ -467,11 +469,13 @@
+ 
+     /* T-402：结算成功才落一笔记忆；文案按话题名取，不改任何结算结果 */
+     var memText = topic ? ('你问过他「' + topic.name + '」') : '你同他讲过几句话';
+-    memRecord(memText);
++    var memRes = memRecord(memText);
+ 
+     return {
+       ok: true, speaker: NPC_STELE.name, first: false, topicId: topic.id, optionId: opt.id,
+-      reply: opt.reply, relDelta: delta, rel: st.rel, stage: st.stage, firstTime: firstTime, heard: st.heard.slice()
++      reply: opt.reply, relDelta: delta, rel: st.rel, stage: st.stage, firstTime: firstTime, heard: st.heard.slice(),
++      /* 只有明确 false 才算"写盘失败"；null/undefined 表示没接这条线，按成功处理，避免误报 */
++      memPersisted: (memRes && memRes.persisted === false) ? false : true
+     };
+   }
+ 
+############ js/npc_memory.js
+# 基线SHA256 60b0b9e34972b45ad8a006ec6cbc6e2e63176b39414f0b6de32848d84edfe950  当前SHA256 00ea68686628c608b2caeedf0ab9c07240ae031cab68061a053bc9f2c015c0c9
+--- js/npc_memory.js.bak_20261108_182924_preD006	2026-11-06 02:24:28.152558900 +0800
++++ js/npc_memory.js	2026-11-08 18:33:13.071953600 +0800
+@@ -188,8 +188,11 @@
+       bucket.splice(worst, 1);
+     }
+     st.mem[npcId] = bucket;
+-    save();
+-    return { ok: true, count: bucket.length };
++    /* persisted=false 表示"只在内存里记住了"（initState 非 ok 或配额满）。
++       原先直接丢弃 save() 返回值后仍报 ok:true，玩家以为老卒记住了，
++       刷新后台词从"认得你"退回"这位朋友"，且日志里一个字都没有。 */
++    const persisted = save();
++    return { ok: true, count: bucket.length, persisted: persisted };
+   }
+ 
+   // ============ 查询 ============
+@@ -411,10 +414,19 @@
+   }
+ 
+   function _reset(){
+-    /* 显式重置是受控恢复路径：解除保护后写空态。不得由启动流程自动调用。 */
+-    initState = 'ok';
++    /* 显式重置是受控恢复路径：写空态成功后才解除保护。不得由启动流程自动调用。
++       ⚠️ 顺序不能反。原实现先 initState='ok' 再 rawSave()，写失败时留下面这个危险组合：
++       内存空 + 磁盘旧 + 已允许写盘 → 之后任意一次 record() 都会用「空白 + 新记忆」覆盖旧档，
++       或刷新后把上一档整桶记忆读回来（"重开 = 全新的人"被破坏）。
++       现在失败就保持 blocked，宁可这局不记新记忆，也不覆盖玩家旧档。 */
+     st = blank();
+-    rawSave();
++    if(!rawSave()){
++      initState = 'blocked';
++      try{ console.error('[NpcMemory] 重置写盘失败，保持 fail-closed（本局不再写记忆）'); }catch(e2){}
++      return { ok: false, persisted: false };
++    }
++    initState = 'ok';
++    return { ok: true, persisted: true };
+   }
+ 
+   function init(h){
+############ js/npc_tower.js
+# 基线SHA256 9c93c4a53e556a0a78ba7dfd58fd887d9fc526d51a422ed1e02f52052e7983c2  当前SHA256 65dda4dc64d6bbd24dc31d8ed611bcf39efed7669ff914aeeadbaa4d0f81177c
+--- js/npc_tower.js.bak_20261108_182924_preD006	2026-11-03 08:57:11.551982100 +0800
++++ js/npc_tower.js	2026-11-08 19:21:46.359890200 +0800
+@@ -69,10 +69,11 @@
+ 
+   function memRecord(text, kind){
+     try {
+-      if (typeof window === 'undefined' || !window.NpcMemory) return;
+-      if (typeof window.NpcMemory.record !== 'function') return;
+-      window.NpcMemory.record('cuijiu', text, kind);
+-    } catch (e){ /* 异常静默忽略 */ }
++      if (typeof window === 'undefined' || !window.NpcMemory) return null;
++      if (typeof window.NpcMemory.record !== 'function') return null;
++      /* 回传记录结果：persisted === false 表示只进了内存、没落盘，UI 需要一句话说明 */
++      return window.NpcMemory.record('cuijiu', text, kind) || null;
++    } catch (e){ return null; }
+   }
+ 
+   function npcSay(state, ctx){
+@@ -84,7 +85,11 @@
+     var greeting = (voice && typeof voice.prefix === 'string' && voice.prefix)
+       ? (voice.prefix + BASE_GREETING) : BASE_GREETING;
+     if (mem && mem.knowsPlayer && typeof mem.top === 'string' && mem.top){
+-      greeting = greeting + '（他顿了顿，像是想起什么：' + mem.top + '）';
++      /* 与沈碑（js/npc.js）同一句式：叙述在后、记忆短语在前。
++         原先是 '（他顿了顿，像是想起什么：' + mem.top + '）'，而 mem.top 本身长这样：
++         「你听崔九讲过「守塔与妖兽」：塔里的妖兽，老朽守了几十年…」
++         → 拼出来双冒号套叠，且把"你听崔九讲过"这种第二人称转述塞进了崔九自己的叙述里。 */
++      greeting = greeting + '（他顿了顿，像是又想起了' + mem.top + '。）';
+     }
+     var topics = [];
+     for (var i = 0; i < TOPICS.length; i++){
+@@ -139,11 +144,15 @@
+ 
+     var text = hashPick(topic.lines, 'cuijiu|' + topic.id + '|' + state.cur.talk + '|' + now);
+ 
+-    /* 记忆语义（T-603/N4）：从"问了话题X"升级为具体故事——带话题名 + 当次讲的台词。
+-       重逢旧事行因此能想起具体内容，而不是"你聊过天"。 */
+-    memRecord('你听崔九讲过「' + topic.text + '」：' + text, topic.memKind);
+-
+-    return { ok: true, text: text, relDelta: relDelta, rel: state.rel, heard: state.heard.slice() };
++    /* 记忆存「可嵌进句子的稳定短语」，不存整段台词：
++       原来的文本带当次台词（hashPick 里掺了 now → 每句都不同），
++       NpcMemory 的"同文本去重"因此永不命中，8 条桶很快被同一话题的不同措辞占满，
++       并且把「登塔破了第 N 层」这类真正有信息量的记忆挤掉。 */
++    var memRes = memRecord('「' + topic.text + '」那些旧话', topic.memKind);
++
++    return { ok: true, text: text, relDelta: relDelta, rel: state.rel, heard: state.heard.slice(),
++      /* 只有明确 false 才算写盘失败，避免"没接这条线"被误报成失败 */
++      memPersisted: (memRes && memRes.persisted === false) ? false : true };
+   }
+ 
+   function npcArrive(state, ctx){
+@@ -156,6 +165,9 @@
+ 
+   window.NpcTower = {
+     NPC_CUIJIU: NPC_CUIJIU,
++    /* 导出话题表：UI 的「已听 n/N」分母必须按真实话题数算，不能写死 6
++       （崔九只有 3 个话题，写死 6 会让玩家永远停在 3/6，像是漏做了内容）。 */
++    TOPICS: TOPICS,
+     npcSay: npcSay,
+     npcPick: npcPick,
+     npcArrive: npcArrive
+############ js/npc_visit.js
+# 基线SHA256 c84f5455330a63c126e96aa6bf064b8e2d1e18eb9a1b8387bbb0ddcf114c5bd9  当前SHA256 390a64a4df6acd76cd4b8635b28edf9a40a5902c2162104c2cdb9f15fc307add
+--- js/npc_visit.js.bak_20261108_182924_preD006	2026-11-03 09:27:38.523571900 +0800
++++ js/npc_visit.js	2026-11-08 18:33:04.587860600 +0800
+@@ -49,8 +49,11 @@
+   function save(){
+     try {
+       localStorage.setItem(KEY, JSON.stringify(st));
++      return true;
+     } catch (err) {
+-      /* 写入失败：静默保留内存态 */
++      /* 写入失败：保留内存态，但必须让调用方知道没落盘 —— 原先这里返回 undefined，
++         调用方全部当成功，于是"事件已消费"只发生在内存里，刷新后同一句搭话会再播一次。 */
++      return false;
+     }
+   }
+ 
+@@ -71,6 +74,13 @@
+     } catch (err) {
+       parsed = null;
+     }
++    if (parsed === null && raw) {
++      /* 解析失败：先把原文另存一份再走空队列。
++         否则下一次 push() 的 save() 会把损坏原文直接覆盖掉，玩家/维护者再也取不回来
++         （主存档那条链路有 xiuxian_save_corrupt 兜底，这里原先没有对应物）。 */
++      try { localStorage.setItem(KEY + '_corrupt', raw); } catch (e2) {}
++      try { console.error('[npc_visit] 来访队列解析失败，原文已备份到 ' + KEY + '_corrupt'); } catch (e3) {}
++    }
+     st.q = (parsed && typeof parsed === 'object' && parsed.q && isArr(parsed.q)) ? parsed.q : [];
+     if (sanitize()) save();
+   }
+@@ -177,7 +187,9 @@
+     }
+     if (taken.length) {
+       st.q = kept;
+-      save();
++      /* 落盘失败也要报出来：内存已消费、磁盘没变 → 刷新后同一句搭话会再播一次。
++         这里不回滚（回滚等于本次立刻重复播报），只留可见记录。 */
++      if (!save()) { try { console.warn('[npc_visit] take 落盘失败：事件可能在刷新后重复播报'); } catch (e0) {} }
+     }
+     return taken;
+   }
+@@ -199,15 +211,19 @@
+     var removed = before - st.q.length;
+     /* 生命周期边界（T-114 审查 A4）：全量 clear（转世/重开）无条件落盘空队列——
+        即便内存恰为空（load 失败降级后），也要覆盖掉可能残存的旧存储，防"存储恢复后旧事件复现"。
+-       按 npc 局部清没有删除就不动盘。 */
+-    if (npc === undefined || removed > 0) save();
+-    return { ok: true, removed: removed };
++       按 npc 局部清没有删除就不动盘。
++       persisted=false 表示清空只发生在内存里：新一世开局可能读回上一世的旧队列。 */
++    var persisted = true;
++    if (npc === undefined || removed > 0) persisted = save();
++    return { ok: true, removed: removed, persisted: persisted };
+   }
+ 
+   /* ---------- (7) 调试 / 测试 ---------- */
+ 
+   function _state(){
+-    return st;
++    /* 深拷贝：原实现返回内部引用，调试/测试方一旦 _state().q.push(...) 就直接改真实队列
++       且不经 save()，内存与磁盘立刻分叉。npc_memory 那边本来就是深拷贝，这里对齐口径。 */
++    return { q: st.q.map(function (e) { return JSON.parse(JSON.stringify(e)); }) };
+   }
+ 
+   function _reset(){
+@@ -227,6 +243,9 @@
+     pending: pending,
+     take: take,
+     clear: clear,
++    /* 导出 load：侧车导入后磁盘变了，常驻内存必须跟着重读，
++       否则下一次 push() 会用导入前的旧队列整体覆盖刚导入的记录。 */
++    load: load,
+     _state: _state,
+     _reset: _reset
+   };
+############ js/story.js
+# 基线SHA256 205f52a92694be735de7000e1b5f7eb019d092cbf67e19bbccf1272861de8bef  当前SHA256 c7448859cef1b274711b02f99f50f0bf2923c14a537e3b0c14bdcc25a67953d8
+--- js/story.js.bak_20261108_182924_preD006	2026-10-28 02:34:00.000000000 +0800
++++ js/story.js	2026-11-08 18:34:18.195979700 +0800
+@@ -339,6 +339,12 @@
+   function pump(force){
+     if(playing || !queue.length) return;
+     clearTimeout(pumpT); pumpT = 0;
++    /* 遮挡复查：pump 多数由 setTimeout 延时触发（间隔 GAP_MS 6 秒、关窗后 460ms），
++       这期间玩家完全可能点开战斗/设置/人物面板。showCard 内部不做任何遮挡判定，
++       原先会把剧情卡直接压到那些弹窗底下（违反"叙事不打断玩法"），
++       而且 playing 仍被置 true 并挂上 12 秒自动关闭 → 这段时间 ready() 恒 false，
++       后续所有剧情段只能排队、不结算。被遮挡就延后再试，段子留在队列里不动。 */
++    if(!ready()){ pumpT = setTimeout(() => pump(force), 800); return; }
+     const wait = force ? 0 : (lastCardAt + GAP_MS - Date.now());
+     if(wait > 0){ pumpT = setTimeout(() => pump(true), wait); return; }
+     const it = queue.shift();
+@@ -360,9 +366,13 @@
+     renderInto();
+ 
+     if(list.length >= MERGE_AT){
++      /* 已排队但还没演过的段不能丢：它们的奖励已发、履历已记，
++         直接 queue=[] 等于"这几段剧情从来没有出现过"，补记卡名单里也没有它们。
++         这里把队列里的段并进本次合并名单（先排队的在前，保持发生顺序）。 */
++      const merged = queue.concat(list);
+       queue = []; clearTimeout(pumpT); pumpT = 0;
+       lastCardAt = now;
+-      showMerge(list);
++      showMerge(merged);
+       logHint();
+       return;
+     }
+############ js/trib.js
+# 基线SHA256 79b4d16625961106c9f30771866bc8f2cd377b1f8529471abb71602e6decc8f9  当前SHA256 bb75459b69cbd2b100e2a0959eacda369298337e5e7487120db09917e01d27ee
+--- js/trib.js.bak_20261108_182924_preD006	2026-10-24 16:54:16.000000000 +0800
++++ js/trib.js	2026-11-08 18:43:37.571116800 +0800
+@@ -12,7 +12,9 @@
+  * 克制原则（红线审美）：
+  *   · 纯 CSS 无图片；不碰任何数值与突破逻辑，只做演出编排；
+  *   · prefers-reduced-motion → 直接跳过演出走 onDone；
+- *   · 演出期间 TRIB.busy = true，game.js 凭此锁住重复突破；
++ *   · 演出期间 TRIB.busy = true；期间的重复 play 按幂等契约忽略（不叠播、不调其 onDone）。
++ *     已知缺口：遮罩 pointer-events:none 不挡点击，连破两层时第二次的结算卡不会出现，
++ *     属待裁定项（放行补发 / 禁止连破），见 play() 内的详细说明；
+  *   · 异常一律兜底（try/catch + onDone 必达），绝卡死突破流程。
+  * ============================================================ */
+ (function(){
+@@ -72,7 +74,18 @@
+       if(opt.onDone) opt.onDone();
+       return { playing:false };
+     }
+-    if(busy) return { playing:false };   /* 演出中不叠播（正常有 game.js 锁双保险） */
++    if(busy){
++      /* 幂等契约（verify.js「演出中重复触发不叠播、不重复收尾」守护着这条）：
++         演出期间的重复 play 一律不叠播、也不调它的 onDone。
++         ⚠️ 已知缺口（待制作人裁定，不擅自改）：遮罩是 pointer-events:none，
++         玩家确实能在 4.6 秒演出里再破一次境（verify_break 又要求连续突破必须允许），
++         那一次的结算卡因此不会出现 —— 境界跳了两级、只看到一张卡。
++         要修必须二选一：允许补发结算卡（改本文件的幂等契约），
++         或禁止演出期间突破（等于给突破加 4.6 秒冷却，属玩法变更）。
++         这里只留一条控制台记录以便事后追查，不改变任何既有行为。 */
++      try{ console.warn('[TRIB] 演出中重复触发，已按幂等契约忽略其 onDone（该次结算不会弹卡）'); }catch(e){}
++      return { playing:false, dropped:!!opt.onDone };
++    }
+     busy = true; lastOk = !!ok; onDone = opt.onDone || null;
+     m.classList.remove('hidden');
+     setPhase('cloud');   /* 阶段只走 data-phase 属性：绝不与 .trib-cloud 等元素类撞名 */
+############ style.css
+# 基线SHA256 3818c5b2f0b8fc5a30211ef339002acda100f031f5e6e25420ab020a7e192458  当前SHA256 95b78ce8ac6f9ae9cf109da35a2509cb0e1ef2494a8bf644cbd6ced53d06cc8f
+--- style.css.bak_20261108_182924_preD006	2026-11-06 14:45:43.631440500 +0800
++++ style.css	2026-11-08 18:31:33.481252700 +0800
+@@ -4308,6 +4308,14 @@
+   font-size:13px; line-height:1.75; color:#574e3e;
+ }
+ .mc-opts{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
++/* [hidden]{display:none} 在浏览器 UA 样式表里，任何作者写的 display 规则都会盖掉它
++   （同特异性下作者样式优先）。项目里已经为此单独补过 .sys-dot[hidden] / .sc-trail[hidden] /
++   .life-btn[hidden] / .life-sum[hidden] / .ch-off.hidden 五处，这里补上联机面板漏掉的两处：
++   · .mc-opts{display:grid} → 道途行/房间道途行/空目录的 hidden 失效，登录后这些块收不回去；
++   · .ch-input{display:flex}（在 @media ≤520px 内）→ 手机上地址行与道号行永远同时可见。
++   选择器带属性，特异性 (0,2,0) 高于裸类名 (0,1,0)，无论书写顺序都能压住。 */
++.ch-input[hidden]{ display:none; }
++.mc-opts[hidden]{ display:none; }
+ /* 收签后的三颗墨点：实心是默守，朱砂空圈是断喝——三息一眼数得清 */
+ .mc-pips{ display:none; gap:8px; align-items:center; }
+ .mc-pips[data-on="1"]{ display:flex; }

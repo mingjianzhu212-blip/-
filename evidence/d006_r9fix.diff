@@ -1,0 +1,123 @@
+############ js/daily.js
+# r9 SHA 69967aa10ea448f9c17dafa3f3a08d532c133fbb4c889054f0b225235b245393  r10 SHA 9d71c0ddfff5e3fe7606f66819c567a768afe98355d9ca918ecbe8118dca5c4d
+--- js/daily.js.bak_20261108_211215_preR9fix	2026-11-08 20:35:20.097887800 +0800
++++ js/daily.js	2026-11-08 21:16:01.905239200 +0800
+@@ -165,17 +165,25 @@
+      把 B 刚写下的进度覆盖掉。 */
+   function bump(kind, n){
+     const t = DAILY_TASKS.find(x => x.id === kind);
+-    if(!t) return Promise.resolve({ ok:false, msg:'任务不存在' });
++    if(!t) return Promise.resolve({ ok:false, code:'UNKNOWN_TASK', msg:'任务不存在' });
+     const add = (typeof n === 'number' && Number.isFinite(n) && n > 0) ? Math.floor(n) : 1;
+     const doBump = () => {
+       load();                       /* 锁内重读，以磁盘为准 */
+       ensureDay();
+-      st.prog[kind] = Math.min(t.goal, (st.prog[kind] || 0) + add);
+-      save();
++      const before = st.prog[kind]; /* 写盘失败要回滚到这个"修改前"的进度 */
++      st.prog[kind] = Math.min(t.goal, (before || 0) + add);
++      /* save() 返回布尔（见上文）。写盘失败时内存里的 +add 没落盘，必须回滚，
++         否则 list() 会把没保存的进度当真进度显示 —— 那就是"假装已经记下"，
++         与本模块对写盘失败的一贯口径（doClaim 早就回滚 + 返回失败）相冲突。
++         返回带 code 的明确失败，交给 dailyBump() 提示玩家一次。 */
++      if(!save()){
++        st.prog[kind] = before;
++        return { ok:false, code:'SAVE_FAILED', msg:'任务进度保存失败（本机存储异常），本次进度未记下。' };
++      }
+       return { ok:true, prog: st.prog[kind] };
+     };
+     const p = withClaimLock(doBump);
+-    if(p) return p.catch(() => ({ ok:false, msg:'进度记录失败，请重试' }));
++    if(p) return p.catch(() => ({ ok:false, code:'BUMP_FAILED', msg:'进度记录失败，请重试' }));
+     /* 无 Web Locks：**不做无保护写入**。
+        "load → 改 → save" 是读改写序列，跨标签页不是原子操作：两个标签页同时累积同一任务时，
+        后写者会用旧基数覆盖前者（进度静默变少）。bump 函数本身同步执行并不能让这段变成原子。
+############ js/game.js
+# r9 SHA a77c5b17d7ecc4fcf37a5ad063bfceea1dbc176b5b071a1bd8a3428ca5255cd6  r10 SHA 2cc1705e0dd8a9f2332eefded86cc7a1a815c0f0ac717102b0b9f9d6764ffd8b
+--- js/game.js.bak_20261108_211215_preR9fix	2026-11-08 20:35:32.874529600 +0800
++++ js/game.js	2026-11-08 21:16:39.986522400 +0800
+@@ -4301,12 +4301,22 @@
+      无 Web Locks 的环境下它会明确拒绝写入（"load→改→save" 跨标签页不安全），
+      这里把"没记下"如实告诉玩家一次 —— 不要让他以为进度已经保存。 */
+   let dailyNoLockWarned = false;
++  let dailySaveFailWarned = false;
+   function dailyBump(kind){
+     if(typeof Daily === 'undefined') return;
+     Promise.resolve(Daily.bump(kind)).then(r => {
+       if(r && r.ok === false && r.code === 'NO_LOCK' && !dailyNoLockWarned){
+         dailyNoLockWarned = true;
+         log('⚠️ ' + r.msg + '（日常任务进度本次不记，其他玩法不受影响）', 'bad');
++      } else if(r && r.ok === false &&
++               (r.code === 'SAVE_FAILED' || r.code === 'BUMP_FAILED') &&
++               !dailySaveFailWarned){
++        /* 有锁但写盘失败（进度已在 daily.js 回滚）：也要如实告知"本次没记下"，
++           与无锁提示分开计数、各只提示一次，避免反复刷屏。
++           ⚠️ 只认这两个码：UNKNOWN_TASK（herb/enlight/ponder 等正常动作本就不计入日常）
++           必须静默忽略，否则每次采药/顿悟都会误报"保存失败"。 */
++        dailySaveFailWarned = true;
++        log('⚠️ ' + r.msg + '（可清理本机存储后重试，其他玩法不受影响）', 'bad');
+       }
+     }, () => {});
+   }
+############ tools/d006-viewsnet.test.mjs
+# r9 SHA 6bd1b1c3d0e2540da5aed8603cb057a736547808f8f6743a15a24c448a46e5c8  r10 SHA 96db88ec3a05bfa5eebca08cbff4f9be64326774e076b6c7251da7569a125e44
+--- tools/d006-viewsnet.test.mjs.bak_20261108_211215_preR9fix	2026-11-08 20:36:04.374584200 +0800
++++ tools/d006-viewsnet.test.mjs	2026-11-08 21:18:39.724869100 +0800
+@@ -1045,3 +1045,57 @@
+   /* 裸调用只允许出现在 dailyBump 内部那一处 */
+   assert.strictEqual((GAME.match(/Daily\.bump\(/g) || []).length, 1, '除 helper 外不许有裸调用（否则失败结果被丢掉）');
+ });
++
++/* 第九轮审查新阻断：有锁环境 save() 返回 false 时不能虚报成功。真跑 daily.js 的 bump。 */
++test('J-1: 有锁 bump 写盘失败 → 不返回成功、回滚内存进度、磁盘不变', async () => {
++  const raw = JSON.stringify({ day: '2026-11-08', prog: { sit: 3, train: 0, tower: 0 }, claimed: [] });
++  const store = { jxwd_daily_v1: raw };
++  const ctx = makeDaily([2026, 11, 8], store);   /* 有 Web Locks */
++  await ctx.ready;                                /* init 完成（同日不写盘） */
++  const before = ctx.Daily._state().prog.sit;     /* 修改前的进度 */
++  /* 注入写盘失败：save() 里 setItem 抛错 → 返回 false */
++  ctx.localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
++  const r = await ctx.Daily.bump('sit', 1);
++  assert.strictEqual(r.ok, false, '写盘失败不能返回成功（否则就是虚报）');
++  assert.strictEqual(r.code, 'SAVE_FAILED', '要带可区分的失败码，供 UI 提示');
++  assert.match(r.msg, /未记下/, '文案要如实说本次没记下');
++  assert.strictEqual(ctx.Daily._state().prog.sit, before, '内存进度必须回滚到修改前，不能停在 4');
++  assert.strictEqual(ctx.Daily.list().find(t => t.id === 'sit').prog, before, 'UI 展示也不能虚报');
++  assert.strictEqual(store.jxwd_daily_v1, raw, '磁盘一个字节都不该变');
++});
++
++/* 真跑 game.js 的 dailyBump：普通写盘失败要给玩家提示、UNKNOWN_TASK 不误报、只提示一次。 */
++test('J-1: 真跑 dailyBump —— SAVE_FAILED 提示、UNKNOWN_TASK 静默、只提示一次', async () => {
++  const fn = extractFn(GAME, 'dailyBump');
++  const logs = [];
++  function makeCtx(bumpResult){
++    const c = {
++      Daily: { bump: () => Promise.resolve(bumpResult) },
++      log: (m) => logs.push(m),
++      Promise,
++      dailyNoLockWarned: false,
++      dailySaveFailWarned: false,
++    };
++    vm.createContext(c);
++    vm.runInContext(fn + '\nglobalThis.__bump = dailyBump;', c);
++    return c;
++  }
++  /* SAVE_FAILED：连调两次，只应提示一次 */
++  const c1 = makeCtx({ ok:false, code:'SAVE_FAILED', msg:'任务进度保存失败（本机存储异常），本次进度未记下。' });
++  c1.__bump('sit'); c1.__bump('sit');
++  await new Promise(r => setTimeout(r, 0));
++  assert.ok(logs.some(m => /未记下/.test(m)), '写盘失败要给玩家可见提示');
++  assert.strictEqual(logs.length, 1, '只提示一次，不刷屏');
++  /* UNKNOWN_TASK：herb/enlight/ponder 等本就不计入日常的正常动作，绝不能误报 */
++  logs.length = 0;
++  const c2 = makeCtx({ ok:false, code:'UNKNOWN_TASK', msg:'任务不存在' });
++  c2.__bump('herb');
++  await new Promise(r => setTimeout(r, 0));
++  assert.strictEqual(logs.length, 0, '任务不存在的正常动作不得误报"保存失败"');
++  /* NO_LOCK 仍走独立提示，不被新的普通失败分支抢占 */
++  logs.length = 0;
++  const c3 = makeCtx({ ok:false, code:'NO_LOCK', msg:'当前浏览器不支持安全的多窗口记录，本次任务进度未保存。' });
++  c3.__bump('sit');
++  await new Promise(r => setTimeout(r, 0));
++  assert.ok(logs.some(m => /日常任务进度本次不记/.test(m)), 'NO_LOCK 仍走原独立提示');
++});

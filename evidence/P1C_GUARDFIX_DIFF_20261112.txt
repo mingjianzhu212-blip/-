@@ -1,0 +1,14 @@
+--- scratch/p1c_prototype/_game_prefix.js	2026-11-12 16:22:51.980498300 +0800
++++ js/game.js	2026-11-12 16:19:30.128105400 +0800
+@@ -11378,8 +11378,9 @@
+     let name = (nameInput ? nameInput.value : '').trim().slice(0, 8);
+     if(!name) name = '无名散修';
+     if(needNewGame && !charPath){ log('请先选择道途，再确认创角。', 'bad'); return; } /* 创角必选（GPT 审查④） */
+-    /* 终身道途：仅当本源尚未确定（创角/老档补选）才写入；已选道途不可被普通编辑覆盖（禁止转职，GPT 代码审查②） */
+-    if(charPath && (typeof S.path !== 'string' || PATH_IDS.indexOf(S.path) < 0)) S.path = charPath;
++    /* 终身道途：仅当本源尚未确定（创角/老档补选）才写入；已选道途不可被普通编辑覆盖（禁止转职，GPT 代码审查②）。
++       P1-C GPT 终审阻断项①修正：写入前先校验 incoming charPath 本身属 PATH_IDS（数据完整性守卫，防非法/越界值落入本源）。 */
++    if(PATH_IDS.indexOf(charPath) >= 0 && (typeof S.path !== 'string' || PATH_IDS.indexOf(S.path) < 0)) S.path = charPath;
+     S.name = name;
+     S.sex = charSex;                              /* 落进playerState.sex（老字段，主界面读它） */
+     S.gender = genderOf(charSex);/* 显式字段：'male' / 'female' */

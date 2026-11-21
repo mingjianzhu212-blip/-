@@ -1,0 +1,18 @@
+{
+  "stamp": "20261111152430",
+  "sha": "571fddb4ec78e9587edd7526ca8f9080fd02e60762938025f931cb5e30ddd8d5",
+  "delivered": 1,
+  "of": 3,
+  "replyChars": 495,
+  "log": [
+    "[15:24:31] {\"tabId\":\"DDD2938DB0794361D68225353EEAE397\",\"url\":\"https://chatgpt.com/\"}",
+    "[15:24:31] {\"tag\":\"【片 2/4 完】\",\"attempt\":1,\"sendable\":true}",
+    "[15:24:37] {\"tag\":\"【片 2/4 完】\",\"attempt\":1,\"clk\":\"CLICKED\",\"readback\":true,\"composerLen\":1,\"ok\":true}",
+    "[15:25:29] {\"tag\":\"【片 3/4 完】\",\"attempt\":1,\"sendable\":false}",
+    "[15:26:18] {\"tag\":\"【片 3/4 完】\",\"attempt\":2,\"sendable\":false}",
+    "[15:26:21] {\"ABORT\":\"chunk_failed\",\"at\":3,\"note\":\"按补充令一·3 失败两次即降级，停止后续片并登记缺件\"}",
+    "[15:26:21] {\"delivered\":1,\"of\":3}",
+    "[15:26:25] {\"pollChars\":495}",
+    "[15:26:37] {\"replyChars\":495,\"elapsedSec\":16}"
+  ]
+}

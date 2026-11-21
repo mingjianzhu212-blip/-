@@ -1,0 +1,125 @@
+=== P1-C CODEFIX 测试原始输出 · 2026-11-12 ===
+
+--- [1] 语法检查 node --check js/game.js ---
+SYNTAX_OK exit=0
+
+--- [2] scratch 原型机制矩阵 pathBonus.test.mjs ---
+TAP version 13
+# Subtest: ① 四道途数值对账：每道途乘子与伤害严格按 fixture 排序
+ok 1 - ① 四道途数值对账：每道途乘子与伤害严格按 fixture 排序
+  ---
+  duration_ms: 1.0058
+  type: 'test'
+  ...
+# Subtest: ② 老档无加成：S.path 缺失/空/旧档 → 乘子回退 1，伤害等于基准
+ok 2 - ② 老档无加成：S.path 缺失/空/旧档 → 乘子回退 1，伤害等于基准
+  ---
+  duration_ms: 0.1209
+  type: 'test'
+  ...
+# Subtest: ③ 脏值回退：未知键/非数/≤0/表缺失 → 乘子回退 1
+ok 3 - ③ 脏值回退：未知键/非数/≤0/表缺失 → 乘子回退 1
+  ---
+  duration_ms: 0.7255
+  type: 'test'
+  ...
+# Subtest: ④ 多道途规则：各道途独立、切换即变、互不污染
+ok 4 - ④ 多道途规则：各道途独立、切换即变、互不污染
+  ---
+  duration_ms: 0.191
+  type: 'test'
+  ...
+# Subtest: ⑤ 重复攻击不重复乘算：每击各乘一次、全场恒定，非复利非整场一次
+ok 5 - ⑤ 重复攻击不重复乘算：每击各乘一次、全场恒定，非复利非整场一次
+  ---
+  duration_ms: 0.1187
+  type: 'test'
+  ...
+# Subtest: ⑥ onSkill 不叠加：pathBonus 仅按路径施加一次，技能标识不引入二次乘区
+ok 6 - ⑥ onSkill 不叠加：pathBonus 仅按路径施加一次，技能标识不引入二次乘区
+  ---
+  duration_ms: 0.0714
+  type: 'test'
+  ...
+# Subtest: ⑦ script 场不受影响：定速演出伤害完全不经过 pathBonus
+ok 7 - ⑦ script 场不受影响：定速演出伤害完全不经过 pathBonus
+  ---
+  duration_ms: 0.1564
+  type: 'test'
+  ...
+# Subtest: ⑧ mobTurn 不受影响：妖兽伤害完全不经过 pathBonus
+ok 8 - ⑧ mobTurn 不受影响：妖兽伤害完全不经过 pathBonus
+  ---
+  duration_ms: 0.1071
+  type: 'test'
+  ...
+# Subtest: ⑨ 退出异常不残留：纯函数、不修改入参、无全局状态
+ok 9 - ⑨ 退出异常不残留：纯函数、不修改入参、无全局状态
+  ---
+  duration_ms: 0.7578
+  type: 'test'
+  ...
+# Subtest: ⑩ 奖励幂等（机制层）：pathBonus 不进入奖励结算，道途切换不影响奖励口径
+ok 10 - ⑩ 奖励幂等（机制层）：pathBonus 不进入奖励结算，道途切换不影响奖励口径
+  ---
+  duration_ms: 0.3051
+  type: 'test'
+  ...
+# Subtest: ⑪ 三者一致（机制层）：伤害 = round(base × computePathBonus(path))，单一权威来源
+ok 11 - ⑪ 三者一致（机制层）：伤害 = round(base × computePathBonus(path))，单一权威来源
+  ---
+  duration_ms: 0.1346
+  type: 'test'
+  ...
+# Subtest: 附·确定性：同一输入重复 50 次恒等输出
+ok 12 - 附·确定性：同一输入重复 50 次恒等输出
+  ---
+  duration_ms: 0.0831
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14.979
+
+--- [3] 真实 game.js 逻辑抽取校验 verify_real_logic.mjs ---
+PATH_IDS [ 'sword', 'body', 'dan', 'array' ]
+PATH_BONUS { sword: 1, body: 1.05, dan: 1.04, array: 1.06 }
+
+✅ 真实 game.js P1-C 逻辑校验全部通过（常量/白名单/战斗乘算/联机隔离/终身锁定/老档补选）
+
+--- [4] 全量 S.path 写入/引用点（grep 'S.path ='）---
+3952:        S.path = o.path;
+3954:        S.path = '';
+3956:          try { const c = localStorage.getItem(MULTI_PATH_KEY); if (c && PATH_IDS.indexOf(c) >= 0) S.path = c; } catch(e){}
+7348:    return (typeof S.path === 'string' && PATH_IDS.indexOf(S.path) >= 0) ? S.path : '';
+7399:              S.path = sp; multiSavePath(sp);        // 本地未选才补全本源 + 缓存
+7773:      if(typeof S.path === 'string' && PATH_IDS.indexOf(S.path) >= 0){
+7778:        S.path = id; multiSavePath(id);              /* 离线补选：写入本源 + 缓存（id 已白名单校验） */
+7785:        S.path = rp; multiSavePath(rp);
+11342:    const existing = (typeof S.path === 'string' && PATH_IDS.indexOf(S.path) >= 0);
+11357:    if(charPath && (typeof S.path !== 'string' || PATH_IDS.indexOf(S.path) < 0)) S.path = charPath;
+11429:    if(!needNewGame && typeof S.path === 'string' && S.path === ''){
+11600:    S.name = ''; S.sex = 'm'; S.gender = 'male'; S.robe = 'bai'; S.path = '';
+
+--- [5] 全量 S.path 引用点计数 ---
+22
+
+--- [6] 基线/当前文件 sha256 ---
+5397383ed085a2948e1994d1c211859c54c3f21f60c14e27593511249b637e86 *js/game.js.bak_20261112_p1c_codefix
+b383b81b711c5620f5b5b834eec6b10e80091bb57b7b8e65a5ca6a1712b8e274 *js/game.js
+
+--- [7] 本轮 diff 涉及的函数/区段（hunk 头）---
+3:@@ -7391,9 +7391,18 @@
+25:@@ -7759,13 +7768,25 @@
+54:@@ -11220,6 +11241,7 @@
+62:@@ -11276,12 +11298,21 @@
+90:@@ -11289,12 +11320,15 @@
+109:@@ -11305,7 +11339,9 @@
+120:@@ -11317,7 +11353,8 @@
+130:@@ -11387,6 +11424,11 @@

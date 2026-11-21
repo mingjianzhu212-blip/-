@@ -1,0 +1,13 @@
+--- js/D007_BACKUP_20261108_225456/sect.js	2026-10-30 11:53:09.000000000 +0800
++++ js/views/sect.js	2026-11-09 00:07:48.859362700 +0800
+@@ -44,8 +44,8 @@
+     { key: 'xx-treasure', view: 'zong_seek', name: '探索秘境', note: '采灵草 · 挖矿石',
+       ico: 'bld_secret.png', sealTxt: '采集',
+       body: `      <section class="card wide">
+-        <button class="treasure-btn" id="xx-treasure">🗺️ 探索秘境 · 灵石</button>
+-        <p class="hint">消耗灵石探索秘境，采得灵草和矿石（炼丹、炼器材料）。</p>
++        <button class="treasure-btn" id="xx-treasure">🗺️ 探索秘境</button>
++        <p class="hint">按钮上标的是本次探索所需灵石（随境界递增，与实扣同源）；可采得灵草与矿石各 5~20 份（炼丹、炼器材料），机缘好时另有百年／万年灵草。</p>
+       </section>` },
+     /* 宗门互助：发求助、替同门护法 */
+     { key: 'xx-help', view: 'zong_help', name: '宗门互助', note: '求助 · 护法 · 领赏',

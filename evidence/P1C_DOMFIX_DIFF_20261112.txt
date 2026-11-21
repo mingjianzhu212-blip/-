@@ -1,0 +1,57 @@
+--- js/game.js.bak_20261112_p1c_domfix	2026-11-12 14:55:58.976907900 +0800
++++ js/game.js	2026-11-12 14:58:42.135383900 +0800
+@@ -11289,6 +11289,21 @@
+   /* P1-C（D1=(a)）：道途选择预览。动态注入容器（不依赖 index.html 改动），
+      复用 .char-pick 样式；无障碍：文字名称 + aria-pressed 选中态。 */
+   function renderPathPreview(){
++    /* P1-C 样式随容器动态注入：不依赖 index.html / style.css 改动（白名单：唯一修改点 js/game.js）。 */
++    if(!document.getElementById('p1c-path-style')){
++      const st = document.createElement('style');
++      st.id = 'p1c-path-style';
++      st.textContent =
++        '.char-path-label{text-align:center;font-size:12px;letter-spacing:1px;color:var(--muted);margin:10px 0 6px}' +
++        '.char-path-picks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 10px}' +
++        '.char-path-picks .char-pick{min-height:58px;padding:8px 4px;justify-content:center;cursor:pointer}' +
++        '.char-path-picks .char-pick .cp-name{font-size:14px;letter-spacing:2px}' +
++        '.char-path-picks .char-pick.active{box-shadow:0 0 0 1px var(--gold,#8a6d3b) inset}' +
++        '.char-path-picks .char-pick.readonly{cursor:default;opacity:.45}' +
++        '.char-path-picks .char-pick.readonly.active{opacity:1}' +
++        '@media(max-width:420px){.char-path-picks{grid-template-columns:repeat(2,1fr)}}';
++      document.head.appendChild(st);
++    }
+     let box = document.getElementById('char-path-picks');
+     if(!box){
+       box = document.createElement('div');
+@@ -11296,7 +11311,10 @@
+       box.className = 'char-path-picks';
+       const modal = document.getElementById('char-modal');
+       const cf = document.getElementById('char-confirm');
+-      if(cf && modal) modal.insertBefore(box, cf); else if(modal) modal.appendChild(box);
++      /* 真实浏览器实测修复：#char-confirm 是 .m-card 的子节点、不是 #char-modal 的直接子节点，
++         用 modal.insertBefore(box, cf) 会抛 NotFoundError 使弹窗打不开。改插到 cf 的真正父节点。 */
++      if(cf && cf.parentNode) cf.parentNode.insertBefore(box, cf);
++      else if(modal) modal.appendChild(box);
+     }
+     const readonly = pathLocked;
+     box.innerHTML = PATH_OPTS.map(o => {
+@@ -11338,10 +11356,17 @@
+   }
+   function showCharModal(editing){
+     charSex = sexOf(S.gender || S.sex);
+-    charEditing = !!editing;
++    /* P1-C 真实浏览器实测修复：#m-char（改名/换装，真实编辑入口）绑定 showCharModal(false)，
++       而 showCharModal(true) 只在「重开」时调用 —— 调用方的 editing 参数不可靠，
++       用它判定锁定会让真实编辑入口绕过终身道途。改以存档状态本身判定：
++         · needNewGame（新档/重开，S.path 已重置为 ''）→ 四选一必选；
++         · 已有合法 S.path 且非新档 → 只读锁定，禁止转职；
++         · S.path 为空且非新档 → 老档补选。
++       editing 形参保留仅为兼容既有调用点，不参与判定。 */
++    charEditing = !needNewGame;
+     const existing = (typeof S.path === 'string' && PATH_IDS.indexOf(S.path) >= 0);
+-    charPath = (editing && existing) ? S.path : ''; /* 编辑已有道途则预选；新档/未选不预选 */
+-    pathLocked = editing && existing;              /* 已有合法道途的编辑态：终身道途只读，禁止转职 */
++    charPath = existing ? S.path : '';             /* 已有道途预选；新档/未选不预选 */
++    pathLocked = existing && !needNewGame;         /* 已选道途的编辑态：终身道途只读 */
+     const nameInput = document.getElementById('char-name');
+     if(nameInput) nameInput.value = S.name || '';
+     renderCharPreview();

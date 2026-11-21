@@ -1,0 +1,179 @@
+{
+  "stamp": "20261111152550",
+  "baseline": [
+    {
+      "file": "server/multi-p0c.test.mjs",
+      "sha256": "827649cb588713ffdd2a28aaebb3cb7ccfc3fb2e09007e277aff48ed8cd5b51c",
+      "chars": 7608
+    },
+    {
+      "file": "server/multi-p0b.test.mjs",
+      "sha256": "e4a37ed7dafb5a266aa93f68b52d8dadac0b8f5f2dcae125a8ad72c92b73b556",
+      "chars": 12403
+    },
+    {
+      "file": "server/multi-p0e.test.mjs",
+      "sha256": "b053b816b7be4095fc7a2aa985cde2dbf015951a18df6db02745bd711ab991ca",
+      "chars": 7312
+    },
+    {
+      "file": "server/multi-p1a.test.mjs",
+      "sha256": "37a647c446b31cf5d60270f9ac30dfaf24efe8ce949e4e38d90877b134c8399b",
+      "chars": 17238
+    },
+    {
+      "file": "server/multi-p1b.test.mjs",
+      "sha256": "840bddb086e0840bc9435bfed7e99156139742800315bea332e994bb6287008a",
+      "chars": 17317
+    },
+    {
+      "file": "server/multi-p1a-client.test.mjs",
+      "sha256": "78ad84bdcb95a3e6ab8145cb7e44ff41f3d464bf41cd87ed2c1a5a8fd9cece05",
+      "chars": 5386
+    },
+    {
+      "file": "server/multi-join-concurrency.test.mjs",
+      "sha256": "2ed923726fb1b0523afcaf1ceeb1bc4b33d6b609eee6207b31e2c99ec55ac924",
+      "chars": 31374
+    },
+    {
+      "file": "server/k11-trade.test.mjs",
+      "sha256": "963b61f3a59127d6fb95a26edc80b5bcbc96017708953192e29605f72a9a89e2",
+      "chars": 20595
+    }
+  ],
+  "diffs": [
+    {
+      "file": "server/multi-p0c.test.mjs",
+      "from": "const PORT = 7810 + (process.pid % 50);",
+      "to": "const PORT = 8600 + (process.pid % 50);",
+      "why": "7810-7859 与 p0 主段 7800-7899 重叠 → 8600-8649",
+      "shaBefore": "827649cb588713ffdd2a28aaebb3cb7ccfc3fb2e09007e277aff48ed8cd5b51c",
+      "shaAfter": "44acc4b0aa44c28aee3465fb87cf872e70523e5d41b94459a7e9387cded79bec"
+    },
+    {
+      "file": "server/multi-p0b.test.mjs",
+      "from": "const PORT = 7820 + (process.pid % 50);",
+      "to": "const PORT = 8650 + (process.pid % 50);",
+      "why": "7820-7869 与 p0 重叠 → 8650-8699",
+      "shaBefore": "e4a37ed7dafb5a266aa93f68b52d8dadac0b8f5f2dcae125a8ad72c92b73b556",
+      "shaAfter": "b88381f3f340cd82e5a16484cba018c432b03e44a8d9b1eb2c24428e3c6678d6"
+    },
+    {
+      "file": "server/multi-p0e.test.mjs",
+      "from": "const PORT = 7870 + (process.pid % 50);",
+      "to": "const PORT = 8700 + (process.pid % 50);",
+      "why": "7870-7919 与 p0/p1a 重叠 → 8700-8749",
+      "shaBefore": "b053b816b7be4095fc7a2aa985cde2dbf015951a18df6db02745bd711ab991ca",
+      "shaAfter": "f3a5de1a4e5a7e1e861ba261776b324e05ff02084ad858b7a4cb02a0852bb07b"
+    },
+    {
+      "file": "server/multi-p1a.test.mjs",
+      "from": "const PORT = 7890 + (process.pid % 50);",
+      "to": "const PORT = 8750 + (process.pid % 50);",
+      "why": "7890-7939 与 p0e 重叠 → 8750-8799",
+      "shaBefore": "37a647c446b31cf5d60270f9ac30dfaf24efe8ce949e4e38d90877b134c8399b",
+      "shaAfter": "cd0fd2ca86e1eb1fb6019a15b3ef8f843b119800e2bb644d27f4ca80b595cac0"
+    },
+    {
+      "file": "server/multi-p1b.test.mjs",
+      "from": "const PORT = 7910 + (process.pid % 50);",
+      "to": "const PORT = 8800 + (process.pid % 50);",
+      "why": "7910-7959 与 p1a 重叠 → 8800-8849",
+      "shaBefore": "840bddb086e0840bc9435bfed7e99156139742800315bea332e994bb6287008a",
+      "shaAfter": "f0cea936e8b60952b1f41bd28185236c0b2a9feeaf91ab9a454fb269c6d8196a"
+    },
+    {
+      "file": "server/multi-p1a-client.test.mjs",
+      "from": "const PORT = 7940 + (process.pid % 50);",
+      "to": "const PORT = 8850 + (process.pid % 50);",
+      "why": "7940-7989 与 p1b 重叠 → 8850-8899",
+      "shaBefore": "78ad84bdcb95a3e6ab8145cb7e44ff41f3d464bf41cd87ed2c1a5a8fd9cece05",
+      "shaAfter": "eeb64029f035ef14d5a19fdcf0da3f4d61bce31ab09d60ddaa986a865d678435"
+    },
+    {
+      "file": "server/multi-join-concurrency.test.mjs",
+      "from": "const PORT = 8070 + (process.pid % 40);",
+      "to": "const PORT = 8900 + (process.pid % 50);",
+      "why": "与 k11-trade.test.mjs 完全同段 8070-8109 → 8900-8949",
+      "shaBefore": "2ed923726fb1b0523afcaf1ceeb1bc4b33d6b609eee6207b31e2c99ec55ac924",
+      "shaAfter": "049354449f7e19f9f33a5f9b3b438c72a4a53909d9f15efc61774ea7f6f3fae7"
+    },
+    {
+      "file": "server/k11-trade.test.mjs",
+      "from": "const port = 8150 + (process.pid % 30);",
+      "to": "const port = 8950 + (process.pid % 30);",
+      "why": "8150-8179 与 tools/p2a-curve-audit 8170-8199 边缘重叠 → 8950-8979",
+      "shaBefore": "963b61f3a59127d6fb95a26edc80b5bcbc96017708953192e29605f72a9a89e2",
+      "shaAfter": "ce7921f7f393df807bf0619f07372a2dc74734d8d2eda603cd393fe53f4ae86c"
+    }
+  ],
+  "baseRun": {
+    "label": "BASELINE_PARALLEL",
+    "serial": false,
+    "status": 1,
+    "pass": "276",
+    "fail": "3",
+    "sec": 6,
+    "ok": false
+  },
+  "runs": [
+    {
+      "label": "AFTER_PARALLEL_1",
+      "serial": false,
+      "status": 1,
+      "pass": "276",
+      "fail": "3",
+      "sec": 6,
+      "ok": false
+    },
+    {
+      "label": "AFTER_PARALLEL_2",
+      "serial": false,
+      "status": 1,
+      "pass": "265",
+      "fail": "14",
+      "sec": 11,
+      "ok": false
+    },
+    {
+      "label": "AFTER_PARALLEL_3",
+      "serial": false,
+      "status": 1,
+      "pass": "276",
+      "fail": "3",
+      "sec": 6,
+      "ok": false
+    },
+    {
+      "label": "AFTER_SERIAL",
+      "serial": true,
+      "status": 1,
+      "pass": "276",
+      "fail": "3",
+      "sec": 16,
+      "ok": false
+    }
+  ],
+  "rolledBack": true,
+  "log": [
+    "[15:25:50] {\"testFiles\":21}",
+    "[15:25:50] {\"step\":\"backup_done\",\"files\":8}",
+    "[15:25:56] {\"label\":\"BASELINE_PARALLEL\",\"serial\":false,\"status\":1,\"pass\":\"276\",\"fail\":\"3\",\"sec\":6}",
+    "[15:25:56] {\"changed\":\"server/multi-p0c.test.mjs\",\"why\":\"7810-7859 与 p0 主段 7800-7899 重叠 → 8600-8649\"}",
+    "[15:25:56] {\"changed\":\"server/multi-p0b.test.mjs\",\"why\":\"7820-7869 与 p0 重叠 → 8650-8699\"}",
+    "[15:25:56] {\"changed\":\"server/multi-p0e.test.mjs\",\"why\":\"7870-7919 与 p0/p1a 重叠 → 8700-8749\"}",
+    "[15:25:56] {\"changed\":\"server/multi-p1a.test.mjs\",\"why\":\"7890-7939 与 p0e 重叠 → 8750-8799\"}",
+    "[15:25:56] {\"changed\":\"server/multi-p1b.test.mjs\",\"why\":\"7910-7959 与 p1a 重叠 → 8800-8849\"}",
+    "[15:25:56] {\"changed\":\"server/multi-p1a-client.test.mjs\",\"why\":\"7940-7989 与 p1b 重叠 → 8850-8899\"}",
+    "[15:25:56] {\"changed\":\"server/multi-join-concurrency.test.mjs\",\"why\":\"与 k11-trade.test.mjs 完全同段 8070-8109 → 8900-8949\"}",
+    "[15:25:56] {\"changed\":\"server/k11-trade.test.mjs\",\"why\":\"8150-8179 与 tools/p2a-curve-audit 8170-8199 边缘重叠 → 8950-8979\"}",
+    "[15:25:56] {\"step\":\"syntax_ok\",\"files\":8}",
+    "[15:26:03] {\"label\":\"AFTER_PARALLEL_1\",\"serial\":false,\"status\":1,\"pass\":\"276\",\"fail\":\"3\",\"sec\":6}",
+    "[15:26:13] {\"label\":\"AFTER_PARALLEL_2\",\"serial\":false,\"status\":1,\"pass\":\"265\",\"fail\":\"14\",\"sec\":11}",
+    "[15:26:20] {\"label\":\"AFTER_PARALLEL_3\",\"serial\":false,\"status\":1,\"pass\":\"276\",\"fail\":\"3\",\"sec\":6}",
+    "[15:26:36] {\"label\":\"AFTER_SERIAL\",\"serial\":true,\"status\":1,\"pass\":\"276\",\"fail\":\"3\",\"sec\":16}",
+    "[15:26:36] {\"ROLLBACK\":\"triggered\",\"failed\":4}",
+    "[15:26:36] {\"step\":\"rolled_back_from_backup\",\"files\":8}"
+  ]
+}

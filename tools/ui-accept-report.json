@@ -1,0 +1,146 @@
+{
+  "steps": [
+    {
+      "who": "A",
+      "step": "enterLobby",
+      "ok": true,
+      "err": null,
+      "state": "lobby"
+    },
+    {
+      "who": "A",
+      "step": "createRoom",
+      "clicked": true,
+      "roomId": "MBKN"
+    },
+    {
+      "who": "B",
+      "step": "enterLobby",
+      "ok": true,
+      "err": null
+    },
+    {
+      "who": "B",
+      "step": "joinRoom",
+      "ok": true,
+      "err": null
+    },
+    {
+      "who": "B",
+      "step": "ready"
+    },
+    {
+      "who": "A",
+      "step": "bothReady",
+      "room": {
+        "members": [
+          {
+            "name": "道友甲",
+            "path": "剑修",
+            "ready": true
+          },
+          {
+            "name": "道友乙",
+            "path": "体修",
+            "ready": true
+          }
+        ],
+        "canStart": true
+      }
+    },
+    {
+      "who": "A",
+      "step": "startRun",
+      "clicked": true,
+      "runArrived": true,
+      "runHidden": false
+    }
+  ],
+  "shots": [
+    {
+      "screen": "lobby",
+      "w": 360,
+      "file": "D:\\xx-scratch\\jiuxiao-analysis\\九霄问道\\tools\\ui-accept-shots\\lobby_360.png"
+    },
+    {
+      "screen": "lobby",
+      "w": 1280,
+      "file": "D:\\xx-scratch\\jiuxiao-analysis\\九霄问道\\tools\\ui-accept-shots\\lobby_1280.png"
+    },
+    {
+      "screen": "room",
+      "w": 360,
+      "file": "D:\\xx-scratch\\jiuxiao-analysis\\九霄问道\\tools\\ui-accept-shots\\room_360.png"
+    },
+    {
+      "screen": "room",
+      "w": 1280,
+      "file": "D:\\xx-scratch\\jiuxiao-analysis\\九霄问道\\tools\\ui-accept-shots\\room_1280.png"
+    },
+    {
+      "screen": "dungeon",
+      "w": 360,
+      "file": "D:\\xx-scratch\\jiuxiao-analysis\\九霄问道\\tools\\ui-accept-shots\\dungeon_360.png"
+    },
+    {
+      "screen": "dungeon",
+      "w": 1280,
+      "file": "D:\\xx-scratch\\jiuxiao-analysis\\九霄问道\\tools\\ui-accept-shots\\dungeon_1280.png"
+    }
+  ],
+  "asserts": [
+    {
+      "screen": "lobby",
+      "pathCardsRender": true,
+      "fourPaths": true,
+      "hallShown": true
+    },
+    {
+      "screen": "lobby",
+      "w": 360,
+      "overflowX": false,
+      "panelOverflow": false
+    },
+    {
+      "screen": "lobby",
+      "w": 1280,
+      "overflowX": false,
+      "panelOverflow": false
+    },
+    {
+      "screen": "room",
+      "hallHidden": true
+    },
+    {
+      "screen": "room",
+      "w": 360,
+      "overflowX": false,
+      "panelOverflow": false
+    },
+    {
+      "screen": "room",
+      "w": 1280,
+      "overflowX": false,
+      "panelOverflow": false
+    },
+    {
+      "screen": "dungeon",
+      "synergyShown": true,
+      "runHiddenWhenShouldShow": false,
+      "hallHidden": true
+    },
+    {
+      "screen": "dungeon",
+      "w": 360,
+      "overflowX": false,
+      "panelOverflow": false
+    },
+    {
+      "screen": "dungeon",
+      "w": 1280,
+      "overflowX": false,
+      "panelOverflow": false
+    }
+  ],
+  "synergy": "秘境深处 第 1 / 5 层 队伍战力 1.14万 · 这一层要 800 流派共鸣：道友甲 +15%（法宝·强化） · 道友乙 +10.5%（装备·护体） 我的道途：剑修 · 破军斩 剩 2 次 · 共鸣 +15%（法宝·强化） 已出手的道友：还没有 ✦ 破军斩（剩 2） ⚔️ 出手 撤退（保住已得的）"
+}

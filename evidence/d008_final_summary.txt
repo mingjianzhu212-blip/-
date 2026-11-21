@@ -1,0 +1,3 @@
+verify_break.js EXIT=0
+verify_npc.js EXIT=0
+_playtest.js EXIT=0

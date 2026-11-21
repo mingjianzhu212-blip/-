@@ -1,0 +1,282 @@
+--- js/game.js.bak_20261112_p1c_planA	2026-11-12 13:22:30.561979600 +0800
++++ js/game.js	2026-11-12 14:58:42.135383900 +0800
+@@ -151,7 +151,7 @@
+      基础战力 = 10×POW_K × 1.5^境界 → 开局 1000、满境界基础约 2525 万，加上功法/法宝/灵兽乘数后期可达数亿 */
+   const POW_K = 100;
+ 
+-  const S = { name: '', sex: 'm', gender: 'male', robe: 'bai', rank: 0, exp: 0, stone: 0, cave: 0, dan: 0, forge: 0, dao: 0, rootIdx: 1, last: Date.now(), log: [], field: 0, bag: [], powScale: POW_K,
++  const S = { name: '', sex: 'm', gender: 'male', robe: 'bai', rank: 0, exp: 0, stone: 0, cave: 0, dan: 0, forge: 0, dao: 0, rootIdx: 1, path: '', last: Date.now(), log: [], field: 0, bag: [], powScale: POW_K,
+     /* 太虚真人引导 V1（2026-11-11）：引导进度/跳过/补讲/奖励凭证，随主存档同一事务提交 */
+     guide: { step: 0, done: false, skipped: false, flags: {}, rewardClaims: {}, toldSystems: {} },
+     gong1: 0, gong2: 0, gong3: 0,                       /* 三种功法等级（逐步进阶） */
+@@ -3847,6 +3847,17 @@
+     try{ log('⚠️ 已导入新存档，但页面尚未重新载入：现在的进度不会被保存。请尽快刷新页面（Ctrl+R）。', 'bad'); }catch(e){}
+     try{ if(typeof window.showToast === 'function') window.showToast('⚠️ 导入后需刷新才生效，当前进度不会保存'); }catch(e){}
+   }
++  /* P1-C（D1=(a)，2026-11-12）：单机道途 ID 与伤害乘子。ID 对齐联机枚举；乘子为机制占位（≤8%），
++     最终平衡待专项 pass。PATH_BONUS 独立于 server AXIS_GRANTS（不同系统不混用，GPT 审查①）。
++     冻结于模块作用域：load()/multiLoadPath()/openBattleAnim() 均可见且不可变（GPT 审查⑥）。 */
++  const PATH_IDS = Object.freeze(['sword','body','dan','array']);
++  const PATH_BONUS = Object.freeze({ sword: 1.00, body: 1.05, dan: 1.04, array: 1.06 });
++  function pathBonusFor(pathId){
++    if (PATH_IDS.indexOf(pathId) < 0) return 1;             // 未选/脏值 → 1（无加成）
++    const v = PATH_BONUS[pathId];
++    return (typeof v === 'number' && isFinite(v) && v > 0) ? v : 1;
++  }
++
+   function save(){
+     if(!inited) return false;
+     /* 存档损坏保护：读到过原始数据但迁移失败时，一次都不许写盘。
+@@ -3934,6 +3945,17 @@
+        'wisdom','failBonus','guardMirror','guardArray','tianji','herb100','herb10000'].forEach(k => {
+         if(typeof o[k] === 'number' && isFinite(o[k])) S[k] = o[k];
+       });
++      /* P1-C（D1=(a)）：道途为主存档字段。仅接受联机同款四 id（白名单兜底，拒绝非字符串/未知串/原型污染键）；
++         脏值或缺失回落 ''（未选，等补选入口）。旧缓存仅作一次性迁移：原始存档无 path 字段时，才从
++         MULTI_PATH_KEY 补入本源（不每次读取覆盖，GPT 审查矛盾 A）。 */
++      if (typeof o.path === 'string' && PATH_IDS.indexOf(o.path) >= 0) {
++        S.path = o.path;
++      } else {
++        S.path = '';
++        if (o.path === undefined) {
++          try { const c = localStorage.getItem(MULTI_PATH_KEY); if (c && PATH_IDS.indexOf(c) >= 0) S.path = c; } catch(e){}
++        }
++      }
+       /* 数字字段的合法性分三层处理（不用 `x | 0`：位运算是 32 位有符号截断，
+          2147483648|0 会变成负数，大数值反而被钳成 0 或翻负）。
+          ① 非负存量（浮点允许小数）：只取下限。
+@@ -7322,7 +7344,8 @@
+   }
+   /* P1-A：道途偏好（只是"下次连服务时报哪个"，不是权威值；权威在服务器 player.path） */
+   function multiLoadPath(){
+-    try{ const v = localStorage.getItem(MULTI_PATH_KEY); return v || 'sword'; }catch(e){ return 'sword'; }
++    // P1-C：本源为 S.path；未选('')返回 ''（触发补选），不回退旧缓存、不默认 sword（GPT 审查矛盾 A）
++    return (typeof S.path === 'string' && PATH_IDS.indexOf(S.path) >= 0) ? S.path : '';
+   }
+   function multiSavePath(id){
+     try{ if(id) localStorage.setItem(MULTI_PATH_KEY, String(id)); }catch(e){}
+@@ -7367,7 +7390,20 @@
+         Net.connect(s.base, s.name || '道友', multiPower(), s.token, multiSnapshot(), multiLoadPath()).then(r => {
+           if(!r.ok){ multiClearSession(); log('📡 重连失败：' + (r.error || '服务没响应') + '（点登录可重新连）', 'note'); renderMulti(); bindMultiDom(); return; }
+           hookMultiNet();
+-          if(r.me && r.me.path) multiSavePath(r.me.path);
++          if(r.me && r.me.path){
++            /* GPT 代码审查③：r.me.path 先白名单校验；冲突须实际登记、不污染缓存 */
++            const sp = (typeof r.me.path === 'string' && PATH_IDS.indexOf(r.me.path) >= 0) ? r.me.path : '';
++            if(!sp){
++              /* 服务器道途非法：不动本源、不写缓存 */
++            } else if(typeof S.path !== 'string' || PATH_IDS.indexOf(S.path) < 0){
++              S.path = sp; multiSavePath(sp);        // 本地未选才补全本源 + 缓存
++            } else if(S.path !== sp){
++              /* 本地与服务器均有效但不一致：保留本地、登记冲突、停覆盖、不污染缓存 */
++              log('⚠️ 道途冲突：本地【' + pathName(S.path) + '】与服务器【' + pathName(sp) + '】不一致，保留本地道途。', 'bad');
++            } else {
++              multiSavePath(sp);                      // 一致：同步缓存
++            }
++          }
+           if(r.resumed){
+             log('📡 已连回原队伍（' + (Net.data().room ? Net.data().room.name : '进行中') + '）。', 'good');
+           } else {
+@@ -7732,13 +7768,25 @@
+     if(act === 'path'){
+       const id = String(arg || '');
+       if(!id) return;
+-      if(Net.state() === 'offline'){ multiSavePath(id); renderMulti(); return; }
++      if(PATH_IDS.indexOf(id) < 0){ log('⚠️ 道途选项无效。', 'bad'); renderMulti(); return; } /* 白名单校验（GPT 代码审查③） */
++      /* 终身道途：联机道途选择入口不得改写已确定的本源 S.path。未选时可经此补选；已选则锁定。 */
++      if(typeof S.path === 'string' && PATH_IDS.indexOf(S.path) >= 0){
++        log('🧭 道途【' + pathName(S.path) + '】为终身道途，不可在联机界面更改。', 'bad');
++        renderMulti(); return;
++      }
++      if(Net.state() === 'offline'){
++        S.path = id; multiSavePath(id);              /* 离线补选：写入本源 + 缓存（id 已白名单校验） */
++        log('🧭 道途定为：' + pathName(id) + '（离线）。', 'note');
++        renderMulti(); return;
++      }
+       Net.api('/api/path', { path: id }).then(r => {
+         if(!r.ok){ multiToastErr(r); renderMulti(); return; }
+-        multiSavePath(r.path);
+-        log('🧭 道途改为：' + (r.pathName || r.path) + '。', 'note');
++        const rp = (typeof r.path === 'string' && PATH_IDS.indexOf(r.path) >= 0) ? r.path : id; /* 服务器回值亦须白名单校验 */
++        S.path = rp; multiSavePath(rp);
++        log('🧭 道途定为：' + pathName(rp) + '。', 'note');
+         renderMulti();
+       });
++      renderMulti();
+       return;
+     }
+     /* P1-A：声明道途技能。次数/效果全在服务器算；这里只发"我要用"这个意图。 */
+@@ -10500,6 +10548,7 @@
+        战力比 → 玩家伤害指数放大（洗完装备打同层明显更快，碾压可一刀秒）；
+        暴击率 = 基础 + 洗练暴击率词条，开战时读取一次 */
+     const powRatio = pMax / mMax;              /* 塔里 ≥1（不足在 challengeTower 已拦截）；带 script 的场子不用它 */
++    const pathBonus = script ? 1 : pathBonusFor(S.path); // P1-C：开战算定一次；script 场不调用取值函数（GPT 审查⑤）
+     const critRate = affixCritRate();
+     let pHP = pMax, mHP = mMax;
+     const titleEl = document.getElementById('bt-title');
+@@ -10598,9 +10647,9 @@
+               const crit = !script && Math.random() < critRate;
+               const raw = script
+                 ? mMax / (script.win ? script.rounds : script.rounds + 2)
+-                : mMax * (0.26 + Math.random() * 0.08) * Math.max(1, Math.pow(powRatio, 1.3));
++                : mMax * (0.26 + Math.random() * 0.08) * Math.max(1, Math.pow(powRatio, 1.3)) * pathBonus;
+               const dmg = script ? Math.max(1, Math.ceil(raw))          /* 定速：不受战力比影响 */
+-                                 : Math.round(raw * (crit ? 2 : 1));    /* 暴击翻倍 */
++                                 : Math.round(raw * (crit ? 2 : 1));    /* 暴击翻倍；道途乘子已含于 raw */
+               const applied = Math.min(dmg, mHP);             /* 秒杀时不超过剩余血量 */
+               mHP -= applied;
+               btRestartAnim(mSide, 'hit');
+@@ -11190,11 +11239,22 @@
+   }
+   /* ---------- 角色创建（立绘选性别） ---------- */
+   let charSex = 'm', needNewGame = false;
++  let charPath = '';          /* P1-C：创角/编辑时暂存的道途选择（D1=(a) 创角必选） */
++  let charEditing = false;    /* P1-C：区分创角必选与老档补选的提示文案 */
++  let pathLocked = false;     /* P1-C：编辑已有合法道途时为 true，道途选择器只读（终身道途，禁止转职） */
+   /* 性别键与展示名。sex 是存档里的旧值（m/f），gender 是新的显式字段（male/female），两者同源 */
+   const SEX_OPTS = [
+     { sex: 'm', gender: 'male', name: '男修', hint: '剑眉星目，青竹般挺拔' },
+     { sex: 'f', gender: 'female', name: '女修', hint: '云鬓花颜，一袭水青' }
+   ];
++  /* P1-C（D1=(a)）：四道途，id 对齐联机枚举（PATH_IDS）。名称/简介仅展示用。 */
++  const PATH_OPTS = [
++    { id: 'sword', name: '剑修', hint: '以剑入道，攻伐凌厉' },
++    { id: 'body',  name: '体修', hint: '淬体强身，稳如山岳' },
++    { id: 'dan',   name: '丹修', hint: '炼丹养元，绵绵不绝' },
++    { id: 'array', name: '阵修', hint: '推演天机，悟性通玄' }
++  ];
++  const pathName = id => { const p = PATH_OPTS.find(x => x.id === id); return p ? p.name : ''; };
+   /* m/f 与 male/female 互认，方便老档与外部读写 */
+   const genderOf = sex => (sex === 'f' || sex === 'female' ? 'female' : 'male');
+   const sexOf    = g   => (g === 'female' || g === 'f' ? 'f' : 'm');
+@@ -11226,17 +11286,100 @@
+       });
+     }
+   }
++  /* P1-C（D1=(a)）：道途选择预览。动态注入容器（不依赖 index.html 改动），
++     复用 .char-pick 样式；无障碍：文字名称 + aria-pressed 选中态。 */
++  function renderPathPreview(){
++    /* P1-C 样式随容器动态注入：不依赖 index.html / style.css 改动（白名单：唯一修改点 js/game.js）。 */
++    if(!document.getElementById('p1c-path-style')){
++      const st = document.createElement('style');
++      st.id = 'p1c-path-style';
++      st.textContent =
++        '.char-path-label{text-align:center;font-size:12px;letter-spacing:1px;color:var(--muted);margin:10px 0 6px}' +
++        '.char-path-picks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 10px}' +
++        '.char-path-picks .char-pick{min-height:58px;padding:8px 4px;justify-content:center;cursor:pointer}' +
++        '.char-path-picks .char-pick .cp-name{font-size:14px;letter-spacing:2px}' +
++        '.char-path-picks .char-pick.active{box-shadow:0 0 0 1px var(--gold,#8a6d3b) inset}' +
++        '.char-path-picks .char-pick.readonly{cursor:default;opacity:.45}' +
++        '.char-path-picks .char-pick.readonly.active{opacity:1}' +
++        '@media(max-width:420px){.char-path-picks{grid-template-columns:repeat(2,1fr)}}';
++      document.head.appendChild(st);
++    }
++    let box = document.getElementById('char-path-picks');
++    if(!box){
++      box = document.createElement('div');
++      box.id = 'char-path-picks';
++      box.className = 'char-path-picks';
++      const modal = document.getElementById('char-modal');
++      const cf = document.getElementById('char-confirm');
++      /* 真实浏览器实测修复：#char-confirm 是 .m-card 的子节点、不是 #char-modal 的直接子节点，
++         用 modal.insertBefore(box, cf) 会抛 NotFoundError 使弹窗打不开。改插到 cf 的真正父节点。 */
++      if(cf && cf.parentNode) cf.parentNode.insertBefore(box, cf);
++      else if(modal) modal.appendChild(box);
++    }
++    const readonly = pathLocked;
++    box.innerHTML = PATH_OPTS.map(o => {
++      const sel = (o.id === charPath);
++      if(readonly){
++        /* 终身道途编辑态：只读展示，当前道途高亮、其余灰显，不可点（禁止转职，GPT 代码审查②） */
++        return '<div class="char-pick' + (sel ? ' active' : '') + ' readonly" data-path="' + o.id + '">' +
++                 '<span class="cp-name">' + o.name + '</span>' +
++                 '<span class="cp-hint">' + o.hint + '</span>' +
++               '</div>';
++      }
++      return '<button type="button" class="char-pick' + (sel ? ' active' : '') + '" data-path="' + o.id + '" aria-pressed="' + sel + '">' +
++               '<span class="cp-name">' + o.name + '</span>' +
++               '<span class="cp-hint">' + o.hint + '</span>' +
++             '</button>';
++    }).join('');
++    let label = document.getElementById('char-path-label');
++    if(!label){
++      label = document.createElement('div');
++      label.id = 'char-path-label';
++      label.className = 'char-path-label';
++      if(box.parentNode) box.parentNode.insertBefore(label, box);
++    }
++    label.textContent = pathLocked
++      ? ('道途·' + pathName(charPath) + '（终身道途，不可更改）')
++      : (charPath
++          ? ('已选道途：' + pathName(charPath))
++          : ('请选择道途' + (charEditing ? '（老档补选）' : '（创角必选）')));
++    if(!box.dataset.bound){
++      box.dataset.bound = '1';
++      box.addEventListener('click', ev => {
++        if(pathLocked) return;                 /* 终身道途：编辑态只读，不接受点击改选 */
++        const b = ev.target.closest('.char-pick');
++        if(!b) return;
++        charPath = b.dataset.path;
++        renderPathPreview();
++      });
++    }
++  }
+   function showCharModal(editing){
+     charSex = sexOf(S.gender || S.sex);
++    /* P1-C 真实浏览器实测修复：#m-char（改名/换装，真实编辑入口）绑定 showCharModal(false)，
++       而 showCharModal(true) 只在「重开」时调用 —— 调用方的 editing 参数不可靠，
++       用它判定锁定会让真实编辑入口绕过终身道途。改以存档状态本身判定：
++         · needNewGame（新档/重开，S.path 已重置为 ''）→ 四选一必选；
++         · 已有合法 S.path 且非新档 → 只读锁定，禁止转职；
++         · S.path 为空且非新档 → 老档补选。
++       editing 形参保留仅为兼容既有调用点，不参与判定。 */
++    charEditing = !needNewGame;
++    const existing = (typeof S.path === 'string' && PATH_IDS.indexOf(S.path) >= 0);
++    charPath = existing ? S.path : '';             /* 已有道途预选；新档/未选不预选 */
++    pathLocked = existing && !needNewGame;         /* 已选道途的编辑态：终身道途只读 */
+     const nameInput = document.getElementById('char-name');
+     if(nameInput) nameInput.value = S.name || '';
+     renderCharPreview();
++    renderPathPreview();
+     document.getElementById('char-modal').classList.remove('hidden');
+   }
+   function confirmChar(){
+     const nameInput = document.getElementById('char-name');
+     let name = (nameInput ? nameInput.value : '').trim().slice(0, 8);
+     if(!name) name = '无名散修';
++    if(needNewGame && !charPath){ log('请先选择道途，再确认创角。', 'bad'); return; } /* 创角必选（GPT 审查④） */
++    /* 终身道途：仅当本源尚未确定（创角/老档补选）才写入；已选道途不可被普通编辑覆盖（禁止转职，GPT 代码审查②） */
++    if(charPath && (typeof S.path !== 'string' || PATH_IDS.indexOf(S.path) < 0)) S.path = charPath;
+     S.name = name;
+     S.sex = charSex;                              /* 落进playerState.sex（老字段，主界面读它） */
+     S.gender = genderOf(charSex);/* 显式字段：'male' / 'female' */
+@@ -11247,7 +11390,7 @@
+       needNewGame = false;
+       finalizeNewGame();
+     }else{
+-      log('道号已定：' + name + '，衣袂如新。', 'gold');
++      log('道号已定：' + name + (S.path ? ('，道途·' + pathName(S.path)) : '') + '，衣袂如新。', 'gold');
+     }
+   }
+   function finalizeNewGame(){
+@@ -11306,6 +11449,11 @@
+       return ev.returnValue;
+     });
+     document.addEventListener('visibilitychange', () => { if(document.hidden) save(); });
++    /* P1-C（D1=(a)）：老档补选入口提示。finishBoot 是老档/导入档汇聚点，全新开局不经此（走 showCharModal）。
++       S.path 为空说明该老档在道途系统上线前创建，提示玩家到角色面板「编辑角色」即可补选，不影响已有进度。 */
++    if(!needNewGame && typeof S.path === 'string' && S.path === ''){
++      try{ log('🧭 你尚未选择道途（单机道途系统上线前的旧档）。点开角色面板「编辑角色」即可补选，不影响已有进度。', 'note'); }catch(e){}
++    }
+   }
+   function boot(){
+     if(inited) return;
+@@ -11474,7 +11622,7 @@
+     S.dailyApplied = [];        /* 每日任务入账凭据也是本世数据，重开一并清 */
+     resetActs();
+     S.dao = 0; S.log = [];
+-    S.name = ''; S.sex = 'm'; S.gender = 'male'; S.robe = 'bai';
++    S.name = ''; S.sex = 'm'; S.gender = 'male'; S.robe = 'bai'; S.path = '';
+     S.swordAura = 0;                                    /* 剑意流派也回到初始的青莲剑意 */
+     S.rootIdx = 1;
+     S.last = Date.now();
