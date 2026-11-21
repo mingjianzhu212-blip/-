@@ -10,6 +10,7 @@ VIEWS.chong = {
     <div class="panel-body">
     <section class="card wide">
       <h2>灵兽</h2>
+      <p class="pet-cond" id="xx-pet-cond"></p>
       <div class="pet-list" id="xx-pets"></div>
       <p class="hint">猎妖拾「妖兽蛋」→ 孵化成灵兽 → 喂养升级 → 出战加战力。灵兽越强，能打的妖兽越高级。</p>
     </section>

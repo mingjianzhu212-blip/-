@@ -19,6 +19,7 @@ VIEWS.bag = {
       <div class="bag-grid" id="xx-bag"></div>
       <button class="bag-buy" id="xx-bag-buy">储物袋 +5 格</button>
       <p class="hint">炼丹房炼出的丹药放在这里 · 点物品看详情，再选服食 / 寄售 / 丢弃 · 储物袋可扩容量</p>
+      <p class="hint">灵草 / 矿石等炼器炼丹原料在洞府料仓，不占背包格。<button class="xlink" type="button" data-cross="dong">去洞府料仓看原料 ›</button></p>
     </section>
     </div>
   </section>`

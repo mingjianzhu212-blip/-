@@ -35,6 +35,7 @@ HUBKIT.define({
         <h2>耕种 <span class="farm-state" id="xx-field-state"></span></h2>
         <div class="farm-bar" id="xx-farm-bar"></div>
         <p class="farm-msg" id="xx-farm-msg" aria-live="polite"></p>
+        <p class="farm-wait" id="xx-field-wait"></p>
         <div class="plot-wrap" id="xx-plot-wrap"><div class="plot-grid" id="xx-plots"></div></div>
         <div class="field">
           <div class="field-main">
@@ -70,7 +71,7 @@ HUBKIT.define({
         <div class="craft-up"><span id="xx-alchemy-up"></span><button type="button" class="field-btn" id="xx-alchemy-upbtn">升级</button></div>
         <p class="farm-msg" id="xx-alchemy-upmsg" aria-live="polite"></p>
         <div class="craft-list" id="xx-alchemy"></div>
-        <p class="hint">用灵草 + 灵石炼制丹药，吃了加修为、提升突破成功率。</p>
+        <p class="hint">用灵草 + 灵石炼制丹药，吃了加修为、提升突破成功率。炼成的丹药与装备在背包。<button class="xlink" type="button" data-cross="bag">去背包看成品 ›</button></p>
       </section>` },
     { key: 'xx-forge-sec', view: 'dong_forge', name: '炼器房', note: '四族法器 · 各九阶',
       ico: 'cave_tag_forge.png', sealId: 'xx-hub-forge', sealTxt: 'Lv.0', also: ['xx-forge'],
@@ -79,7 +80,7 @@ HUBKIT.define({
         <div class="craft-up"><span id="xx-forge-up"></span><button type="button" class="field-btn" id="xx-forge-upbtn">升级</button></div>
         <p class="farm-msg" id="xx-forge-upmsg" aria-live="polite"></p>
         <div class="craft-list" id="xx-forge"></div>
-        <p class="hint">灵器提修炼、战器加战力、破器助破境、财器添灵石——四族各占一个持有位，可以同时佩。</p>
+        <p class="hint">灵器提修炼、战器加战力、破器助破境、财器添灵石——四族各占一个持有位，可以同时佩。炼成的法宝在背包与人物页。<button class="xlink" type="button" data-cross="bag">去背包看成品 ›</button></p>
       </section>` },
     { key: 'xx-enhance-sec', view: 'dong_enhance', name: '法宝强化', note: '强化 · 洗练词条',
       ico: 'ic_blade.png', sealId: 'xx-hub-enhance', sealTxt: '无',

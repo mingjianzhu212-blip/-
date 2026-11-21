@@ -98,6 +98,11 @@
     h.querySelectorAll('[data-role-jump]').forEach(b => b.addEventListener('click', () => {
       open('role', b.dataset.roleJump);
     }));
+    /* P0.5：料仓 ↔ 背包互指 */
+    h.querySelectorAll('[data-cross]').forEach(b => b.addEventListener('click', () => {
+      const p = b.dataset.cross;
+      if(p) open(p);
+    }));
     /* 第三批 P0：缺料「去哪弄」跳转（炼丹/炼器行内的 .mat-go） */
     ['#xx-alchemy', '#xx-forge'].forEach(sel => {
       const box = h.querySelector(sel);

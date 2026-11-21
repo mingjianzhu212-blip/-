@@ -2636,7 +2636,7 @@ const XX = (function(){
     if(f > SECRET_FLOORS){ log('「' + ch.name + '」十层已通，妖王伏诛。', 'gold'); return; }
     const need = secretPower(ci, f);
     const cp = combatPower();
-    if(cp < need){ log('战力不足，第 ' + f + ' 层守关 ' + fmt(need) + ' 战力（差 ' + fmt(need - cp) + '）。', 'bad'); return; }
+    if(cp < need){ log('战力不足，第 ' + f + ' 层守关 ' + fmt(need) + ' 战力（' + powerGapAdvice(cp, need) + '）。', 'bad'); return; }
     /* 探路（第 101 轮）：灵石与材料不可兼得——取财多拿灵石、取料多拿材料，层数与守关战力都不变。
        plain 是老口径（灵石原样、1 个材料），程序内调用仍走它。 */
     road = road || 'plain';
@@ -2699,7 +2699,7 @@ const XX = (function(){
     const f = secretProg(ci) + 1;
     if(f > SECRET_FLOORS){ log('「' + ch.name + '」十层已通，妖王伏诛。', 'gold'); return false; }
     const need = secretPower(ci, f), cp = combatPower();
-    if(cp < need){ log('战力不足，第 ' + f + ' 层守关 ' + fmt(need) + ' 战力（差 ' + fmt(need - cp) + '）。', 'bad'); return false; }
+    if(cp < need){ log('战力不足，第 ' + f + ' 层守关 ' + fmt(need) + ' 战力（' + powerGapAdvice(cp, need) + '）。', 'bad'); return false; }
     const base = secretReward(ci, f);
     const matName = (ITEMS[base.mat] || {}).n || base.mat;
     pickStance({
@@ -6190,6 +6190,8 @@ function towerBossCompLetter(){
     if(t) t.textContent = '💥 突破未成 · 道基未损';
     if(d){
       let rows = '';
+      /* P0.5：第一行大字先安抚——保底收益用本次实际 failBonus */
+      rows += '<span class="brk-boon">保底收益 · 下次成功率 +' + (Math.round((info.failBonus || 0) * 1000) / 10) + '%</span>';
       rows += '<span class="brk-row"><span>这一次成功率</span><b>' + (info.guarantee ? '成（必定成功）' : (Math.round(info.p * 1000) / 10) + '%') + '</b></span>';
       rows += '<span class="brk-row"><span>修为反噬</span><b>-' + fmt(info.lose - (info.back || 0)) + (info.back ? '（护心镜挡回 ' + fmt(info.back) + '）' : '') + '</b></span>';
       rows += '<span class="brk-row"><span>顿悟进度</span><b>' + info.insight + ' / ' + WISDOM.full + '</b></span>';
@@ -8542,7 +8544,7 @@ function towerBossCompLetter(){
   function startHunt(beastId){
     const beast = BEASTS.find(x => x.id === beastId);
     if(!beast) return;
-    if(combatPower() < beast.power){ log('战力不足，打不过【' + beast.name + '】。', 'bad'); return; }
+    if(combatPower() < beast.power){ log('战力不足，打不过【' + beast.name + '】。' + powerGapAdvice(combatPower(), beast.power), 'bad'); return; }
     S.huntBeast = beastId;
     S.huntProg = 0;
     trace = null; traceT = 0; traceGap = TRACE.first;   /* 换猎场就重新等妖踪 */
@@ -11269,9 +11271,19 @@ function towerBossCompLetter(){
     setTxt('st-kicker', mode === 1 ? '入门八事' : (mode === 3 ? '轮回 · 第' + gens() + '世 · ' + (idx + 1) + '/' + total : '道途 · ' + (idx + 1) + '/' + total));
     setTxt('st-seal', mode === 1 ? TRAIL_CN.charAt(idx) : (mode === 3 ? '轮' : '道'));
     setTxt('st-name', st.name);
-    setTxt('st-hint', (secludeLeftMs() > 0 && /突破|破境/.test(st.hint || ''))
+    let hintTxt = (secludeLeftMs() > 0 && /突破|破境/.test(st.hint || ''))
       ? gateLockNote() + '；可做：' + gateGoals().join('、')
-      : st.hint);
+      : st.hint;
+    /* P0.5：灵草生长期不让玩家空等——倒计时与“可先去做”同屏写清 */
+    try{
+      const grow = (S.plots || []).filter(p => p && !plotRipe(p)).sort((a, b) =>
+        (a.need - (Date.now() - a.t0) / 1000) - (b.need - (Date.now() - b.t0) / 1000))[0];
+      if(grow){
+        const c = CROPS[grow.crop] || { name: '灵草' };
+        hintTxt += ' ｜ ' + c.name + '约 ' + plotLeftTxt(grow) + '后成熟；可先去做：打坐 / 采药 / 爬塔';
+      }
+    }catch(e){}
+    setTxt('st-hint', hintTxt);
     setTxt('st-prog', mode === 1 ? trailProg(idx) : (mode === 3 ? trail3Prog(idx) : trail2Prog(idx)));
     el.dataset.k = st.key;
     el.dataset.mode = mode === 1 ? 'ru' : (mode === 3 ? 'lun' : 'dao');
@@ -12001,6 +12013,16 @@ function towerBossCompLetter(){
       state.textContent = S.field <= 0 ? '尚未开垦'
         : '成熟 ' + r + ' · 生长中 ' + g + ' · 空田 ' + Math.max(0, plotCount() - r - g);
     }
+    /* P0.5：生长期不空等——倒计时与可做的事同屏 */
+    const waitEl = document.getElementById('xx-field-wait');
+    if(waitEl){
+      const grow = (S.plots || []).filter(p => p && !plotRipe(p)).sort((a, b) =>
+        (a.need - (Date.now() - a.t0) / 1000) - (b.need - (Date.now() - b.t0) / 1000))[0];
+      waitEl.textContent = grow
+        ? '⏳ ' + (CROPS[grow.crop] || { name: '灵草' }).name + '约 ' + plotLeftTxt(grow) +
+          ' 后成熟；等待时可先去做：打坐 / 采药 / 爬塔（不必守在这页）'
+        : '';
+    }
     /* 作物选择条（事件委托绑一次，重绘只换 innerHTML） */
     const bar = document.getElementById('xx-farm-bar');
     if(bar){
@@ -12243,6 +12265,26 @@ function towerBossCompLetter(){
     }
     return '<div class="recipe-codex"><b>' + inkIco('📜') + '丹方 <span>' + got + ' / ' + DAN_VARIANT_COUNT + '</span></b>' +
       '<small>' + tip + '</small></div>';
+  }
+  /* P0.5：战力差距说人话——只读现有装备/修为状态，不新造阈值 */
+  function powerGapAdvice(cp, need){
+    cp = Number(cp) || 0; need = Number(need) || 0;
+    if(cp >= need) return '';
+    const gap = need - cp;
+    const pct = need > 0 ? Math.round(gap / need * 100) : 0;
+    const empty = EQUIP_SLOTS.filter(k => !equippedId(k)).length;
+    let better = false;
+    EQUIP_SLOTS.forEach(k => {
+      const c = equipCands(k);
+      if(!c || !c.top) return;
+      const cur = equippedId(k) ? (ITEMS[equippedId(k)] || {}) : null;
+      if(!cur || c.top.power > (cur.power || 0)) better = true;
+    });
+    let act;
+    if(empty || better) act = '先补装备' + (empty ? '（还有 ' + empty + ' 个空槽）' : '（背包里有更好的）');
+    else if(S.exp >= needOf(S.rank)) act = '修为已满，先破境';
+    else act = '先补装备/法宝，或攒满修为破境';
+    return '差 ' + fmt(gap) + ' 战力（约 ' + pct + '%）· 建议' + act;
   }
   /* 第三批 P0：缺料「去哪弄」映射（只指路，不新增产出/数值） */
   const MAT_GO = {
@@ -12584,9 +12626,31 @@ function towerBossCompLetter(){
   /* A77：灵兽园每秒被无条件重建，按钮 mousedown/mouseup 常被中途打断 → 表现为「点了没反应」。
      内容签名守卫：状态没变就留着行元素，一次点击才能完整走完。 */
   let petBox = null, petSig = '';
+  function renderPetBadge(){
+    const b = document.getElementById('sc-pet-badge');
+    if(!b) return;
+    if(S.pets.length > 0){ b.textContent = ''; b.style.display = 'none'; return; }
+    b.style.display = '';
+    b.textContent = S.eggs.length > 0 ? ('蛋 ' + S.eggs.length) : '差蛋';
+  }
   function renderPets(){
     const box = document.getElementById('xx-pets');
-    if(!box){ petBox = null; petSig = ''; return; }
+    if(!box){ petBox = null; petSig = ''; renderPetBadge(); return; }
+    renderPetBadge();
+    /* P0.5：入口先定性——解锁条件与当前差什么写在同一页顶部 */
+    const cond = document.getElementById('xx-pet-cond');
+    if(cond){
+      let s;
+      if(S.pets.length > 0) s = '已解锁 · 现有 ' + S.pets.length + ' 只灵兽（' + S.pets.length + ' / ' + S.petSlots + ' 槽）';
+      else if(S.eggs.length > 0){
+        const cost = Math.floor(needOf(S.rank) * BAL.petHatchK);
+        s = '已解锁 · 有 ' + S.eggs.length + ' 枚妖兽蛋待孵化；孵化需灵石 ' + fmt(cost) +
+          (S.stone < cost ? '（差 ' + fmt(cost - S.stone) + '）' : '（足够）');
+      }else{
+        s = '尚未拥有灵兽 · 解锁条件：获得 1 枚妖兽蛋（坊市货架可买；签到第 6 天、仙盟战功、论剑台声望也可换）';
+      }
+      cond.textContent = s;
+    }
     const cp = combatPower();
     const petSum = petPowerSum();
     let html = '<div class="pet-power">' + inkIco('⚔️') + '战力 <b>' + fmt(cp) + '</b>' +
@@ -12746,7 +12810,7 @@ function towerBossCompLetter(){
     const need = towerPower(S.tower), cp = combatPower();
     if(cp < need){
       log('⚔️ 实力不济，请先去提升（第 ' + S.tower + ' 层守卫战力 ' + fmt(need) +
-          '，你 ' + fmt(cp) + '，还差 ' + fmt(need - cp) + '）。', 'bad');
+          '，你 ' + fmt(cp) + '，' + powerGapAdvice(cp, need) + '）。', 'bad');
       save(); render(); renderTower();
       return false;
     }
@@ -13298,6 +13362,51 @@ function towerBossCompLetter(){
   }
   /* 塔装备：只在破纪录那一次掉（两条通关路径都调），已持有/信匣待领则不再掉。
      不进 towerReward：扫荡共用那函数，会把装备当常规收益刷出来。 */
+  /* P0.5：装备掉落结算——与当前所穿逐项对比，并提供「立即穿戴」 */
+  function equipDropInfo(id){
+    const meta = ITEMS[id] || {};
+    const slot = meta.slot;
+    if(!slot) return null;
+    const curId = equippedId(slot);
+    const cur = curId ? (ITEMS[curId] || null) : null;
+    const curPow = cur ? (cur.power || 0) : 0;
+    const newPow = meta.power || 0;
+    const rows = [
+      settleLine('新装备 · ' + (meta.n || id), '+' + fmt(newPow) + ' 战力', 'good'),
+      settleLine('当前' + (SLOT_NAME[slot] || '') + '槽', cur ? ('【' + (cur.n || curId) + '】+' + fmt(curPow)) : '空槽'),
+      settleLine('对比', newPow > curPow ? ('高 ' + fmt(newPow - curPow) + ' 战力') : newPow === curPow ? '持平' : ('低 ' + fmt(curPow - newPow) + ' 战力'), newPow > curPow ? 'good' : 'bad')
+    ];
+    return { id, meta, slot, rows, better: newPow > curPow, mailed: false };
+  }
+  function appendEquipAction(drop){
+    if(!drop || drop.mailed) return;
+    const box = document.getElementById('cs-rows');
+    if(!box) return;
+    const id = drop.id;
+    const meta = ITEMS[id] || {};
+    if(!meta.slot) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-main settle-act';
+    b.textContent = '立即穿戴';
+    b.onclick = () => {
+      const r = equipItem(id);
+      if(r && r.ok){ document.getElementById('craft-settle').classList.add('hidden'); }
+    };
+    box.appendChild(b);
+  }
+  function showEquipDrop(drop){
+    if(!drop) return;
+    const info = equipDropInfo(drop.id);
+    if(!info) return;
+    if(drop.mailed){
+      info.rows.push(settleLine('备注', '背包已满，已暂存信匣；取回后可穿戴', 'bad'));
+    }
+    showSettle({ icon: '🗡️', title: '装备掉落', sub: (info.meta.n || drop.id) + ' · ' + (SLOT_NAME[info.slot] || ''),
+      rows: info.rows,
+      note: info.mailed ? '信匣取回后再穿戴。' : (info.better ? '比当前所穿更好，可直接穿戴。' : '当前所穿更好；已放入背包，需要时再换。') });
+    if(!drop.mailed) appendEquipAction({ id: drop.id, mailed: false });
+  }
   function towerEqGrant(floor){
     const id = TOWER_EQ_DROP[floor];
     if(!id || ownsEquip(id)) return null;
@@ -13321,7 +13430,9 @@ function towerBossCompLetter(){
     if(!(r.ok || r.mail)) return null;
     log('🗡️ 历练拾得【' + (meta.n || id) + '】（战力 +' + fmt(meta.power || 0) + '）' +
       (r.mail ? '，背包已满暂存信匣' : '') + '。', 'gold');
-    return { id: id, name: meta.n || id, power: meta.power || 0, mailed: !!r.mail };
+    const drop = { id: id, name: meta.n || id, power: meta.power || 0, mailed: !!r.mail };
+    showEquipDrop(drop);
+    return drop;
   }
   function towerFloorSettle(floor, win){
     if(!win){
@@ -13371,6 +13482,7 @@ function towerBossCompLetter(){
       rows: srows,
       note: '掉落数值按定版甲案，本层账目未改；背包满的部分已注明入信匣。'
     });
+    if(eq) appendEquipAction(eq);
     save(); render(); renderTower(); renderBag();
   }
   function towerFightCurrent(){
@@ -13379,7 +13491,7 @@ function towerBossCompLetter(){
     const need = towerPower(floor), cp = combatPower();
     if(cp < need){
       log('⚔️ 实力不济，请先去提升（第 ' + floor + ' 层守卫战力 ' + fmt(need) +
-          '，你 ' + fmt(cp) + '，还差 ' + fmt(need - cp) + '）。', 'bad');
+          '，你 ' + fmt(cp) + '，' + powerGapAdvice(cp, need) + '）。', 'bad');
       save(); render(); renderTower();
       return false;
     }
@@ -15229,6 +15341,7 @@ function towerBossCompLetter(){
     _bagCap: bagCap, _offlineCap: offlineCapSec,
     _addItem: addItem, _addItemEx: addItemEx, _claimOverflow: claimOverflow,
     _showSettle: showSettle, _claimSign: claimSign, _claimDailyToday: claimDailyToday,
+    _showEquipDrop: showEquipDrop, _equipDropInfo: equipDropInfo, _powerGapAdvice: powerGapAdvice,
     _renderToday: renderToday, _nextResetMs: nextDayResetMs, _todayKey: todayKey, _todayNo: todayNo,
     _todayKeyAt: todayKeyAt, _todayNoAt: todayNoAt,
     _passFloatState: () => ({ at: passFloatAt, acc: { exp: passAcc.exp, stone: passAcc.stone, ore: passAcc.ore } }),
@@ -15429,9 +15542,17 @@ const SECT = (function(){
     Object.keys(o).forEach(k => { if(o[k] != null) p.set(k, String(o[k])); });
     return p.toString();
   }
+  async function readJson(r){
+    if(!r || !r.ok) throw new Error('HTTP ' + (r ? r.status : '?'));
+    try{ return await r.json(); }catch(e){ throw new Error('BAD_JSON'); }
+  }
+  function errTag(e){
+    const m = e && /HTTP \d+/.exec(String(e.message || ''));
+    return m ? '（' + m[0] + '）' : '';
+  }
   async function get(name, params){
     const r = await withTimeout(fetch(host + '/api/sect/' + name + '?' + qs(Object.assign({ pid, nick }, params || {})), { cache: 'no-store' }), 6000);
-    return r.json();
+    return readJson(r);
   }
   async function post(name, body){
     /* 服务端对所有请求（含 POST）都要求 URL query 上带合法 pid，且 body.pid 必须与 query.pid 相等
@@ -15442,7 +15563,7 @@ const SECT = (function(){
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.assign({ pid, nick }, body || {}))
     }), 6000);
-    return r.json();
+    return readJson(r);
   }
 
   function rankNo(){ try{ return XX._s.rank | 0; }catch(e){ return 0; } }
@@ -15496,7 +15617,9 @@ const SECT = (function(){
     if(!sb) return;
     if(!stats || !online){
       if(wq){ wq.textContent = online ? '读取中…' : '未连接'; wq.className = 'sc-quota off'; }
-      sb.innerHTML = '<div class="sc-none">山门气象需连上互助服务。</div>';
+      sb.innerHTML = '<div class="sc-none">山门气象需连上互助服务。</div>' +
+        (noteTxt ? '<p class="sc-note ' + esc(noteCls) + '">' + esc(noteTxt) + '</p>' : '') +
+        '<button type="button" class="btn-sub" data-sect-retry>重新连接</button>';
       if(rb) rb.innerHTML = '';
       if(eb) eb.innerHTML = '';
       return;
@@ -15605,7 +15728,7 @@ const SECT = (function(){
     busy = true; note('正在贴求助…'); render();
     let r;
     try{ r = await post('publish', { rank: s.rank, ready: true }); }
-    catch(e){ online = false; busy = false; note('连不上互助服务。', 'bad'); render(); return; }
+    catch(e){ online = false; busy = false; note('连不上互助服务' + errTag(e) + '，可点「重新连接」重试。', 'bad'); render(); return; }
     busy = false;
     if(r.ok){
       req = r.req; me = r.me; bonus = r.bonus; bonusNow = 0;
@@ -15624,7 +15747,7 @@ const SECT = (function(){
     busy = true; note('护法中…'); render();
     let r;
     try{ r = await post('guard', { reqId: id }); }
-    catch(e){ online = false; busy = false; note('连不上互助服务。', 'bad'); render(); return; }
+    catch(e){ online = false; busy = false; note('连不上互助服务' + errTag(e) + '，可点「重新连接」重试。', 'bad'); render(); return; }
     busy = false;
     if(r.ok){
       me = r.me;
@@ -15643,7 +15766,7 @@ const SECT = (function(){
     busy = true;
     let r;
     try{ r = await post('cancel', { reqId: req.id }); }
-    catch(e){ online = false; busy = false; render(); return; }
+    catch(e){ online = false; busy = false; note('连不上互助服务' + errTag(e) + '，可点「重新连接」重试。', 'bad'); render(); return; }
     busy = false;
     if(r.ok){ req = null; me = r.me; note('求助已撤回。', ''); }
     else note(r.msg || '撤回失败', 'bad');
@@ -15652,7 +15775,7 @@ const SECT = (function(){
   async function claim(){
     if(!online) return null;
     let r;
-    try{ r = await post('claim', {}); }catch(e){ return null; }
+    try{ r = await post('claim', {}); }catch(e){ note('领取暂时失败' + errTag(e) + '，稍后自动重试。', 'bad'); return null; }
     if(!r || !r.ok) return null;
     if(r.stone > 0 || r.exp > 0){
       XX._grant(r.exp, r.stone);
@@ -15681,7 +15804,7 @@ const SECT = (function(){
         await claim();
         refreshSoon();
       }else if(r.err === 'gone'){ req = null; }
-    }catch(e){}
+    }catch(e){ note('结算回执暂时失败' + errTag(e) + '，可稍后重试。', 'bad'); }
     try{ render(); }catch(e){}
   }
 
@@ -15705,7 +15828,7 @@ const SECT = (function(){
       }catch(e){}
       render();
     }catch(e){
-      if(online) note('互助服务连不上了，先挂机，等会儿自动重连。', 'bad');
+      if(online) note('互助服务连不上了' + errTag(e) + '，先挂机，等会儿自动重连；也可点「重新连接」。', 'bad');
       online = false;
       render();
     }
@@ -15722,7 +15845,7 @@ const SECT = (function(){
   }
 
   async function boot(){
-    try{ await bootInner(); }catch(e){ booting = false; online = false; try{ render(); }catch(x){} }
+    try{ await bootInner(); }catch(e){ booting = false; online = false; note('山门服务连接失败' + errTag(e) + '，可点「重新连接」。', 'bad'); try{ render(); }catch(x){} }
   }
   async function bootInner(){
     if(booting) return;
@@ -15750,6 +15873,15 @@ const SECT = (function(){
   }
 
   function bindUI(){
+    /* 气象页的「重新连接」也要生效（该页没有 sc-box，单靠下面的委托绑不到） */
+    if(!document.documentElement.dataset.sectRetry){
+      document.documentElement.dataset.sectRetry = '1';
+      document.addEventListener('click', ev => {
+        const b = ev.target && ev.target.closest ? ev.target.closest('[data-sect-retry]') : null;
+        if(!b) return;
+        ready = false; boot();
+      });
+    }
     const box = el('sc-box');
     if(!box || box.dataset.bound) return;
     box.dataset.bound = '1';
@@ -15880,7 +16012,7 @@ const SECT = (function(){
     bonusRate, afterBreak, panelOpen,
     chatBind, chatOpen, chatClose, chatSend,
     host: () => host,
-    _candidates: candidates, _firstAlive: firstAlive,
+    _candidates: candidates, _firstAlive: firstAlive, _readJson: readJson, _errTag: errTag,
     _state: () => ({ online, ready, host, pid, nick, me, list, req, bonus, bonusNow, noteTxt,
       stats, timer: !!timer,
       chatUnread, chatMsgs: chatMsgs.length })

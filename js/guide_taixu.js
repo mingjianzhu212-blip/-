@@ -239,6 +239,8 @@
     view.querySelector('.tb-text').textContent = d.text;
     if (d.dan && !state.rewardClaims[DAN_CLAIM]) claimDan();  /* 进入背包步即发丹（幂等，随主存档同事务） */
     if (d.click) view.classList.add('tb-click'); else view.classList.remove('tb-click');
+    /* 非点击拍不吞点击：气泡若压到灵兽园等入口，点下去仍能进页（治“点灵兽园只弹气泡”） */
+    view.classList.toggle('tb-pass', !d.click);
     view.style.display = 'block';
     /* 纸签让位立即生效（不等下一次 game render，消除同屏 1 拍窗口） */
     var trEl = document.getElementById('sc-trail');
@@ -446,6 +448,8 @@
       '#taixu-bubble.tb-bottom .tb-tail{top:-6px;border-bottom:0;border-right:0;}' +
       '#taixu-bubble.tb-left .tb-tail{right:-6px;border-bottom:0;border-left:0;}' +
       '#taixu-bubble.tb-right .tb-tail{left:-6px;border-top:0;border-right:0;}' +
+      '#taixu-bubble.tb-pass{pointer-events:none;}' +
+      '#taixu-bubble.tb-pass .tb-tail{pointer-events:none;}' +
       '#taixu-bubble.tb-click{cursor:pointer;}' +
       '#taixu-bubble.tb-click .tb-text::after{content:"  ›";color:#b9a7d6;}' +
       '#taixu-skip{position:fixed;z-index:9000;font:12px/1.2 "PingFang SC","Microsoft YaHei",sans-serif;' +
