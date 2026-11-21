@@ -3982,7 +3982,7 @@ const XX = (function(){
     /* 人物（道碑）单独插一枚：不走 DOT_RULES——那张表由 renderDots 统一驱动，
        而道碑红点的开关频率与"看没看过"有关，独立控制更直白 */
     try{
-      const r = document.querySelector('[data-bld="role"]');
+      const r = document.querySelector('[data-tab="role"]');
       if(r && !r.querySelector('.e-dot')){
         const d = document.createElement('i');
         d.className = 'e-dot';
@@ -3993,7 +3993,7 @@ const XX = (function(){
   /* 道碑红点：有新立未看的碑才亮（进人物面板即灭，见 milesMarkSeen） */
   function renderMileDot(){
     try{
-      const r = document.querySelector('[data-bld="role"]');
+      const r = document.querySelector('[data-tab="role"]');
       const d = r ? r.querySelector('.e-dot') : null;
       if(d) d.classList.toggle('on', (S.milesNew || []).length > 0);
     }catch(e){}
@@ -11346,7 +11346,7 @@ function towerBossCompLetter(){
       if(ev.target && ev.target.closest && ev.target.closest('#sc-break')) return;
       const brk = document.getElementById('sc-break');
       if(brk && !brk.disabled){ brk.click(); return; }
-      const role = document.querySelector('.sys-rail .sys-btn[data-bld="role"]');
+      const role = document.querySelector('.scene-tab[data-tab="role"]');
       if(role) role.click();
     });
   }

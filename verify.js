@@ -402,7 +402,7 @@ const DIAG = `
     const caveBgCs = getComputedStyle(document.querySelector('#page-scene .scene-bg'));
     L('caveBgImg', String(caveBgCs.backgroundImage).indexOf('cave-bg.jpg') >= 0 ? 'yes' : 'no');
     L('caveBgWash', String(caveBgCs.backgroundImage).indexOf('0.44') >= 0 ? 'yes' : 'no');
-    L('railIcons', document.querySelectorAll('.sys-rail .sys-btn .sys-ic').length);   // 侧栏 4 钮（高频）
+    L('railIcons', document.querySelectorAll('.sys-rail .sys-btn .sys-ic').length);   // 侧栏 2 钮（功法/设置；人物/背包已收进五签）
     L('handbookIcons', document.querySelectorAll('#sc-handbook .sys-btn .sys-ic').length); // 手札 3 钮（低频）
     L('scBreak', !!document.getElementById('sc-break'));                             // 顶部突破按钮
     L('scActs', document.querySelectorAll('#sc-acts .cave-act').length);             // 2 个修炼行动（打坐+历练）
@@ -934,7 +934,7 @@ const DIAG = `
       return b ? getComputedStyle(b).writingMode : '';
     })());
     L('milesTotal', XX._milesTotal());
-    L('milesDotEl', !!document.querySelector('[data-bld="role"] .e-dot') ? 'yes' : 'no');
+    L('milesDotEl', !!document.querySelector('[data-tab="role"] .e-dot') ? 'yes' : 'no');
     /* 造一个达成：打坐 20 次 → 立「引气入体」，自动发奖、亮红点 */
     const mStone0 = XX._s.stone, mExp0 = XX._s.exp;
     XX._s.miles = {}; XX._s.milesNew = [];
@@ -943,12 +943,12 @@ const DIAG = `
     L('milesGot', Object.keys(XX._s.miles).length);
     L('milesReward', (XX._s.stone > mStone0 || XX._s.exp > mExp0) ? 'yes' : 'no');
     L('milesNewN', XX._milesNew());
-    L('milesDotOn', document.querySelector('[data-bld="role"] .e-dot').classList.contains('on') ? 'yes' : 'no');
+    L('milesDotOn', document.querySelector('[data-tab="role"] .e-dot').classList.contains('on') ? 'yes' : 'no');
     L('milesDoneTxt', (document.querySelector('#xx-role-miles .mile.done b') || {}).textContent || '');
     L('milesToast', (document.getElementById('toast') || {}).textContent || '');
     /* 进面板即"看过" → 红点灭 */
     XX._milesSeen();
-    L('milesDotOff', document.querySelector('[data-bld="role"] .e-dot').classList.contains('on') ? 'no' : 'yes');
+    L('milesDotOff', document.querySelector('[data-tab="role"] .e-dot').classList.contains('on') ? 'no' : 'yes');
     /* 更漏防篡改：存档时间跑到未来 → 本次离线收益作废（堵"改系统时间刷离线"） */
     XX._s.last = Date.now() + 6 * 3600 * 1000;
     const ckB4 = XX._s.stone, ckE0 = XX._s.exp;
@@ -1930,7 +1930,7 @@ const DIAG = `
     L('guideSitTxt', gtxt().indexOf('盘腿') >= 0 ? 'ok' : gtxt().slice(0, 20));
     L('guideLocks1', gLockN());                                                     // 5：已教到 sit，那一格去灰
     { const e1 = document.querySelector('#sc-acts .cave-act[data-k="sit"]');
-      const e2 = document.querySelector('.sys-btn[data-bld="role"]');
+      const e2 = document.querySelector('.scene-tab[data-tab="role"]');
       L('guideLockNow', [e1 ? (e1.classList.contains('guide-locked') ? 'greyed' : 'clear') : 'noEl',
                          e2 ? (e2.classList.contains('guide-locked') ? 'greyed' : 'clear') : 'noEl'].join('/')); }
     /* POLL 路径：只改权威业务状态（打过坐），引导自己认出来——不是猜点了哪一下 */
@@ -3848,7 +3848,7 @@ const DIAG = `
       if (b[0] === 0x89 && b[1] === 0x50 && b[25] === 6) iconOk++; else iconMissing.push(p);   // PNG 魔数 + colorType 6(RGBA)
     } catch (e) { iconMissing.push(p); }
   });
-  ok(F.railIcons === '4' && F.handbookIcons === '3', '侧栏 4 钮 + 仙途手札 3 钮（人物/背包/功法/设置 · 任务/传音/音效）');
+  ok(F.railIcons === '2' && F.handbookIcons === '3', '侧栏 2 钮（功法/设置）+ 仙途手札 3 钮（任务/传音/音效）；人物/背包走五签');
   ok(F.huntRemoved === 'yes', '塔页已无旧猎妖列表');
   ok(F.danImgPng === 'yes', '丹药图标切 PNG（dan1/dan4 各自独立图）');
   ok(iconPaths.length + railPaths.length >= 81 && iconOk === iconPaths.length + railPaths.length,
@@ -4048,10 +4048,10 @@ const DIAG = `
      F.guideDanCount === '1' && F.guideDanClaim === 'ok' && F.guideDanSaved === 'ok',
      'W3·S1 / 阶段二 N12-3：引导毕业一份丹药——现行改赠下品破境丹（丹号 dan1 / 丹名 / 唯一凭证号三条字面量都在），' +
      '运行时也真发到背包恰好 ' + F.guideDanCount + ' 枚、凭证只落一次并随档存下（' + F.guideDanClaim + '/' + F.guideDanSaved + '）');
-  ok(taixuSrc.indexOf("target: '.sys-btn[data-bld=\"role\"]'") >= 0 &&
+  ok(taixuSrc.indexOf("target: '.scene-tab[data-tab=\"role\"]'") >= 0 &&
      taixuSrc.indexOf('后山那位，记得替我问好') >= 0 &&
      F.guideToHandoff === 'ok' && F.guideFinishLog === 'ok',
-     'W3·S1：引导收尾把玩家交到具体去处——最后一步仍指着顶上【识人】那颗按钮（指向未动，只是不再让人出了坊市就没方向），' +
+     'W3·S1：引导收尾把玩家交到具体去处——最后一步指着底部【人物】签（旧玉印已收，指向随拍板改挂五签），' +
      '运行时收尾那句旁白也真落进日志（' + F.guideToHandoff + '/' + F.guideFinishLog + '）');
   ok(chatCss.indexOf('.sc-trail') >= 0 && chatCss.indexOf('.st-seal') >= 0 &&
      chatCss.indexOf('trailRing') >= 0 && chatCss.indexOf('.sc-trail[hidden]') >= 0,
@@ -5639,10 +5639,10 @@ setInterval(function(){
     var pl=q("#xx-plots .plot.empty");
     if(pl){pl.click();O.planted=1;}
     return;}
-  if(id==="handoff"){                                     /* 真点顶栏【人物】，再点 hub 格子里的「识人 · 沈碑」 */
+  if(id==="handoff"){                                     /* 真点底部【人物】签，再点人物页里的「识人 · 沈碑」 */
     if(!document.getElementById("npc-topics")){
-      if(!O.roleHub){clk('.sys-btn[data-bld="role"]',"roleBtn");O.roleHub=1;return;}
-      clk('#panel-host .hub-cell[data-jump="xx-role-npc"]',"npcCell");return;}
+      if(!O.roleHub){clk('.scene-tab[data-tab="role"]',"roleBtn");O.roleHub=1;return;}
+      clk('#panel-host [data-role-jump="xx-role-npc"]',"npcCell");return;}
     return;}
   idle++;if(idle>=8){idle=0;O.stuckAt=(O.stuckAt||0)+1;}
 },200);

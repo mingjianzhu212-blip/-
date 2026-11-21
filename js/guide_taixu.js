@@ -55,13 +55,13 @@
     { id: 'field', text: '种子先赊你，回头扣。本座就是那种人。',
       target: '#sc-field' },
     { id: 'bag', text: '背包里那颗丹你留着；别谢，谢就俗了——别跟后山那位提。',
-      target: '.sys-btn[data-bld="bag"]', dan: true, click: true },
+      target: '.scene-tab[data-tab="bag"]', dan: true, click: true },
     { id: 'flash.a', text: '……塔里的小东西闹脾气，这叫举重若轻。',
       target: '.bld[data-bld="tower"]', click: true },
     { id: 'flash.b', text: '不像炼气期？听课不专心——罚你去见个人。',
       target: '.bld[data-bld="tower"]', click: true },
     { id: 'handoff', text: '后山有块碑，守碑老头记性好，记三百年；名号别报，报了不理你。',
-      target: '.sys-btn[data-bld="role"]' }
+      target: '.scene-tab[data-tab="role"]' }
   ];
 
   /* 完成判定：读权威业务状态（window.S）。不是点击猜测，是“业务成功后的状态验证”。 */

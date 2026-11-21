@@ -5837,3 +5837,8 @@ html,body{ background:var(--jx-paper); }
 /* B6：软结算——遮罩不吃点击，卡片可关，不挡下一步操作 */
 .modal.soft{ pointer-events:none; background:rgba(60,50,30,.10); backdrop-filter:none; }
 .modal.soft .m-card{ pointer-events:auto; }
+
+/* 第三批拍板②：旧玉印「人物/背包」收掉；红点改挂底部五签，签位需可定位 */
+.app > .scene-tabs .scene-tab{ position:relative; }
+.app > .scene-tabs .scene-tab .e-dot{ top:2px; right:calc(50% - 22px); }
+.app > .scene-tabs .scene-tab .sys-dot{ top:2px; right:calc(50% - 22px); }

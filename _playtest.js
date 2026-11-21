@@ -336,8 +336,8 @@ const SCENARIOS = [
         }
         if(id === 'handoff'){
           if(!document.getElementById('npc-topics')){
-            if(!O.roleHub){ __click('.sys-btn[data-bld="role"]', 'body'); O.roleHub = 1; return; }
-            __click('.hub-cell[data-jump="xx-role-npc"]', '#panel-host');
+            if(!O.roleHub){ __click('.scene-tab[data-tab="role"]', 'body'); O.roleHub = 1; return; }
+            __click('[data-role-jump="xx-role-npc"]', '#panel-host');
           }
           return;
         }
@@ -495,7 +495,7 @@ const SCENARIOS = [
         var segs = pg ? pg.querySelectorAll('.dan-seg').length : 0;
         var effs = pg ? pg.querySelectorAll('.craft-eff').length : 0;
         /* 真人路径：侧栏背包 → 点格子开详情 → 详情框点服食。名字一律从丹表取，测试里不写死 */
-        var bagBtn = __click('[data-bld="bag"]', 'body');
+        var bagBtn = __click('.scene-tab[data-tab="bag"]', 'body');
         setTimeout(function(){
           var gridShown = __sh('#page-bag') ? 'shown' : 'no';
           var names = ids.map(function (id) { return XX._dan.all[id].name; });
