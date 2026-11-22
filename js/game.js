@@ -227,6 +227,10 @@ const XX = (function(){
          last 上回做完的差事, run 连着几趟做同一件事}]
        grad = 出师人数（第 62 节）：每出师一人，门风 +2% 差事收益，至多十人 */
     gate: { lv: 0, disciples: [], grad: 0 },
+    /* P2 宗门协力 Boss（拍板 B：总血量 = 成员战力总和 ×20；周一 08:00 重置） */
+    coopBoss: { week: '', hpMax: 0, dmg: 0, claimed: [], parts: 0 },
+    /* P2 灵潮（周六 20:00–20:15；进场后每 20 秒一杀，30 杀封顶） */
+    lingchao: { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 },
     /* 山门议事（第 103 轮）：每日一条议题三选一。n = 已议过几条（决定今天轮到哪条议题，
        只增不减），last = 上一条的结论文本（议事页与日志各留一处） */
     council: { day: '', n: 0, last: '' },
@@ -2400,6 +2404,7 @@ const XX = (function(){
     S.stone += stone; S.stats.stoneEarned += stone;
     S.arena.rep += rep;
     if(win) S.arena.win++; else S.arena.lose++;
+    if(win) coopBossHit();   /* P2：论剑胜利计入宗门协力伤害 */
     /* NPC 记忆（T-506 接入）：沈碑看门人视角，论剑台胜负落账；记忆系统缺失/异常一律静默，绝不影响结算 */
     /* 记忆短语用第二人称：这句会被 npc.js 拼进沈碑的开场白
        （「（他顿了顿，像是想起了…）」），写"玩家在论剑台赢了一场"会把 UI 术语漏进 NPC 口中。 */
@@ -2662,6 +2667,7 @@ const XX = (function(){
         mailed > 0 ? 'bad' : (f >= SECRET_FLOORS ? 'gold' : 'good'));
     if(f >= SECRET_FLOORS){ log('👑 守关妖王伏诛，「' + ch.name + '」十层尽通！', 'gold'); }
     gainChip('🌀 ' + ch.name + ' ' + f + ' 层 · 灵石 +' + fmt(rw.stone), f >= SECRET_FLOORS ? 'gold' : 'good');
+    coopBossHit();   /* P2：秘境通关计入宗门协力伤害 */
     {
       const srows = [settleLine('灵石', '+' + fmt(rw.stone), 'good')];
       if(added > 0) srows.push(settleLine('材料 · ' + matName, '+' + added + (mailed ? '（部分入信匣）' : ''), mailed ? 'bad' : 'good'));
@@ -3585,6 +3591,155 @@ const XX = (function(){
   }
   /* 面板：名册结构只在"品阶/弟子/差事"变化时重建，倒计时原地改写文本——
      500ms 一次的整体重绘会把刚点下的按钮换掉，点击反馈（hover/按下）就断了。 */
+  /* ===== P2 · 宗门协力 Boss（拍板 B） =====
+     成员战力总和：现行只有掌门有战力字段，弟子无独立战力；本版按「掌门 + 每名弟子各计掌门同战力」
+     计人数，总血量 = 该和 × 20（倍数常量单独提出，便于下次报批调整）。
+     伤害来源：镇妖塔/秘境/论剑胜利，各按当次 combatPower() 计一次。 */
+  const COOP_HP_MULT = 20;
+  const COOP_MATS = ['boss_core', 'boss_pearl', 'boss_feather', 'boss_heart'];
+  function coopWeekKey(){
+    const t = dayStamp();
+    const d = new Date(t.y, t.m - 1, t.d);
+    const dow = (d.getDay() + 6) % 7;           /* 周一=0 */
+    d.setDate(d.getDate() - dow);
+    const p = n => (n < 10 ? '0' : '') + n;
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  function coopMembers(){ return 1 + ((S.gate && S.gate.disciples) ? S.gate.disciples.length : 0); }
+  function coopBossEnsure(){
+    if(!S.coopBoss || typeof S.coopBoss !== 'object') S.coopBoss = { week:'', hpMax:0, dmg:0, claimed:[], parts:0 };
+    const wk = coopWeekKey();
+    if(S.coopBoss.week !== wk || !S.coopBoss.hpMax){
+      const sum = Math.max(1, Math.floor(combatPower())) * coopMembers();
+      S.coopBoss = { week: wk, hpMax: Math.max(1, sum * COOP_HP_MULT), dmg: 0, claimed: [], parts: 0 };
+    }
+    return S.coopBoss;
+  }
+  function coopBossHit(){
+    const b = coopBossEnsure();
+    if(b.dmg >= b.hpMax) return;
+    const dmg = Math.max(1, Math.floor(combatPower()));
+    b.dmg = Math.min(b.hpMax, b.dmg + dmg);
+    b.parts = 1;
+    /* 跨档时给一条世界通告（结构同其他通告，不进聊天） */
+    [0.25, 0.5, 0.75, 1].forEach((p, i) => {
+      if(!b.claimed.includes(i) && b.dmg >= Math.floor(b.hpMax * p) && b.dmg - dmg < Math.floor(b.hpMax * p)){
+        announce('协力', '镇山妖王已推进到第 ' + (i + 1) + ' 档');
+      }
+    });
+  }
+  function coopBossClaim(i){
+    const b = coopBossEnsure();
+    const pct = [0.25, 0.5, 0.75, 1][i];
+    if(pct == null || b.dmg < Math.floor(b.hpMax * pct) || b.claimed.includes(i)) return false;
+    const id = COOP_MATS[i], meta = ITEMS[id] || {};
+    const r = addItemEx(id, meta.n || id);
+    const stone = Math.floor(needOf(S.rank) * 0.5);
+    S.stone += stone; S.stats.stoneEarned += stone;
+    b.claimed.push(i);
+    log('🐲 协力里程碑 ' + (i + 1) + '/4：' + (meta.n || id) + ' ×1、灵石 +' + fmt(stone) +
+      (r && r.mail ? '（材料暂存信匣）' : '') + '。', 'gold');
+    save(); render();
+    return true;
+  }
+  function coopBossHtml(){
+    if(!gateLv()) return '';
+    const b = coopBossEnsure();
+    const pct = Math.min(100, b.dmg / b.hpMax * 100);
+    let h = '<div class="coop"><div class="coop-head"><b>镇山妖王 · 宗门协力</b>' +
+      '<span>' + (b.parts ? '本版参与：掌门 1 人' : '尚未出手') + ' · 周一 08:00 重置</span></div>' +
+      '<div class="coop-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
+      '<p class="coop-num">累计伤害 ' + fmt(b.dmg) + ' / ' + fmt(b.hpMax) + '（' + pct.toFixed(1) + '%）' +
+      ' · 伤害来源：塔/秘境/论剑胜利</p><div class="coop-steps">';
+    [0.25, 0.5, 0.75, 1].forEach((p, i) => {
+      const need = Math.floor(b.hpMax * p);
+      const done = b.claimed.includes(i);
+      const can = !done && b.dmg >= need;
+      h += '<button type="button" class="coop-step' + (done ? ' done' : '') + '" data-gact="coopclaim" data-i="' + i + '"' +
+        (done || !can ? ' disabled' : '') + '>' + Math.round(p * 100) + '%' +
+        '<small>' + (done ? '已领' : (can ? '领取' : fmt(need))) + '</small></button>';
+    });
+    h += '</div><p class="hint">总血量 = 宗门成员战力总和 × ' + COOP_HP_MULT +
+      '（弟子暂无独立战力，按掌门同战力计人数；第一周试运行）。</p></div>';
+    return h;
+  }
+
+  /* ===== P2 · 灵潮（周六 20:00–20:15；20 秒一杀，30 杀封顶） ===== */
+  const LC_KILL_MS = 20000, LC_CAP = 30;
+  function lingchaoWindow(now){
+    now = now || new Date();
+    const day = now.getDay();                    /* 6 = 周六 */
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 0, 0, 0);
+    const end = new Date(start.getTime() + 15 * 60000);
+    const active = day === 6 && now >= start && now < end;
+    const preview = day === 6 && now >= new Date(start.getTime() - 10 * 60000) && now < start;
+    /* 下一次周六 20:00：周日~周五取本周六；周六过了场次则顺延 7 天 */
+    let next = new Date(start.getTime());
+    const toSat = (6 - day + 7) % 7;
+    if(toSat > 0) next.setDate(next.getDate() + toSat);
+    else if(now >= end) next.setDate(next.getDate() + 7);
+    const week = coopWeekKey();
+    return { active, preview, start, end, next, week,
+      leftMs: active ? (end - now) : Math.max(0, next - now) };
+  }
+  function lingchaoEnsure(){
+    if(!S.lingchao || typeof S.lingchao !== 'object') S.lingchao = { week:'', started:0, startedAt:0, kills:0, claimed:[], pv:0 };
+  }
+  function lingchaoStart(now){
+    lingchaoEnsure();
+    const w = lingchaoWindow(now);
+    if(!w.active){ log('灵潮未开（每周六 20:00–20:15）。', 'bad'); return false; }
+    if(S.lingchao.week !== w.week){ S.lingchao = { week:w.week, started:0, startedAt:0, kills:0, claimed:[], pv:1 }; }
+    if(S.lingchao.started){ log('已在灵潮中，守到 30 杀封顶。', ''); return true; }
+    S.lingchao.started = 1; S.lingchao.startedAt = (now ? now.getTime() : Date.now()); S.lingchao.kills = 0;
+    log('🌊 灵潮已起：每 20 秒一杀，30 杀封顶；中途离开不惩罚。', 'gold');
+    save(); render();
+    return true;
+  }
+  function lingchaoTick(nowIn){
+    lingchaoEnsure();
+    const now = nowIn || new Date();
+    const w = lingchaoWindow(now);
+    if(S.lingchao.week !== w.week && !w.active) return;
+    /* 预告：开前 10 分钟走世界通告条（每周一次） */
+    if(w.preview && S.lingchao.week !== w.week && !S.lingchao.pv){
+      S.lingchao.week = w.week; S.lingchao.pv = 1;
+      announce('灵潮预告', '周六 20:00 灵潮将起，15 分钟，30 杀封顶');
+      save();
+    }
+    if(!S.lingchao.started || S.lingchao.week !== w.week) return;
+    const end = Math.min(now.getTime(), w.end.getTime());
+    const kills = Math.min(LC_CAP, Math.floor(Math.max(0, end - S.lingchao.startedAt) / LC_KILL_MS));
+    if(kills <= S.lingchao.kills) return;
+    S.lingchao.kills = kills;
+    /* 每 5 杀一档：现有材料 1 份 + 灵石 = 一层需求 ×0.2 */
+    [5,10,15,20,25,30].forEach((k, i) => {
+      if(kills >= k && !S.lingchao.claimed.includes(i)){
+        const r = addItemEx('mat_core', '妖丹');
+        const stone = Math.floor(needOf(S.rank) * 0.2);
+        S.stone += stone; S.stats.stoneEarned += stone;
+        S.lingchao.claimed.push(i);
+        log('🌊 灵潮 ' + k + ' 杀：妖丹 ×1、灵石 +' + fmt(stone) + (r && r.mail ? '（妖丹入信匣）' : '') + '。', 'good');
+      }
+    });
+    save();
+  }
+  function lingchaoHtmlRow(){
+    lingchaoEnsure();
+    const w = lingchaoWindow();
+    const st = S.lingchao.week === w.week ? S.lingchao : null;
+    const kills = st ? st.kills : 0;
+    const started = !!(st && st.started);
+    let state, btn = '';
+    if(w.active){
+      state = started ? ('进行中 · ' + kills + '/' + LC_CAP + ' 杀' + (kills >= LC_CAP ? ' · 已封顶' : '')) : '已开启 · 可进入';
+      if(!started) btn = '<button type="button" data-lingchao="start">进入</button>';
+    }else if(w.preview){ state = '10 分钟内开始'; }
+    else { state = '距开始 ' + fmtCd(w.leftMs); }
+    return '<div class="today-row' + (kills >= LC_CAP ? ' done' : '') + '">' +
+      '<div class="tr-main"><b>🌊 灵潮</b><small>周六场 · 20 秒一杀 · 30 杀封顶 · 每 5 杀一份材料</small></div>' +
+      '<span class="tr-state">' + state + (kills >= LC_CAP ? ' · 封顶后无额外产出' : '') + '</span>' + (btn || '<span></span>') + '</div>';
+  }
   function gateHtml(){
     const lv = gateLv(), list = gateList();
     if(!lv){
@@ -3599,7 +3754,7 @@ const XX = (function(){
         '<div class="gate-foot"><button type="button" class="gate-btn" data-gact="build">开山立派' +
         '<small>' + fmt(gateBuildCost()) + ' 灵石</small></button></div>';
     }
-    let h = '<div class="gate-meta"><span class="gate-gain">差事收益 +' + Math.round((gateYieldMult() - 1) * 100) + '%' +
+    let h = coopBossHtml() + '<div class="gate-meta"><span class="gate-gain">差事收益 +' + Math.round((gateYieldMult() - 1) * 100) + '%' +
       (gateGradN() ? '<i class="gate-feng">门风 +' + Math.round(gateFeng() * 100) + '%</i>' : '') + '</span>' +
       '<span class="gate-idle">闲置 ' + gateIdleN() + ' 人' +
       (gateGradN() ? ' · 出师 ' + gateGradN() + ' 人' : '') + '</span></div><div class="dgrid">';
@@ -3668,6 +3823,7 @@ const XX = (function(){
         else if(a === 'recruit') gateRecruit();
         else if(a === 'apt') gateApt(btn.getAttribute('data-sid') || '');
         else if(a === 'grad') gateGraduate(btn.getAttribute('data-sid') || '');
+        else if(a === 'coopclaim') coopBossClaim(Number(btn.getAttribute('data-i')) || 0);
         else gateAssign(btn.getAttribute('data-sid') || '', a);
       });
     }
@@ -4840,6 +4996,24 @@ const XX = (function(){
               }))
               .slice(0, BAL.gateCapBase + BAL.gateMaxLv * BAL.gateCapPer)
           : [];
+      }
+      /* P2：宗门协力 Boss / 灵潮（旧档无则用默认；周键不符会在 ensure 时重置） */
+      if(o.coopBoss && typeof o.coopBoss === 'object'){
+        const c = o.coopBoss;
+        S.coopBoss.week = typeof c.week === 'string' ? c.week : '';
+        S.coopBoss.hpMax = (typeof c.hpMax === 'number' && isFinite(c.hpMax)) ? Math.max(0, Math.floor(c.hpMax)) : 0;
+        S.coopBoss.dmg = (typeof c.dmg === 'number' && isFinite(c.dmg)) ? Math.max(0, Math.floor(c.dmg)) : 0;
+        S.coopBoss.parts = (typeof c.parts === 'number' && isFinite(c.parts)) ? Math.max(0, c.parts | 0) : 0;
+        S.coopBoss.claimed = Array.isArray(c.claimed) ? c.claimed.filter(x => typeof x === 'number' && x >= 0 && x < 4) : [];
+      }
+      if(o.lingchao && typeof o.lingchao === 'object'){
+        const c = o.lingchao;
+        S.lingchao.week = typeof c.week === 'string' ? c.week : '';
+        S.lingchao.started = c.started ? 1 : 0;
+        S.lingchao.startedAt = (typeof c.startedAt === 'number' && isFinite(c.startedAt)) ? c.startedAt : 0;
+        S.lingchao.kills = (typeof c.kills === 'number' && isFinite(c.kills)) ? Math.max(0, Math.min(30, c.kills | 0)) : 0;
+        S.lingchao.claimed = Array.isArray(c.claimed) ? c.claimed.filter(x => typeof x === 'number' && x >= 0 && x < 6) : [];
+        S.lingchao.pv = c.pv ? 1 : 0;
       }
       /* 山门议事（第 103 轮）：旧档无则补空卷（今日待议）；n 只进不退，钳在 9999 内防脏档刷屏 */
       if(o.council && typeof o.council === 'object'){
@@ -7602,6 +7776,13 @@ function towerBossCompLetter(){
     rows.push({ name: '山门议事', icon: '📜', sub: '今日一条 · ' + reset,
       done: councilDone(), state: councilDone() ? '已议' : '待议',
       claim: '', go: 'zong:xx-council' });
+    /* P2：宗门协力 Boss 入口 */
+    if(gateLv()){
+      const b = coopBossEnsure();
+      rows.push({ name: '镇山妖王 · 协力', icon: '🐲', sub: '累计 ' + fmt(b.dmg) + ' / ' + fmt(b.hpMax) + ' · 周一 08:00 重置',
+        done: b.dmg >= b.hpMax, state: Math.floor(b.dmg / b.hpMax * 100) + '%',
+        claim: '', go: 'zong:xx-gate' });
+    }
     return rows;
   }
   function renderToday(){
@@ -7610,7 +7791,7 @@ function towerBossCompLetter(){
     if(cd) cd.textContent = '距下次重置 ' + fmtCd(nextDayResetMs());
     if(!list) return;
     const rows = todayCountRows();
-    list.innerHTML = rows.map(r => {
+    list.innerHTML = lingchaoHtmlRow() + rows.map(r => {
       let btn = '<span></span>';
       if(r.claim){
         const attr = r.claim === 'sign' ? 'data-today-claim="sign"' : 'data-today-claim="' + r.claim + '"';
@@ -10613,6 +10794,8 @@ function towerBossCompLetter(){
     S.secret.prog = S.secret.prog.slice(); S.secret.day = ''; S.secret.swept = 0;   /* 秘境进度保留，扫荡重置 */
     S.arena.foes = []; S.arena.day = ''; S.arena.left = BAL.arenaDaily;   /* 论剑榜重排（段位声望保留） */
     S.market = { day: '', goods: [], buyRate: 1, sellRate: 1, sold: 0, freeRefresh: 1 };   /* 坊市重新进货 */
+    S.coopBoss = { week: '', hpMax: 0, dmg: 0, claimed: [], parts: 0 };   /* 转世：协力进度从头 */
+    S.lingchao = { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 };
     GONGS.forEach(x => { S[x.id] = 0; });
     S.pillUntil = 0; S.pillBonus = 0;
     danClean({});   /* 三族丹药 buff 也是时间戳状态：转世 / 重开一并消散 */
@@ -13528,6 +13711,7 @@ function towerBossCompLetter(){
     }
     const first = floor > S.towerMax;
     const isBoss = floor % 10 === 0;
+    coopBossHit();   /* P2：塔胜计入宗门协力伤害（按当次战力） */
     const base = towerFloorGrant(floor, 1);
     const srows = [settleLine('灵石', '+' + fmt(base.stone), 'good')];
     if(base.got) srows.push(settleLine('掉落 · ' + base.matName, '+' + base.got + (base.mailed ? '（部分入信匣）' : ''), base.mailed ? 'bad' : 'good'));
@@ -14397,6 +14581,7 @@ function towerBossCompLetter(){
     S.last = now;
     loopSafe('tick', () => tick(dt));
     loopSafe('passFloat', passFloatTick);
+    loopSafe('lingchao', lingchaoTick);
     loopSafe('trail', trailTick);                      /* 入门八事：条件可能由挂机本身满足（猎妖/破境） */
     loopSafe('trace', traceUiTick);                    /* 妖踪倒计时/过期（只活体） */
     loopSafe('miles', checkMiles);
@@ -14829,6 +15014,8 @@ function towerBossCompLetter(){
     S.gate = { lv: 0, disciples: [], grad: 0 };         /* 山门弟子一并散尽（重开 = 一无所有） */
     S.dt = { qing: 0, zhu: 0, su: 0, xuan: 0, huang: 0 }; S.dtMain = '';
     S.market = { day: '', goods: [], buyRate: 1, sellRate: 1, sold: 0, freeRefresh: 1 };
+    S.coopBoss = { week: '', hpMax: 0, dmg: 0, claimed: [], parts: 0 };
+    S.lingchao = { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 };
     /* 寿元 / 道统（第 96 轮）：重开 = 换一个全新的人，连"转世过几世"都不该记得。
        新档寿元是开着的（on=true），所以重开之后也开着。 */
     S.life = { age: 0, on: true, brk: 0 }; S.zuo = 0; S.legacy = { gens: 0, relic: null, hist: [], pick: null };
@@ -15397,6 +15584,9 @@ function towerBossCompLetter(){
     _gate: () => S.gate, _gateList: gateList, _gateLv: gateLv, _gateCap: gateCap,
     _gateBuild: gateBuild, _gateUp: gateUp, _gateRecruit: gateRecruit, _gateAssign: gateAssign,
     _gateSettle: gateSettle, _gateBusy: gateBusy, _gateLeft: gateLeft, _gateIdleN: gateIdleN,
+    _coopBoss: () => coopBossEnsure(), _coopHit: coopBossHit, _coopClaim: coopBossClaim, _coopWeek: coopWeekKey,
+    _lingchaoStart: lingchaoStart, _lingchaoTick: lingchaoTick, _lingchaoWindow: lingchaoWindow,
+    _lingchaoState: () => S.lingchao,
     _gateBuildCost: gateBuildCost, _gateLvCost: gateLvCost, _gateRecruitCost: gateRecruitCost,
     _gateTasks: GATE_TASKS, _gateApts: GATE_APTS, _gateYieldMult: gateYieldMult,
     /* 弟子成长（第 62 节） */

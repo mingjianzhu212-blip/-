@@ -6039,3 +6039,20 @@ html,body{ background:var(--jx-paper); }
   background:rgba(247,243,233,.9) !important;
   color:#8a8172 !important; border-color:rgba(120,100,60,.22) !important; box-shadow:none !important;
 }
+
+/* P2：宗门协力 Boss / 灵潮 */
+.coop{ margin:0 0 12px; padding:10px 12px; border-radius:12px;
+  background:linear-gradient(165deg,rgba(252,250,245,.98),rgba(242,236,222,.96));
+  border:1px solid rgba(181,137,46,.38); }
+.coop-head{ display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px; align-items:baseline; }
+.coop-head b{ font-size:14px; color:#7a5a20; }
+.coop-head span{ font-size:10.5px; color:#6b6252; }
+.coop-bar{ height:9px; margin:8px 0 4px; border-radius:5px; background:rgba(107,98,82,.16); overflow:hidden; }
+.coop-bar i{ display:block; height:100%; background:linear-gradient(90deg,#a5302a,#c83e37); border-radius:5px; transition:width .4s; }
+.coop-num{ margin:0; font-size:11.5px; color:#6b6252; }
+.coop-steps{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; margin-top:8px; }
+.coop-step{ padding:5px 2px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:11px;
+  color:#f7efe2; background:linear-gradient(180deg,#b83a32,#a5302a); border:1px solid #8f2a24; }
+.coop-step small{ display:block; font-size:9px; color:#ffe8d6; }
+.coop-step:disabled{ color:#8a8172; background:rgba(247,243,233,.85); border-color:rgba(120,100,60,.22); cursor:default; }
+.coop-step.done{ color:#2e6b4f; background:rgba(61,107,88,.10); border-color:rgba(61,107,88,.25); }

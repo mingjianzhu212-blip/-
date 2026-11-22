@@ -130,6 +130,8 @@
         const parts = String(g.dataset.todayGo || '').split(':');
         if(parts[0]) open(parts[0], parts[1] || undefined);
       }
+      const lc = ev.target.closest ? ev.target.closest('[data-lingchao]') : null;
+      if(lc && lc.dataset.lingchao === 'start'){ try{ XX._lingchaoStart(); }catch(e){} }
     });
     const le = h.querySelector('#xx-life-enable');
     if(le) le.addEventListener('click', () => {
