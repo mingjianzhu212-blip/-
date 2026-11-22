@@ -1738,14 +1738,14 @@ const SCENARIOS = [
   },
 
   /* ⑮ 城镇七面板「一格一页」（第 88 轮 B）：制作人反复提的老毛病——
-     不同功能点进去全挤在同一页，只是上下关系。这里真点每一格（共 30 格），
+     不同功能点进去全挤在同一页，只是上下关系。这里真点每一格（共 33 格），
      验三件事：格子数对得上、点进去是一个独立页（页眉就是那格的名字、
      页里没有 hub 的入口格、← 只回 hub）、hub 上每格图标真加载且有现状印。
      站 hub 上量图标要先让出一拍（enter() 刚换上的 <img> 还没 decode，立刻量得到假裂图）；
      逐格真点则同步读数即可。enter() 会整段换掉 innerHTML，所以每轮都按 key 重新取元素，
      攥着旧节点再 click 就打不出委托监听了。 */
   {
-    id: 'townhub', name: '城镇七面板一格一页（真点 30 格）', budget: 12000, size: '900,1200',
+    id: 'townhub', name: '城镇七面板一格一页（真点 33 格）', budget: 12000, size: '900,1200',
     save() {
       const s = midSave();
       s.rank = 12; s.exp = 0; s.stone = 200000;
@@ -1753,7 +1753,7 @@ const SCENARIOS = [
     },
     body: `
       setInterval(__clearPopups, 400);
-      var WANT = { xiu:6, role:6, zong:5, market:4, secret:4, arena:3, event:4 };
+      var WANT = { xiu:6, role:6, zong:6, market:4, secret:4, arena:3, event:4 };
       var LIST = ['xiu','role','zong','market','secret','arena','event'];
       var O = { rows: [], cells: 0, viewN: 0, dup: 0, depthBad: 0, titleOk: 0,
                 noHub: 0, backOk: 0, icMiss: '', sealBad: '', hubCards: 0,
@@ -1845,22 +1845,22 @@ const SCENARIOS = [
     checks(d) {
       return [
         { ok: d.rows && d.rows.length === 7 && d.allCells === true,
-          label: '七个面板 hub 都在，入口格数一个不差（藏经阁6 人物6 宗门5 坊市4 秘境4 论剑3 活动4）',
+          label: '七个面板 hub 都在，入口格数一个不差（藏经阁6 人物6 宗门6 坊市4 秘境4 论剑3 活动4）',
           detail: d.counts },
-        { ok: d.cells === 32 && d.viewN === 32 && d.dup === 0 && !(d.rows || []).some(r => r.onPanel),
-          label: '32 格点进去是 32 个不同页面（不是同一页上下滚）',
+        { ok: d.cells === 33 && d.viewN === 33 && d.dup === 0 && !(d.rows || []).some(r => r.onPanel),
+          label: '33 格点进去是 33 个不同页面（不是同一页上下滚）',
           detail: '格子' + d.cells + ' · 独立页' + d.viewN + ' · 重页' + d.dup },
         { ok: d.badLead === '' && d.hubCards === 1,
           label: 'hub 上只剩入口格：秘境留一张卷首概览，其余六块 0 张卡',
           detail: d.badLead || '卡合计' + d.hubCards },
-        { ok: d.titleOk === 32,
-          label: '每格进的那一页，页眉写的就是那一格的功能名', detail: d.titleOk + '/32' },
-        { ok: d.noHub === 32 && d.depthBad === 0 && d.backOk === 32,
+        { ok: d.titleOk === 33,
+          label: '每格进的那一页，页眉写的就是那一格的功能名', detail: d.titleOk + '/33' },
+        { ok: d.noHub === 33 && d.depthBad === 0 && d.backOk === 33,
           label: '独立页里没有第二格入口；栈深恒 2；← 先回 hub 不退主场景',
           detail: ['无入口' + d.noHub, '栈深错' + d.depthBad, '回hub' + d.backOk].join(' / ') },
         { ok: d.icMiss === '',
-          label: '32 格各挂 HUBKIT 里写定的那枚题签（挂错/漏挂都算红）',
-          detail: d.icMiss ? ('错位:' + d.icMiss) : '32/32 对得上' },
+          label: '33 格各挂 HUBKIT 里写定的那枚题签（挂错/漏挂都算红）',
+          detail: d.icMiss ? ('错位:' + d.icMiss) : '33/33 对得上' },
         { ok: HUB_ART === '',
           label: '八块面板用到的每一枚题签素材都是真 PNG（Node 读字节判，不中虚拟时间的假红）',
           detail: HUB_ART || HUB_ART_N + ' 枚全部有效' },

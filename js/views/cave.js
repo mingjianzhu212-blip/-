@@ -80,6 +80,7 @@ HUBKIT.define({
         <div class="craft-up"><span id="xx-forge-up"></span><button type="button" class="field-btn" id="xx-forge-upbtn">升级</button></div>
         <p class="farm-msg" id="xx-forge-upmsg" aria-live="polite"></p>
         <button type="button" class="xlink codex-open" data-codex>法宝图鉴 · 看全 36 件 ›</button>
+        <div class="bp-box" id="xx-bp-box"></div>
         <div class="craft-list" id="xx-forge"></div>
         <p class="hint">灵器提修炼、战器加战力、破器助破境、财器添灵石——四族各占一个持有位，可以同时佩。炼成的法宝在背包与人物页。<button class="xlink" type="button" data-cross="bag">去背包看成品 ›</button></p>
       </section>` },

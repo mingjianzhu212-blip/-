@@ -233,6 +233,9 @@ const XX = (function(){
     lingchao: { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 },
     /* batch5：已弹过的功能解锁插屏 id（不重复弹；老档见 load 种子） */
     unlocks: [],
+    /* batch5：图纸定向锻造（一次性图纸计数）＋天机阁每周自选图 */
+    blueprints: {},
+    bpShop: { week: '', bought: 0 },
     /* 山门议事（第 103 轮）：每日一条议题三选一。n = 已议过几条（决定今天轮到哪条议题，
        只增不减），last = 上一条的结论文本（议事页与日志各留一处） */
     council: { day: '', n: 0, last: '' },
@@ -1129,6 +1132,28 @@ const XX = (function(){
     ART_IDS[fam] = ids;
   });
   const artById = (fam, seg) => (seg > 0 ? (ART_BY_ID[(ART_IDS[fam] || [])[seg - 1]] || null) : null);
+  /* batch5：图纸定向锻造（首批 6 张；只用现有 ART_ROWS / RECIPES，不新增法宝） */
+  const BLUEPRINTS = [
+    { id:'bp_lq5',  fam:'lq',  seg:5, name:'图·承露剑' },
+    { id:'bp_bg5',  fam:'bg',  seg:5, name:'图·破军刀' },
+    { id:'bp_brk5', fam:'brk', seg:5, name:'图·玄门针' },
+    { id:'bp_cai5', fam:'cai', seg:5, name:'图·泉涌珠' },
+    { id:'bp_lq7',  fam:'lq',  seg:7, name:'图·太虚剑' },
+    { id:'bp_bg7',  fam:'bg',  seg:7, name:'图·天罡斧' }
+  ];
+  const BP_IDS = BLUEPRINTS.map(b => b.id);
+  const BP_BY_ID = {}; BLUEPRINTS.forEach(b => { BP_BY_ID[b.id] = b; });
+  const BP_POOLS = {
+    yougu: ['bp_lq5', 'bp_bg5', 'bp_brk5', 'bp_cai5'],
+    beiming: ['bp_lq7', 'bp_bg7']
+  };
+  const bpCount = id => Math.max(0, (S.blueprints && S.blueprints[id]) | 0);
+  function bpGive(id){
+    if(!BP_BY_ID[id]) return false;
+    if(!S.blueprints || typeof S.blueprints !== 'object') S.blueprints = {};
+    S.blueprints[id] = Math.min(999, bpCount(id) + 1);
+    return true;
+  }
   /* 效果文案只有一个来源：炼器面板与炼制日志都从这里取数 */
   function artEffectText(fam, seg){
     if(!seg) return '未佩';
@@ -2635,15 +2660,32 @@ const XX = (function(){
   function secretTotal(){
     return SECRET_CH.reduce((a, _, ci) => a + secretProg(ci), 0);
   }
-  function challengeSecret(ci, road){
+  function challengeSecret(ci, road, repeat){
     const ch = SECRET_CH[ci];
     if(!ch) return;
     if(S.rank < ch.rank){ log('「' + ch.name + '」要 ' + RANK_NAMES[ch.rank] + ' 才开得动。', 'bad'); return; }
-    const f = secretProg(ci) + 1;
-    if(f > SECRET_FLOORS){ log('「' + ch.name + '」十层已通，妖王伏诛。', 'gold'); return; }
-    const need = secretPower(ci, f);
-    const cp = combatPower();
-    if(cp < need){ log('战力不足，第 ' + f + ' 层守关 ' + fmt(need) + ' 战力（' + powerGapAdvice(cp, need) + '）。', 'bad'); return; }
+    const done = secretProg(ci) >= SECRET_FLOORS;
+    const f0 = done ? SECRET_FLOORS : secretProg(ci) + 1;
+    const need0 = secretPower(ci, f0);
+    const cp0 = combatPower();
+    if(cp0 < need0){ log('战力不足，第 ' + f0 + ' 层守关 ' + fmt(need0) + ' 战力（' + powerGapAdvice(cp0, need0) + '）。', 'bad'); return; }
+    /* batch5：十层已通后的重复挑战——只掷图纸 20%，不再给灵石/材料、不推进层数 */
+    if(repeat || done){
+      const pool = ci === 1 ? BP_POOLS.yougu : ci === 2 ? BP_POOLS.beiming : null;
+      if(!pool){ log('「' + ch.name + '」十层已通，妖王伏诛。', 'gold'); return; }
+      let drop = null;
+      if(Math.random() < 0.2){
+        drop = pool[Math.floor(Math.random() * pool.length)];
+        if(bpGive(drop)) log('📜 重复挑战妖王，得【' + BP_BY_ID[drop].name + '】。', 'gold');
+      }
+      showSettle({ icon: '👑', title: ch.name + ' · 第 10 层 · 重复挑战',
+        rows: [settleLine('图纸', drop ? ('+' + BP_BY_ID[drop].name + ' ×1') : '本次未掉（20% 概率）', drop ? 'good' : 'bad')],
+        note: '重复挑战只掷图纸，不再给灵石/材料，也不推进层数。' });
+      save(); render(); renderSecret(); renderBag();
+      return;
+    }
+    const f = f0;
+    const need = need0;
     /* 探路（第 101 轮）：灵石与材料不可兼得——取财多拿灵石、取料多拿材料，层数与守关战力都不变。
        plain 是老口径（灵石原样、1 个材料），程序内调用仍走它。 */
     road = road || 'plain';
@@ -2654,6 +2696,7 @@ const XX = (function(){
       mat: base.mat,
       matN: road === 'mat' ? 2 : road === 'stone' ? 0 : 1
     };
+    const firstBoss = f >= SECRET_FLOORS && secretProg(ci) < SECRET_FLOORS;
     S.secret.prog[ci] = f;
     S.stone += rw.stone; S.stats.stoneEarned += rw.stone;
     let got = '', added = 0, mailed = 0;
@@ -2670,8 +2713,19 @@ const XX = (function(){
     if(f >= SECRET_FLOORS){ log('👑 守关妖王伏诛，「' + ch.name + '」十层尽通！', 'gold'); }
     gainChip('🌀 ' + ch.name + ' ' + f + ' 层 · 灵石 +' + fmt(rw.stone), f >= SECRET_FLOORS ? 'gold' : 'good');
     coopBossHit();   /* P2：秘境通关计入宗门协力伤害 */
+    /* batch5：幽谷/北冥 10 层 Boss 首通必掉一张对应池图纸；重复 20% */
+    let bpDrop = null;
+    if(f >= SECRET_FLOORS){
+      const pool = ci === 1 ? BP_POOLS.yougu : ci === 2 ? BP_POOLS.beiming : null;
+      if(pool && (firstBoss || Math.random() < 0.2)){
+        bpDrop = pool[Math.floor(Math.random() * pool.length)];
+        bpGive(bpDrop);
+        log('📜 妖王遗落图纸【' + BP_BY_ID[bpDrop].name + '】' + (firstBoss ? '（首通必掉）' : '（20% 掉落）') + '。', 'gold');
+      }
+    }
     {
       const srows = [settleLine('灵石', '+' + fmt(rw.stone), 'good')];
+      if(bpDrop) srows.push(settleLine('图纸 · ' + BP_BY_ID[bpDrop].name, '+1', 'good'));
       if(added > 0) srows.push(settleLine('材料 · ' + matName, '+' + added + (mailed ? '（部分入信匣）' : ''), mailed ? 'bad' : 'good'));
       if(rw.matN === 0) srows.push(settleLine('材料', '本层走「取财」，不带材料'));
       showSettle({
@@ -2704,10 +2758,21 @@ const XX = (function(){
     const ch = SECRET_CH[ci];
     if(!ch) return false;
     if(S.rank < ch.rank){ log('「' + ch.name + '」要 ' + RANK_NAMES[ch.rank] + ' 才开得动。', 'bad'); return false; }
-    const f = secretProg(ci) + 1;
-    if(f > SECRET_FLOORS){ log('「' + ch.name + '」十层已通，妖王伏诛。', 'gold'); return false; }
+    const done = secretProg(ci) >= SECRET_FLOORS;
+    const f = done ? SECRET_FLOORS : secretProg(ci) + 1;
     const need = secretPower(ci, f), cp = combatPower();
     if(cp < need){ log('战力不足，第 ' + f + ' 层守关 ' + fmt(need) + ' 战力（' + powerGapAdvice(cp, need) + '）。', 'bad'); return false; }
+    if(done){
+      const pool = ci === 1 ? BP_POOLS.yougu : ci === 2 ? BP_POOLS.beiming : null;
+      if(!pool){ log('「' + ch.name + '」十层已通，妖王伏诛。', 'gold'); return false; }
+      pickStance({
+        icon: '👑', title: ch.name + ' · 第 10 层 · 重复挑战',
+        text: '只掷一样东西：<b>20%</b> 掉一张图纸。重复挑战不再给灵石/材料，也不推进层数。',
+        opts: [{ k: 'repeat', n: '再战妖王', d: '图纸 20% · 无其他收益' }],
+        foot: '关掉就当没打。'
+      }, k => { if(k) challengeSecret(ci, 'repeat', true); });
+      return true;
+    }
     const base = secretReward(ci, f);
     const matName = (ITEMS[base.mat] || {}).n || base.mat;
     pickStance({
@@ -2792,14 +2857,19 @@ const XX = (function(){
         '<div class="sec-prog"><div class="sec-track"><i style="width:' + (p / SECRET_FLOORS * 100).toFixed(1) + '%"></i></div>' +
         '<span>' + p + ' / ' + SECRET_FLOORS + ' 层</span></div>' +
         '<div class="sec-rew">' + (done ? '十层尽通' : '第 ' + f + ' 层守关 ' + fmt(need) + ' 战力 · 灵石 ' + fmt(rw.stone) + ' · 材料「' + (((ITEMS[rw.mat] || {}).n) || rw.mat) + '」') + '</div>';
+      const bpPool = ci === 1 ? BP_POOLS.yougu : ci === 2 ? BP_POOLS.beiming : null;
       html += locked ? '<div class="sec-lock">' + RANK_NAMES[ch.rank] + '开启</div>'
-        : done ? '<div class="sec-lock done">已通关</div>'
+        : done ? (bpPool
+            ? '<button class="sec-btn" data-repeat="' + ci + '">👑 重复挑战妖王 · 图纸 20%</button>'
+            : '<div class="sec-lock done">已通关</div>')
         : '<button class="sec-btn' + (canWin ? '' : ' off') + '" data-fight="' + ci + '">' +
           (canWin ? inkIco('⚔️') + '探路 · 第 ' + f + ' 层' : '战力不足（差 ' + fmt(need - cp) + '）') + '</button>';
       if(box.dataset.sig !== html){
         box.dataset.sig = html; box.innerHTML = html;
         const btn = box.querySelector('[data-fight]');
         if(btn && canWin) btn.addEventListener('click', () => secretPick(ci));
+        const rb = box.querySelector('[data-repeat]');
+        if(rb) rb.addEventListener('click', () => secretPick(ci));
       }
     });
   }
@@ -3660,12 +3730,36 @@ const XX = (function(){
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   }
   function coopMembers(){ return 1 + ((S.gate && S.gate.disciples) ? S.gate.disciples.length : 0); }
+  /* batch5 第 4 项迁移：下个周键起，总血量优先用服务端认可的战力（近 7 天上报）。
+     服务端 sum 已含本地掌门（若本地有新鲜上报）；弟子无独立战力，仍按掌门同战力补人数。
+     没连服务、没上报或缓存过期 → 回退旧口径（本地掌门/弟子同战力），不把血量算成 1。 */
+  function coopServerPower(){
+    try{
+      if(typeof SECT === 'undefined' || !SECT.powerBoard) return null;
+      const pb = SECT.powerBoard();
+      const at = SECT.powerBoardAt ? SECT.powerBoardAt() : 0;
+      if(!pb || !pb.ok || !(pb.fresh > 0) || !(pb.sum > 0)) return null;
+      if(!at || Date.now() - at > 30 * 60000) return null;
+      return { sum: Math.max(0, pb.sum | 0), me: !!(pb.me && pb.me.fresh) };
+    }catch(e){ return null; }
+  }
+  function coopBossSum(){
+    const own = Math.max(1, Math.floor(combatPower()));
+    const n = coopMembers();
+    const sv = coopServerPower();
+    if(!sv) return own * n;
+    return sv.sum + (sv.me ? 0 : own) + own * (n - 1);
+  }
   function coopBossEnsure(){
     if(!S.coopBoss || typeof S.coopBoss !== 'object') S.coopBoss = { week:'', hpMax:0, dmg:0, claimed:[], parts:0 };
     const wk = coopWeekKey();
     if(S.coopBoss.week !== wk || !S.coopBoss.hpMax){
-      const sum = Math.max(1, Math.floor(combatPower())) * coopMembers();
+      const sum = coopBossSum();
       S.coopBoss = { week: wk, hpMax: Math.max(1, sum * COOP_HP_MULT), dmg: 0, claimed: [], parts: 0 };
+    }else if(S.coopBoss.dmg === 0 && !(S.coopBoss.claimed || []).length && coopServerPower()){
+      /* 周切换瞬间服务端榜单可能还没拉回：本周尚未出手时，按新口径补一次（已出手则保持冻结） */
+      const next = Math.max(1, coopBossSum() * COOP_HP_MULT);
+      if(next > S.coopBoss.hpMax) S.coopBoss.hpMax = next;
     }
     return S.coopBoss;
   }
@@ -3713,8 +3807,9 @@ const XX = (function(){
         (done || !can ? ' disabled' : '') + '>' + Math.round(p * 100) + '%' +
         '<small>' + (done ? '已领' : (can ? '领取' : fmt(need))) + '</small></button>';
     });
-    h += '</div><p class="hint">总血量 = 宗门成员战力总和 × ' + COOP_HP_MULT +
-      '（弟子暂无独立战力，按掌门同战力计人数；第一周试运行）。</p></div>';
+    h += '</div><p class="hint">总血量 = 宗门成员战力总和 × ' + COOP_HP_MULT + '（' +
+      (coopServerPower() ? '取自宗门服务近 7 天上报的真实战力' : '未连宗门服务，暂按本地掌门与弟子同战力计') +
+      '；弟子暂无独立战力，按掌门同战力计人数）。</p></div>';
     return h;
   }
 
@@ -5063,6 +5158,17 @@ const XX = (function(){
       /* batch5：老档没有 unlocks → 把当前已越过的解锁点直接记为已弹，避免上线一次弹一串 */
       if(Array.isArray(o.unlocks)) S.unlocks = o.unlocks.filter(id => typeof id === 'string' && UNLOCK_POINTS.some(p => p.id === id));
       else S.unlocks = UNLOCK_POINTS.filter(p => S.rank >= p.rank).map(p => p.id);
+      if(o.blueprints && typeof o.blueprints === 'object' && !Array.isArray(o.blueprints)){
+        S.blueprints = {};
+        BP_IDS.forEach(id => {
+          const n = o.blueprints[id];
+          if(typeof n === 'number' && isFinite(n) && n > 0) S.blueprints[id] = Math.min(999, Math.floor(n));
+        });
+      }
+      if(o.bpShop && typeof o.bpShop === 'object'){
+        S.bpShop.week = typeof o.bpShop.week === 'string' ? o.bpShop.week : '';
+        S.bpShop.bought = (typeof o.bpShop.bought === 'number' && isFinite(o.bpShop.bought)) ? Math.max(0, Math.min(1, o.bpShop.bought | 0)) : 0;
+      }
       if(o.lingchao && typeof o.lingchao === 'object'){
         const c = o.lingchao;
         S.lingchao.week = typeof c.week === 'string' ? c.week : '';
@@ -7294,6 +7400,96 @@ function towerBossCompLetter(){
         if (b && !b.disabled) { ev.stopPropagation(); buyShop(b.dataset.buy, b); }
       });
     }
+    renderBpShop();
+  }
+  /* batch5 图纸定向锻造 · 天机阁周限购自选图：
+     价格 = 当前一层需求 ×3 灵石 + 500 悟道值（不随境界系数放大悟道价）；
+     每周限 1 张，与现有周限购同口径（周一 0 点跨周重置，状态存 S.bpShop）。 */
+  const BP_SHOP_STONE_MULT = 3;
+  const BP_SHOP_WISDOM = 500;
+  function resetBpShopWeek(){
+    if(!S.bpShop || typeof S.bpShop !== 'object') S.bpShop = { week: '', bought: 0 };
+    const k = weekKey();
+    if(S.bpShop.week !== k){ S.bpShop.week = k; S.bpShop.bought = 0; }
+    return S.bpShop;
+  }
+  function bpShopState(){
+    resetBpShopWeek();
+    const bought = Math.max(0, Math.min(1, S.bpShop.bought | 0));
+    return {
+      sold: bought >= 1, left: 1 - bought,
+      stone: Math.max(1, Math.floor(needOf(S.rank) * BP_SHOP_STONE_MULT)),
+      wisdom: BP_SHOP_WISDOM,
+      txt: '本周 ' + bought + '/1'
+    };
+  }
+  function doBuyBlueprint(id){
+    const b = BP_BY_ID[id];
+    if(!b){ log('天机阁没有这张图纸。', 'bad'); return false; }
+    const st = bpShopState();
+    if(st.sold){ log('本周的图纸已选过，下周再来。', 'bad'); return false; }
+    if(moneyInt(S.stone) < st.stone){
+      log('灵石不足，【' + b.name + '】要 ' + fmt(st.stone) + ' 灵石。', 'bad'); return false;
+    }
+    if(moneyInt(S.wisdom) < st.wisdom){
+      log('悟道值不足，【' + b.name + '】要 ' + fmt(st.wisdom) + ' 点（现有 ' + moneyInt(S.wisdom) + '）。', 'bad'); return false;
+    }
+    S.stone -= st.stone; S.wisdom -= st.wisdom;
+    S.bpShop.bought = 1;
+    bpGive(id);
+    log('📜 花 ' + fmt(st.stone) + ' 灵石 + ' + fmt(st.wisdom) + ' 点悟道值，自选【' + b.name + '】。', 'gold');
+    sfx.win(); save(); render();
+    showSettle({
+      icon: '📜', title: '天机阁 · 图纸', sub: '已放入图纸夹 · 去炼器坊查看',
+      rows: [settleLine(b.name, '+1', 'good')],
+      note: '图纸锻造只跳炼器坊等级与器师阶两道门槛，材料与成功率照卡。'
+    });
+    return true;
+  }
+  function buyBlueprint(id, fromEl){
+    const b = BP_BY_ID[id];
+    if(!b){ log('天机阁没有这张图纸。', 'bad'); return false; }
+    const st = bpShopState();
+    if(st.sold) return doBuyBlueprint(id);
+    if(moneyInt(S.stone) < st.stone || moneyInt(S.wisdom) < st.wisdom) return doBuyBlueprint(id);
+    pickStance({
+      icon: '📜', title: '天机阁 · 自选图纸【' + b.name + '】',
+      text: '将消耗 <b>' + fmt(st.stone) + '</b> 灵石（当前一层需求 ×' + BP_SHOP_STONE_MULT + '）＋ <b>' +
+        fmt(st.wisdom) + '</b> 悟道值。<br>本周限 1 张 · ' + st.txt + '。',
+      opts: [{ k: 'ok', n: '确认选图', d: '图纸入图纸夹' }],
+      foot: '取消不会扣任何资源。'
+    }, k => { if(k === 'ok') doBuyBlueprint(id); });
+    return true;
+  }
+  function renderBpShop(){
+    const box = document.getElementById('tj-bp');
+    if(!box) return;
+    const st = bpShopState();
+    const stateEl = document.getElementById('tj-bp-state');
+    if(stateEl) stateEl.textContent = st.txt;
+    const enoughStone = moneyInt(S.stone) >= st.stone;
+    const enoughWisdom = moneyInt(S.wisdom) >= st.wisdom;
+    box.innerHTML = BLUEPRINTS.map(b => {
+      const n = bpCount(b.id);
+      const btnTxt = st.sold ? '本周已选' : '选此图';
+      const dis = st.sold || !enoughStone || !enoughWisdom;
+      return '<div class="mk-row' + (st.sold ? ' sold' : '') + '">' +
+        '<span class="mk-emo">📜</span>' +
+        '<div class="mk-main"><b>' + b.name + '</b>' +
+        '<small>' + ART_FAM[b.fam].name + '第 ' + b.seg + ' 阶 · 持有图纸 ' + n + ' 张</small></div>' +
+        '<div class="mk-btns"><button class="btn-mini' + (dis ? ' dis' : '') + '" data-buy-bp="' + b.id + '"' +
+        (st.sold ? ' disabled' : '') + ' title="灵石 ' + fmt(st.stone) + ' + 悟道值 ' + fmt(st.wisdom) + '">' +
+        btnTxt + '</button></div></div>';
+    }).join('') +
+      '<p class="hint">图纸定价：<b>' + fmt(st.stone) + '</b> 灵石（当前一层需求 ×' + BP_SHOP_STONE_MULT +
+      '）＋ <b>' + fmt(st.wisdom) + '</b> 悟道值 · 每周限 1 张。</p>';
+    if(!box.dataset.bp_binded){
+      box.dataset.bp_binded = '1';
+      box.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-buy-bp]');
+        if(b && !b.disabled){ ev.stopPropagation(); buyBlueprint(b.dataset.buyBp, b); }
+      });
+    }
   }
   function bagCap(){ return S.bagSize + dtBagN(); }
   /* 合法上限：储物袋满级 + 所有洞天加格（含主洞 ×1.5）。读档只按这个兜底，防止改档塞爆 DOM */
@@ -8300,20 +8496,23 @@ function towerBossCompLetter(){
    *            4. 成功率判定 5. 成功产出（丹药入背包 / 法宝装备并重掷词条）/ 失败返还 30% 材料
    *            6. 无论成败均涨匠道经验（阶梯式成长的核心来源）
    */
-  function craftItem(bld, recipeId){
+  function craftItem(bld, recipeId, opts){
+    opts = opts || {};
     const meta = BUILDINGS[bld];
     const rec = recipeById(recipeId);
     if(!meta || !rec || rec.bld !== bld){ log('配方有误。', 'bad'); return; }
     /* 旁方是"参透"出来的：没参透时即使拿到 id 也不许炼 */
     if(rec.of && !variantUnlocked(rec.of)){ log('这张旁方尚未参透。', 'bad'); return; }
     const lv = bldLevel(bld);
+    /* batch5 图纸：只跳过炼器坊等级 + 器师阶位两条门槛，其余照卡 */
+    if(opts.blueprint && !bpCount(opts.bpId)){ log('没有这张图纸了。', 'bad'); return; }
     /* 1a. 建筑等级门槛（高阶配方锁死在建筑等级上） */
-    if(lv < rec.reqLv){
+    if(!opts.blueprint && lv < rec.reqLv){
       log('【' + rec.name + '】需' + meta.name + ' ' + rec.reqLv + ' 级（当前 ' + lv + ' 级），先去升级' + meta.name + '。', 'bad'); return;
     }
     /* 1b. 匠道阶位门槛：手艺不到，丹不成器不就 */
     const reqM = rec.reqM || 1;
-    if(masteryOf(bld) < reqM){
+    if(!opts.blueprint && masteryOf(bld) < reqM){
       log('【' + rec.name + '】需' + masteryName(bld) + ' ' + reqM + ' 阶（当前 ' + masteryOf(bld) + ' 阶）：多炼低阶积累匠道经验。', 'bad'); return;
     }
     /* 法器只能逐阶炼制，不能回炉同阶或越阶（四族各判各的持有阶，互不覆盖） */
@@ -8335,9 +8534,10 @@ function towerBossCompLetter(){
     const matBefore = {};
     rec.mats.forEach(m => { if(m.t !== 'stone') matBefore[m.t] = matCount(m.t); });
     const expBefore = masteryExp(bld), lvBefore = masteryOf(bld);
-    /* 3. 扣除材料与灵石 */
+    /* 3. 扣除材料与灵石；图纸定向额外消耗 1 张图纸（成败都耗） */
     S.stone -= stoneCost;
     rec.mats.forEach(m => { if(m.t !== 'stone') matTake(m.t, m.n); });
+    if(opts.blueprint && opts.bpId) S.blueprints[opts.bpId] = Math.max(0, bpCount(opts.bpId) - 1);
     /* 3b. 正方记炉数（旁方不反向计数）；失败也算练过——"炼废的也是经验" */
     let unlockedNow = null;
     const baseId = variantBaseOf(rec);
@@ -8401,6 +8601,7 @@ function towerBossCompLetter(){
     try{
       showCraftSettle({
         bld: bld, rec: rec, rate: rate, success: success,
+        bpName: opts.blueprint ? ((BP_BY_ID[opts.bpId] || {}).name || '定向图纸') : '',
         stoneSpent: stoneBefore - S.stone,
         matBefore: matBefore, settleProduct: settleProduct, settleBack: settleBack,
         expBefore: expBefore, lvBefore: lvBefore,
@@ -8449,6 +8650,7 @@ function towerBossCompLetter(){
     const rows = [];
     const line = (k, v, cls) => '<div class="cs-row' + (cls ? ' ' + cls : '') + '"><span>' + k + '</span><b>' + v + '</b></div>';
     rows.push(line('消耗 · 灵石', '−' + fmt(d.stoneSpent) + '（不返还）', 'bad'));
+    if(d.bpName) rows.push(line('消耗 · ' + d.bpName, '−1', 'bad'));
     rec.mats.forEach(mm => {
       if(mm.t === 'stone') return;
       rows.push(line('消耗 · ' + matName(mm.t), '−' + fmt(mm.n)));
@@ -11976,6 +12178,7 @@ function towerBossCompLetter(){
     renderTownHub();
     renderAlchemy();
     renderForge();
+    renderBlueprintBox();
     renderCodex();
     renderEnhance();
     renderHunt();
@@ -12678,6 +12881,42 @@ function towerBossCompLetter(){
           : '<span class="cc-src">出处：' + src + '</span>') +
         '</div>';
     }).join('');
+  }
+  /* batch5：图纸定向锻造 */
+  function craftByBlueprint(bpId, fromEl){
+    const b = BP_BY_ID[bpId];
+    if(!b){ log('图纸不存在。', 'bad'); return; }
+    if(!bpCount(bpId)){ log('没有【' + b.name + '】了；图纸可从秘境 Boss 或天机阁获得。', 'bad'); return; }
+    const rec = RECIPES[b.fam + b.seg];
+    if(!rec){ log('图纸对应的图谱缺失。', 'bad'); return; }
+    craftItem('forge', rec.recipeId, { blueprint: true, bpId: bpId });
+  }
+  function renderBlueprintBox(){
+    const box = document.getElementById('xx-bp-box');
+    if(!box) return;
+    if(!Object.keys(S.blueprints || {}).length){
+      box.innerHTML = '<p class="bp-empty">暂无图纸。图纸可由秘境 10 层 Boss 掉落，或天机阁每周自选。</p>';
+      return;
+    }
+    box.innerHTML = BLUEPRINTS.filter(b => bpCount(b.id) > 0).map(b => {
+      const rec = RECIPES[b.fam + b.seg];
+      const owned = artSeg(b.fam) >= b.seg;
+      const n = bpCount(b.id);
+      const rate = rec ? Math.round(craftRate(rec) * 100) : 0;
+      return '<div class="bp-row">' +
+        '<div class="bp-main"><b>' + b.name + ' ×' + n + '</b>' +
+        '<small>' + ART_FAM[b.fam].name + '第 ' + b.seg + ' 阶 · ' + (rec ? matLedger(rec.mats) : '') +
+        ' · 当前成功率 ' + rate + '%</small></div>' +
+        '<button type="button" class="bp-btn" data-bp="' + b.id + '"' + (owned ? ' disabled' : '') + '>' +
+        (owned ? '已持有' : '图纸锻造') + '</button></div>';
+    }).join('');
+    if(!box.dataset.bound){
+      box.dataset.bound = '1';
+      box.addEventListener('click', ev => {
+        const b = ev.target && ev.target.closest ? ev.target.closest('[data-bp]') : null;
+        if(b && !b.disabled) craftByBlueprint(b.dataset.bp, b);
+      });
+    }
   }
   function renderForge(){
     const box = document.getElementById('xx-forge');
@@ -15111,6 +15350,7 @@ function towerBossCompLetter(){
     S.coopBoss = { week: '', hpMax: 0, dmg: 0, claimed: [], parts: 0 };
     S.lingchao = { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 };
     S.unlocks = [];
+    S.blueprints = {}; S.bpShop = { week: '', bought: 0 };
     /* 寿元 / 道统（第 96 轮）：重开 = 换一个全新的人，连"转世过几世"都不该记得。
        新档寿元是开着的（on=true），所以重开之后也开着。 */
     S.life = { age: 0, on: true, brk: 0 }; S.zuo = 0; S.legacy = { gens: 0, relic: null, hist: [], pick: null };
@@ -15629,6 +15869,7 @@ function towerBossCompLetter(){
     _beasts: BEASTS, _eggRate: EGG_RATE, _masteryExpCfg: MASTERY_EXP, _powK: POW_K,
     _claimQuest: claimQuest, _quests: questList,
     _hunt: startHunt, _stopHunt: stopHunt, _power: combatPower,
+    _powerSnapshot: multiSnapshot,   /* batch5：服务端战力重算的同一份养成快照 */
     _trace: () => trace, _traceSpawn: traceSpawn, _traceChase: traceChase, _traceLet: traceLet,
     _renderTrace: renderTrace, _tracePaint: tracePaint, _traceTick: traceUiTick,
     _traceReset: () => { trace = null; traceT = 0; traceGap = TRACE.first; renderTrace(); },
@@ -15680,6 +15921,10 @@ function towerBossCompLetter(){
     _gateBuild: gateBuild, _gateUp: gateUp, _gateRecruit: gateRecruit, _gateAssign: gateAssign,
     _gateSettle: gateSettle, _gateBusy: gateBusy, _gateLeft: gateLeft, _gateIdleN: gateIdleN,
     _coopBoss: () => coopBossEnsure(), _coopHit: coopBossHit, _coopClaim: coopBossClaim, _coopWeek: coopWeekKey,
+    _coopSum: coopBossSum, _coopServerPower: coopServerPower,
+    /* batch5 第 4 项：图纸锻造/周店 + 战力快照（测试出口） */
+    _bpList: BLUEPRINTS, _bp: () => Object.assign({}, S.blueprints), _bpGive: bpGive,
+    _bpShop: bpShopState, _resetBpShopWeek: resetBpShopWeek, _craftByBlueprint: craftByBlueprint,
     _lingchaoStart: lingchaoStart, _lingchaoTick: lingchaoTick, _lingchaoWindow: lingchaoWindow,
     _lingchaoState: () => S.lingchao,
     _gateBuildCost: gateBuildCost, _gateLvCost: gateLvCost, _gateRecruitCost: gateRecruitCost,
@@ -15826,6 +16071,8 @@ const SECT = (function(){
   let me = null, list = [], req = null;
   let bonus = 0.07, bonusNow = 0;
   let stats = null;                 /* 山门气象：全服活跃度快照 */
+  let powerBoard = null, powerBoardAt = 0;   /* batch5：战力榜缓存（25 秒轮询刷新） */
+  let powerShown = -1, powerDebounce = 0, powerWatchTimer = 0, powerHeartTimer = 0;
   let timer = 0, noteTxt = '', noteCls = '';
 
   function ensurePid(){
@@ -15965,6 +16212,7 @@ const SECT = (function(){
     /* 第 88 轮 B 拆页：山门气象自成一页，互助那页没有 sc-box。
        气象先写，否则「没 sc-box 就早退」会把降级文案一起吞掉。 */
     renderWeather();
+    renderPower();
     const box = el('sc-box');
     if(!box) return;
     const quota = el('sc-quota');
@@ -16034,6 +16282,80 @@ const SECT = (function(){
     if(s < 3600) return Math.floor(s / 60) + ' 分前';
     if(s < 86400) return Math.floor(s / 3600) + ' 时前';
     return Math.floor(s / 86400) + ' 日前';
+  }
+
+  /* ---- 战力榜（batch5 第 4 项 · 乙案） ----
+     客户端每 2 秒防抖上报一次养成快照，60 秒心跳；服务端重算后回 power/at。
+     榜单上限 50，只显示服务端认可的战力，不显示 pid。 */
+  async function powerReport(){
+    if(!ready || !online) return null;
+    let snap = null;
+    try{ snap = XX._powerSnapshot ? XX._powerSnapshot() : null; }catch(e){}
+    if(!snap) return null;
+    try{
+      const r = await post('power', { snapshot: snap, ver: 1 });
+      if(r && r.ok){
+        if(powerBoard && powerBoard.me){
+          powerBoard.me.power = r.power; powerBoard.me.at = r.at; powerBoard.me.fresh = true;
+        }
+        return r;
+      }
+    }catch(e){}
+    return null;
+  }
+  /* 战力变化 → 2 秒防抖；心跳 60 秒。计时器只挂一次，断开连接时自然跳过。 */
+  function powerWatch(){
+    if(powerWatchTimer) return;
+    powerWatchTimer = setInterval(() => {
+      if(!online || !ready) return;
+      let cur = 0;
+      try{ cur = XX._power ? Math.floor(XX._power()) : 0; }catch(e){ return; }
+      if(cur === powerShown) return;
+      powerShown = cur;
+      if(powerDebounce) clearTimeout(powerDebounce);
+      powerDebounce = setTimeout(() => { powerDebounce = 0; powerReport(); }, 2000);
+    }, 1000);
+    powerHeartTimer = setInterval(() => { if(online && ready) powerReport(); }, 60000);
+  }
+  async function fetchPowerBoard(){
+    try{
+      const pb = await get('powerboard', {});
+      if(pb && pb.ok){ powerBoard = pb; powerBoardAt = Date.now(); renderPower(); return pb; }
+    }catch(e){}
+    return null;
+  }
+  function renderPower(){
+    const box = el('sc-pw-list');
+    if(!box) return;
+    const st = el('sc-pw-state');
+    if(!online){
+      if(st){ st.textContent = '未连接'; st.className = 'sc-quota off'; }
+      box.innerHTML = '<div class="sc-none">战力榜需连上互助服务。</div>';
+      return;
+    }
+    const pb = powerBoard;
+    if(!pb || !pb.ok){
+      if(st){ st.textContent = '读取中…'; st.className = 'sc-quota'; }
+      box.innerHTML = '<div class="sc-none">榜单读取中…</div>';
+      return;
+    }
+    if(st){ st.textContent = '已上报 ' + pb.total + ' 人 · 每 25 秒刷新'; st.className = 'sc-quota'; }
+    const list = pb.list || [];
+    let h = '<div class="sc-listhead"><span>名次 · 道号</span><span>战力</span></div>';
+    if(!list.length){
+      h += '<div class="sc-none">尚无同门上报战力。进入宗门后会自动同步。</div>';
+    }else{
+      h += list.map(x => '<div class="sc-pw-row' + (x.me ? ' me' : '') + '">' +
+        '<span class="sc-pw-no">' + x.no + '</span>' +
+        '<b class="sc-pw-nick">' + esc(x.nick) + '</b>' +
+        '<em class="sc-pw-rank">' + rankName(x.rank) + '</em>' +
+        '<span class="sc-pw-val">' + fmt(x.power) + '</span>' +
+        '<small class="sc-pw-ago">' + fmtAgo(x.at) + '</small></div>').join('');
+    }
+    h += '<p class="sc-hint">' + ((pb.me && pb.me.fresh)
+      ? '你的战力：' + fmt(pb.me.power) + ' · ' + fmtAgo(pb.me.at) + (pb.me.rank ? ' · 第 ' + pb.me.rank + ' 名' : '')
+      : '你的战力尚未上报，稍后自动同步。') + '</p>';
+    box.innerHTML = h;
   }
 
   function viewMine(){
@@ -16202,6 +16524,8 @@ const SECT = (function(){
         const st = await get('stats', { rank: rk });
         if(st && st.ok) stats = st;
       }catch(e){}
+      /* 战力榜：进页面拉一次 + 25 秒轮询（与互助主流程同频） */
+      await fetchPowerBoard();
       render();
     }catch(e){
       if(online) note('互助服务连不上了' + errTag(e) + '，先挂机，等会儿自动重连；也可点「重新连接」。', 'bad');
@@ -16239,6 +16563,9 @@ const SECT = (function(){
     if(!okHost){ ready = false; online = false; render(); startPoll(); return; }
     host = okHost;
     ready = true; online = true;
+    powerWatch();
+    await powerReport();          /* 登入/进入宗门：先报一次快照 */
+    try{ powerShown = Math.floor(XX._power()); }catch(e){}
     await refresh();
     startPoll();
   }
@@ -16381,12 +16708,16 @@ const SECT = (function(){
       const st = await get('stats', { rank: rankNo() });
       if(st && st.ok){ stats = st; renderWeather(); }
     }catch(e){}
+    powerReport();
+    await fetchPowerBoard();
+    renderPower();
   }
 
   return {
     boot, refresh, refreshNick, publish, guard, cancel: cancelReq, claim, reconnect,
     bonusRate, afterBreak, panelOpen,
     chatBind, chatOpen, chatClose, chatSend,
+    powerReport, powerBoard: () => powerBoard, powerBoardAt: () => powerBoardAt,
     host: () => host,
     _candidates: candidates, _firstAlive: firstAlive, _readJson: readJson, _errTag: errTag,
     _state: () => ({ online, ready, host, pid, nick, me, list, req, bonus, bonusNow, noteTxt,

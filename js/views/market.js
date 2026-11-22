@@ -36,6 +36,9 @@ HUBKIT.define({
           <b>当前总资产 35%~45% 的灵石 + 大额悟道值</b>双扣（悟道价随境界 ×<b id="tj-mul">1.00</b>）——囤多少灵石都一口榨走三到五成。
           悟道值仅由<span class="tj-src">任务、签到、突破失败</span>获得。护心镜每周限购 2 次；护道阵法每周限购 1 次；天机令每大境界限 1 次。</p>
         <div class="mk-goods" id="tj-goods"></div>
+        <h2 class="tj-bp-title">图纸 · 每周自选 <small id="tj-bp-state">本周 0/1</small></h2>
+        <p class="hint">每周可自选 1 张图纸，价格 = 当前一层需求 ×3 灵石 + 500 悟道值；图纸锻造只跳炼器坊等级与器师阶，材料与成功率照卡。</p>
+        <div class="mk-goods" id="tj-bp"></div>
       </section>` }
   ]
 });

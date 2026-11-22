@@ -292,6 +292,21 @@
   }
   .sc-rchip em{ font-style:normal; font-size:10px; color:var(--muted); }
   .sc-elist{ display:grid; gap:2px; margin-top:8px; }
+  /* ---- batch5：战力榜（服务端重算 · 前 50） ---- */
+  .sc-pw-list{ display:grid; gap:3px; margin-top:8px; }
+  .sc-pw-row{
+    display:flex; align-items:baseline; gap:7px; padding:7px 9px; border-radius:9px;
+    background:var(--card-solid);
+  }
+  .sc-pw-row.me{ background:rgba(138,109,59,0.10); box-shadow:inset 0 0 0 1px rgba(138,109,59,0.18); }
+  .sc-pw-no{ flex:0 0 22px; font-size:11px; color:var(--muted); text-align:right; }
+  .sc-pw-nick{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sc-pw-rank{ flex:0 0 auto; font-style:normal; font-size:10px; color:var(--muted); }
+  .sc-pw-val{ flex:0 0 auto; font-size:12.5px; font-weight:700; color:#8a5a2b; }
+  .sc-pw-ago{ flex:0 0 auto; font-size:10px; color:var(--muted); }
+  /* 天机阁 · 图纸每周自选 */
+  .tj-bp-title{ margin-top:18px; }
+  .tj-bp-title small{ font-size:10.5px; color:var(--muted); font-weight:400; margin-left:6px; }
   .sc-ev{
     display:flex; align-items:center; gap:8px; padding:4px 2px;
     font-size:11.5px; color:var(--text); line-height:1.5;
@@ -1596,6 +1611,18 @@
   .recipe-codex b span{ color:#8a6d3b; font-variant-numeric:tabular-nums; }
   .recipe-codex small{ display:block; font-size:10.5px; color:var(--muted); margin-top:2px; }
   .craft.alt{ background:rgba(160,132,64,.055); box-shadow:inset 0 0 0 1px rgba(160,132,64,.16); }
+  /* batch5 图纸定向锻造：图纸夹（炼器坊顶部） */
+  .bp-box{ display:grid; gap:7px; margin:0 0 8px; }
+  .bp-box:empty{ display:none; }
+  .bp-row{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:12px;
+    background:rgba(160,132,64,.07); box-shadow:inset 0 0 0 1px rgba(160,132,64,.18); }
+  .bp-main{ flex:1; min-width:0; }
+  .bp-main b{ font-size:12.5px; color:#5a4a2e; }
+  .bp-main small{ display:block; font-size:10.5px; color:var(--muted); margin-top:2px; line-height:1.5; }
+  .bp-btn{ flex:0 0 auto; min-width:76px; padding:7px 10px; border-radius:10px; border:none;
+    background:rgba(61,107,88,0.08); color:var(--teal); font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .bp-btn:disabled{ opacity:.45; cursor:default; color:var(--muted); background:var(--bg-2); }
+  .bp-empty{ margin:0 0 8px; font-size:11px; color:var(--muted); line-height:1.6; }
 .craft small .alt-hint{ white-space:nowrap; }
   .vtag{ display:inline-block; font-style:normal; font-weight:400; font-size:9.5px; letter-spacing:.08em;
     color:#8a6d3b; border:1px solid rgba(160,132,64,.3); border-radius:4px; padding:0 4px; margin-right:2px; }

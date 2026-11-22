@@ -41,6 +41,17 @@ HUBKIT.define({
         <div class="sc-roster" id="sc-roster"></div>
         <div class="sc-events" id="sc-events"></div>
       </section>` },
+    /* batch5：战力榜（服务端按养成快照重算，前 50） */
+    { key: 'xx-power', view: 'zong_power', name: '战力榜', note: '同门前 50 · 服务端重算',
+      ico: 'ic_bolt.png', sealId: 'xx-hub-power', sealTxt: '战力',
+      body: `      <section class="card wide" id="sc-power">
+        <div class="sect-head">
+          <h2>宗门战力榜</h2>
+          <span class="sc-quota off" id="sc-pw-state">未连接</span>
+        </div>
+        <div class="sc-pw-list" id="sc-pw-list"></div>
+        <p class="hint">只列服务端认可的战力（客户端上报养成快照、服务端重算），最多 50 名；不显示玩家标识。进入页面自动上报一次，之后每 60 秒心跳。</p>
+      </section>` },
     /* 探索：花灵石进秘境采材料 */
     { key: 'xx-treasure', view: 'zong_seek', name: '探索秘境', note: '采灵草 · 挖矿石',
       ico: 'bld_secret.png', sealTxt: '采集',

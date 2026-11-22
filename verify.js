@@ -978,7 +978,7 @@ const DIAG = `
     // ---- 寻宝 ----
     /* 第 88 轮 B 拆页：hub 五格（弟子 / 议事 / 气象 / 探索 / 互助），山门品阶落在弟子格朱砂印 */
     window.switchTab('zong');
-    L('zongHubCells', document.querySelectorAll('#page-zong .hub-nav [data-jump]').length);   // 5
+    L('zongHubCells', document.querySelectorAll('#page-zong .hub-nav [data-jump]').length);   // 6（batch5 加战力榜）
     L('zongHubCards', document.querySelectorAll('#page-zong .panel-body > .card').length);     // 0
     L('zongHubSealGate', document.getElementById('xx-hub-zong-gate').textContent);             // 未立 · 0/N
     window.switchTab('zong_seek');
@@ -3957,8 +3957,8 @@ const DIAG = `
   ok(F.coBlockHerb === 'yes/灵草不足' && F.coBlockIdle === 'yes/无弟子在山上' && F.coDayIdle === '今日待议',
      '代价不够 / 无人可派的签直接置灰并写明原因');
   ok(F.coSvc === '1', '「准其下山」给闲置弟子的差事趟数 +1');
-  ok(F.coCycle === '5/caravan' && F.coHubSecs === '5/zong_council' && F.zongHubCells === '5',
-     '五条议题轮换、宗门 hub 多出第五格「山门议事」');
+  ok(F.coCycle === '5/caravan' && F.coHubSecs === '6/zong_council' && F.zongHubCells === '6',
+     '五条议题轮换、宗门 hub 现有六格（原五格 + batch5 战力榜）「山门议事」仍在第二格');
   ok(F.coMigDirty === 'string/0/string' && F.coMigBigN === '9999/10',
      '脏档议事字段读档即夹（n 0~9999、day/last 只收字符串）');
   /* W1「塔底」（第 109 轮）：唯一真值 worldFoot 的读档口径。
@@ -4248,8 +4248,8 @@ const DIAG = `
      'W2 用例收尾把 base 档写回并 reload：W1 的账没被带脏（' + F.w2Restored + '）');
   /* 山门气象（2026-10-25） */
   ok(F.wxCard === 'yes' && F.wxSlots === '4', '「山门气象」独立页四个挂点（统计/名录/动向/状态）');
-  ok(F.zongHubCells === '5' && F.zongHubCards === '0',
-     '宗门拆页：hub 五格（弟子 / 议事 / 气象 / 探索 / 互助），气象不再和互助上下堆（格 ' + F.zongHubCells + ' · 卡 ' + F.zongHubCards + '）');
+  ok(F.zongHubCells === '6' && F.zongHubCards === '0',
+     '宗门拆页：hub 六格（弟子 / 议事 / 气象 / 探索 / 互助 / 战力榜），气象不再和互助上下堆（格 ' + F.zongHubCells + ' · 卡 ' + F.zongHubCards + '）');
   ok(String(F.zongHubSealGate).indexOf('·') >= 0, '山门弟子格朱砂印报品阶与名册（' + F.zongHubSealGate + '）');
   ok(F.wxFallback.indexOf('山门气象') >= 0, '未连服务时山门气象给降级文案，不留空白（' + F.wxFallback + '）');
   ok(F.wxPanelApi === 'yes' && F.wxStatsState === 'yes', 'SECT.panelOpen 接口 + stats 快照进 _state()');

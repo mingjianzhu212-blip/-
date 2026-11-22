@@ -14,6 +14,13 @@ const GUARD_MAX = 10;
 const BODY_MAX = 16 * 1024;
 const MAX_RANK = 25;
 const MAX_PLAYERS = 20_000;
+/* batch5 第 4 项（拍板乙案）：服务端战力字段与战力榜。
+ * 客户端只上报养成快照，服务端按 combatPower 同口径重算；不采信客户端最终数字。
+ * 公式副本与 server/server.mjs 的 recomputePower 同源；改战力公式须制作人批准。 */
+const POWER_VER = 1;
+const POWER_MAX = 1e10;                 /* 与 server/server.mjs MAX_POWER 一致 */
+const POWER_FRESH_MS = 7 * DAY_MS;      /* 榜单/协力只认近 7 天上报 */
+const POWER_BOARD_CAP = 50;
 const CHAT_MAX = 200;        /* 世界频道环形缓冲上限（纯内存态，重启清空——聊天是瞬态数据，不值得落盘） */
 const CHAT_LEN = 60;         /* 单条消息字数上限 */
 const CHAT_CD = 2500;        /* 发言冷却 ms */
@@ -28,6 +35,58 @@ function today(now = Date.now()) {
 
 function safeText(value, max) {
   return String(value == null ? '' : value).replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, max);
+}
+
+/* ===================== 服务端战力重算（batch5 第 4 项 · 乙案） =====================
+ * 客户端上报"受钳制养成快照"，服务端逐项钳制后按 game.js combatPower() 同口径重算。
+ * 钳制常量都能在客户端源码指到出处，只取"合法满级"上限（与 server/server.mjs 的
+ * recomputePower 同一套；此处 ART_BG_CAP 取 0.86 = ART_FX.bg 最高 0.56 + 强化 20 级 ×1.5%，
+ * 因为客户端 artPowPct() 把强化加成算在同一分数里 —— server.mjs 旧副本只取 0.56，
+ * 会低估满强化角色，本服务按客户端实际合法最大值对齐）。 */
+const SECT_POW_K = 100;                          /* game.js:152 */
+const SECT_GONGS = [                             /* game.js:689-693 rate/max */
+  { rate: 1.03, max: 10 }, { rate: 1.04, max: 10 }, { rate: 1.05, max: 10 }
+];
+const SECT_WEAPON_MULT = [1.0, 1.05, 1.10, 1.20, 1.35, 1.44, 1.53, 1.63, 1.73, 1.85]; /* game.js:400 */
+const SECT_ENHANCE_RATE = 0.05;                  /* BAL.enhancePowRate */
+const SECT_ENHANCE_MAX = 20;                     /* BAL.enhanceMax */
+const SECT_RANK_CAP = 25;                        /* 飞升 rank 25 */
+const SECT_GONG_CAP = 10;
+const SECT_WU_CAP_PCT = 52;                      /* game.js WU_TREE.sword 全满 */
+const SECT_AFFIX_CAP_PCT = 22;                   /* 单法宝战力词条最高 22 */
+const SECT_DAN_CAP_FRAC = 0.55;                  /* 淬体丹最高档 */
+const SECT_DT_CAP_PCT = 22.5;                    /* 洞天 pow 满级 + 主洞 ×1.5 */
+const SECT_PET_TOTAL_CAP = 0.40;                 /* 灵兽总战力 = 40% × 境界基础战力（game.js:2938,2956） */
+const SECT_EQUIP_CAP = 4500;                     /* 三槽最强 1800+1500+1200 */
+const SECT_ART_BG_CAP = 0.86;                    /* ART_FX.bg 0.56 + 0.015×20 */
+
+function sectClamp(v, lo, hi, dflt) {
+  const n = (typeof v === 'number' && Number.isFinite(v)) ? v : dflt;
+  return Math.min(hi, Math.max(lo, n));
+}
+/* 返回 { power, source } 或 null（无有效快照）。 */
+function recomputePower(snap) {
+  if (!snap || typeof snap !== 'object' || Array.isArray(snap)) return null;
+  const rank = sectClamp(snap.rank, 0, SECT_RANK_CAP, 0);
+  const gLv = Array.isArray(snap.gongLvs) ? snap.gongLvs : [];
+  const gongMult = SECT_GONGS.reduce((a, g, i) => a * Math.pow(g.rate, sectClamp(gLv[i], 0, SECT_GONG_CAP, 0)), 1);
+  const weapon = sectClamp(snap.weapon, 0, SECT_WEAPON_MULT.length - 1, 0);
+  const weaponMult = SECT_WEAPON_MULT[weapon] || 1;
+  const weaponLv = sectClamp(snap.weaponLv, 0, SECT_ENHANCE_MAX, 0);
+  const core = 10 * SECT_POW_K * Math.pow(1.5, rank) * gongMult * weaponMult * (1 + weaponLv * SECT_ENHANCE_RATE);
+  const affixPct = sectClamp(snap.affixPct, 0, SECT_AFFIX_CAP_PCT, 0);
+  const wuPct = sectClamp(snap.wuPct, 0, SECT_WU_CAP_PCT, 0);
+  const artBgPct = sectClamp(snap.artBgPct, 0, SECT_ART_BG_CAP, 0);
+  const danPowPct = sectClamp(snap.danPowPct, 0, SECT_DAN_CAP_FRAC, 0);
+  const dtPowPct = sectClamp(snap.dtPowPct, 0, SECT_DT_CAP_PCT, 0);
+  const mult = (1 + affixPct / 100) * (1 + wuPct / 100) * (1 + artBgPct) * (1 + danPowPct) * (1 + dtPowPct / 100);
+  /* 灵兽合计封顶随境界走（40% × 10×POW_K×1.5^rank），与客户端 petPowerSum 同口径；
+     固定上限会低估高境界合法灵兽（旧 server.mjs 的 2,160,000 已落后于 N7 的 ×POW_K 刻度）。 */
+  const petCap = Math.floor(SECT_PET_TOTAL_CAP * 10 * SECT_POW_K * Math.pow(1.5, rank));
+  const petPower = Math.min(sectClamp(snap.petPower, 0, Number.MAX_SAFE_INTEGER, 0), petCap);
+  const equipPower = sectClamp(snap.equipPower, 0, SECT_EQUIP_CAP, 0);
+  const power = sectClamp(Math.floor(core * mult) + petPower + equipPower, 1, POWER_MAX);
+  return { power, source: 'snapshot' };
 }
 
 function readBody(req) {
@@ -108,7 +167,8 @@ function createSectServer(options = {}) {
     if (!state.players[pid]) {
       if (Object.keys(state.players).length >= MAX_PLAYERS) throw Object.assign(new Error('宗门名册已满'), { status: 503 });
       state.players[pid] = { nick, guardDay: '', guard: 0, pubDay: '', pub: 0, pendStone: 0, pendExp: 0,
-        seen: 0, rank: 0, joined: now(), guardsAll: 0, pubsAll: 0 };
+        seen: 0, rank: 0, joined: now(), guardsAll: 0, pubsAll: 0,
+        power: 0, powerAt: 0, powerSource: 'none', powerVer: 0 };
     }
     const p = state.players[pid];
     if (p.guardDay !== today(now())) { p.guardDay = today(now()); p.guard = 0; }
@@ -119,6 +179,12 @@ function createSectServer(options = {}) {
     if (!Number.isFinite(p.joined)) p.joined = now();
     if (!Number.isFinite(p.guardsAll)) p.guardsAll = 0;
     if (!Number.isFinite(p.pubsAll)) p.pubsAll = 0;
+    /* 旧档补字段（additive，不改客户端存档结构）：缺失/损坏一律归 0/none，不上榜、不报错 */
+    if (!Number.isFinite(p.power) || p.power < 0) p.power = 0;
+    p.power = Math.min(POWER_MAX, Math.floor(p.power));
+    if (!Number.isFinite(p.powerAt) || p.powerAt < 0) p.powerAt = 0;
+    if (p.powerSource !== 'snapshot' && p.powerSource !== 'reported' && p.powerSource !== 'none') p.powerSource = 'none';
+    if (!Number.isInteger(p.powerVer) || p.powerVer < 0) p.powerVer = 0;
     return p;
   }
 
@@ -243,6 +309,26 @@ function createSectServer(options = {}) {
         .sort((a, b) => a.createdAt - b.createdAt).slice(0, 50).map(publicRequest);
       return response(res, 200, { ok: true, list, me: quota(p) });
     }
+    /* 战力榜（batch5 第 4 项）：只返回道号/境界/战力/上报时间，不下发 pid/IP；
+       最多 50 名，按 power 降序、同战力最近上报者在前；sum/fresh 供宗门协力迁移用（近 7 天）。 */
+    if (req.method === 'GET' && action === 'powerboard') {
+      const stamp = now();
+      p.seen = stamp;
+      const all = Object.values(state.players).filter(x => (x.power | 0) > 0);
+      all.sort((a, b) => (b.power | 0) - (a.power | 0) || (b.powerAt | 0) - (a.powerAt | 0) ||
+        String(a.nick).localeCompare(String(b.nick)));
+      const list = all.slice(0, POWER_BOARD_CAP).map((x, i) => ({
+        no: i + 1, nick: x.nick, rank: x.rank | 0, power: x.power | 0, at: x.powerAt | 0, me: x === p
+      }));
+      const fresh = all.filter(x => stamp - (x.powerAt || 0) <= POWER_FRESH_MS);
+      const freshSum = fresh.reduce((s, x) => s + (x.power | 0), 0);
+      const myIndex = all.indexOf(p);
+      return response(res, 200, { ok: true, list, total: all.length, cap: POWER_BOARD_CAP,
+        sum: freshSum, fresh: fresh.length,
+        me: { power: p.power | 0, at: p.powerAt | 0,
+          fresh: (p.power | 0) > 0 && stamp - (p.powerAt || 0) <= POWER_FRESH_MS,
+          rank: myIndex >= 0 ? myIndex + 1 : 0 } });
+    }
     if (req.method !== 'POST') return response(res, 405, { ok: false, msg: '请求方法不支持' });
     const body = await readBody(req);
     if (!body || typeof body !== 'object' || Array.isArray(body)) return response(res, 400, { ok: false, msg: '请求内容无效' });
@@ -250,6 +336,23 @@ function createSectServer(options = {}) {
     const bodyNick = safeText(body.nick || '', 12);
     if (bodyPid !== pid || !bodyNick) return response(res, 400, { ok: false, msg: '玩家信息无效' });
     p.nick = bodyNick;
+
+    /* 战报（batch5 第 4 项）：客户端只报养成快照，服务端重算后落 power 字段。
+       旧客户端不报 → 保持 0/none；直接报 power 数字的请求在这里不读。 */
+    if (action === 'power') {
+      const rp = recomputePower(body.snapshot);
+      if (!rp) return response(res, 400, { ok: false, msg: '战力快照无效' });
+      p.power = rp.power;
+      p.powerAt = now();
+      p.powerSource = rp.source;
+      p.powerVer = Number.isInteger(body.ver) && body.ver > 0 ? Math.min(body.ver, POWER_VER) : POWER_VER;
+      p.seen = p.powerAt;
+      if (Number.isInteger(body.snapshot.rank) && body.snapshot.rank > (p.rank | 0) && body.snapshot.rank < MAX_RANK) {
+        p.rank = body.snapshot.rank;
+      }
+      persist();
+      return response(res, 200, { ok: true, power: p.power, at: p.powerAt, source: p.powerSource, ver: p.powerVer });
+    }
 
     if (action === 'publish') {
       const rank = Number(body.rank);
@@ -339,4 +442,4 @@ if (require.main === module) {
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));
 }
 
-module.exports = { createSectServer };
+module.exports = { createSectServer, recomputePower, POWER_VER, POWER_FRESH_MS };
