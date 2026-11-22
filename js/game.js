@@ -2196,7 +2196,7 @@ const XX = (function(){
       const tasks = Daily.list();
       const anyReady = tasks.some(t => t.done && !t.claimed);
       let html = '<div class="ev-line"><span>今日任务</span><b>' +
-        (Daily.allClaimed() ? '已全部完成' : tasks.filter(t => t.done).length + ' / ' + tasks.length + ' 达成') +
+        (Daily.allClaimed() ? '已全部完成' : '已达成 ' + tasks.filter(t => t.done).length + ' / ' + tasks.length + ' 项 · 满进度算 1 项') +
         (anyReady ? '<i class="dot-red"></i>' : '') + '</b></div>';
       html += '<div class="ev-rew-list">';
       tasks.forEach(t => {
@@ -5926,6 +5926,11 @@ function towerBossCompLetter(){
   function dailyBump(kind){
     if(typeof Daily === 'undefined') return;
     Promise.resolve(Daily.bump(kind)).then(r => {
+      if(r && r.ok === true){
+        /* batch6 对账：bump 走跨窗口锁是异步的，动作当场那次 render 读到的还是旧值。
+           这里在锁内写盘返回后再刷一次自课/今日清单，做到“点完一下，计数就 +1”。 */
+        try{ renderToday(); renderEvent(); renderQuest(); }catch(e){}
+      }
       if(r && r.ok === false && r.code === 'NO_LOCK' && !dailyNoLockWarned){
         dailyNoLockWarned = true;
         log('⚠️ ' + r.msg + '（日常任务进度本次不记，其他玩法不受影响）', 'bad');
@@ -6901,6 +6906,7 @@ function towerBossCompLetter(){
 
   /* ---------- 历练 · 文字冒险（复用奇遇古风弹窗 #enc-modal） ---------- */
   let advEv = null;     /* 当前抽中的事件对象（null = 弹窗当前不是冒险态） */
+  let advFoeCur = null; /* batch6 补1：开事件时先定对手，选项前就能看到战力与差距 */
   let advStage = 0;     /* 0=选选项 1=已出结果（此时点「继续赶路」关窗） */
   let advResult = null; /* { text, detail } 结果页文案 */
   /* 对手：从玩家境界可达的妖兽里随机抽（BEASTS.power 已 ×POW_K，与战力同刻度） */
@@ -6912,7 +6918,7 @@ function towerBossCompLetter(){
   function openAdventure(){
     const ev = ADV_EVENTS[Math.floor(Math.random() * ADV_EVENTS.length)];
     if(!ev) return null;
-    advEv = ev; advStage = 0; advResult = null;
+    advEv = ev; advFoeCur = advFoe(); advStage = 0; advResult = null;
     S.enc.bubble = null;            /* 若奇遇气泡在场，先收掉，弹窗一次只讲一个故事 */
     renderEncounter();
     renderAdventure();
@@ -6934,14 +6940,19 @@ function towerBossCompLetter(){
     if(iconEl) iconEl.innerHTML = inkIco('⚔️');
     if(nameEl) nameEl.textContent = '历练 · 山野遭逢';
     if(advStage === 0){
-      textEl.textContent = ev.desc;
+      const foe = advFoeCur || (advFoeCur = advFoe());
+      const gap = arenaGapText(combatPower(), foe.power).replace(/<[^>]*>/g, '');
+      /* 补1：选项前明示敌方战力 + 差距解读（口径与论剑台同一函数） */
+      textEl.textContent = ev.desc + ' 对手【' + foe.name + '】战力 ' + fmt(foe.power) + '；' + gap + '。';
       /* 内联 onclick 直连全局 handleAdventureChoice：不依赖 #enc-opts 的委托绑定
          （委托只在奇遇路径 openEncounter 里绑过，直接历练的玩家会踩漏绑，见 2026-10-20 修复） */
       box.innerHTML = ev.options.map((o, i) =>
         '<button class="enc-opt' + (o.action === 'battle' ? ' risk' : '') + '" data-i="' + i + '"' +
         ' onclick="handleAdventureChoice(' + i + ', event)">' +
         '<span>' + o.text + '</span>' +
-        '<small>' + (o.action === 'battle' ? '胜负未知 · 战力对决' : '明哲保身 · 修为 +' + fmt(advEscapeExp())) + '</small>' +
+        '<small>' + (o.action === 'battle'
+          ? '对战 ' + foe.name + ' · 战力 ' + fmt(foe.power) + ' · 胜负未知'
+          : '明哲保身 · 修为 +' + fmt(advEscapeExp())) + '</small>' +
         '</button>').join('');
     }else{
       textEl.textContent = advResult.text;
@@ -6959,7 +6970,7 @@ function towerBossCompLetter(){
     if(!opt) return null;
     let text = '', detail = '', win = null;
     if(opt.action === 'battle'){
-      const foe = advFoe();
+      const foe = advFoeCur || (advFoeCur = advFoe());
       const my = combatPower() * (0.85 + Math.random() * 0.30);   /* 临场发挥 ±15%，同论剑口径 */
       const op = foe.power * (0.85 + Math.random() * 0.30);
       win = my >= op;
@@ -8057,8 +8068,8 @@ function towerBossCompLetter(){
     try{
       (Daily.list() || []).forEach(t => {
         rows.push({ name: t.name, icon: t.icon || '📜',
-          sub: t.prog + ' / ' + t.goal + ' · ' + reset,
-          done: !!t.claimed, state: t.claimed ? '已领' : (t.done ? '可领' : (t.prog + '/' + t.goal)),
+          sub: '进度 ' + t.prog + ' / ' + t.goal + ' · ' + reset,
+          done: !!t.claimed, state: t.claimed ? '已领' : (t.done ? '可领' : '进行中'),
           claim: (!t.claimed && t.done) ? ('daily:' + t.id) : '', go: '' });
       });
     }catch(e){}
@@ -8067,7 +8078,7 @@ function towerBossCompLetter(){
     Object.keys(BAL.actLimit || {}).forEach(k => {
       const lim = BAL.actLimit[k] | 0, used = (S.acts && S.acts[k]) | 0;
       const left = Math.max(0, lim - used);
-      rows.push({ name: actName[k] || k, icon: '🧘', sub: '剩 ' + left + ' / ' + lim + ' 次 · ' + reset,
+      rows.push({ name: actName[k] || k, icon: '🧘', sub: '今日已用 ' + used + ' / ' + lim + ' 次 · ' + reset,
         done: left <= 0, state: left > 0 ? ('剩 ' + left + ' 次') : '今日已用完',
         claim: '', go: 'xiu:xx-acts' });
     });
@@ -14802,7 +14813,7 @@ function towerBossCompLetter(){
     if(typeof Daily !== 'undefined' && Daily.list){
       const tasks = Daily.list();
       html += '<div class="q-sec-h">今日 · 日课<span>' +
-        tasks.filter(t => t.done).length + ' / ' + tasks.length + ' 达成</span></div>';
+        '已达成 ' + tasks.filter(t => t.done).length + ' / ' + tasks.length + ' 项 · 满进度算 1 项</span></div>';
       tasks.forEach(t => {
         const pct = Math.max(0, Math.min(100, t.prog / t.goal * 100));
         html += '<div class="q-mile' + (t.claimed ? ' got' : '') + '">' +
@@ -16171,7 +16182,7 @@ function towerBossCompLetter(){
     _pillHint: pillHintText, _weaponHint: weaponHintText, _craftCfg: CRAFT,
     /* ===== 随机奇遇（挂机气泡 / 古风弹窗 / 选项结算） ===== */
     _encCfg: ENC, _encounters: ENCOUNTERS, _encState: () => S.enc, _encBuff: encBuff,
-    _advEvents: ADV_EVENTS, _openAdventure: openAdventure, _resolveAdventure: resolveAdventure,
+    _advEvents: ADV_EVENTS, _openAdventure: openAdventure, _resolveAdventure: resolveAdventure, _advFoeCur: () => advFoeCur,
     _advWinStone: advWinStone, _advLossExp: advLossExp, _advEscapeExp: advEscapeExp,
     _rankByPower: rankByPower,
     _resetCd: () => { Object.keys(CD).forEach(k => { CD[k] = 0; }); },

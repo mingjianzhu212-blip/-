@@ -12,6 +12,10 @@ const SCRIPT = `
   await sleep(700);
   var sm=document.getElementById('story-modal');if(sm&&!sm.classList.contains('hidden'))document.getElementById('sto-close').click();
   await sleep(900);
+  /* 探针清场后显式起引导：层级测试只关心气泡与弹窗的相对关系 */
+  document.querySelectorAll('.modal').forEach(function(m){m.classList.add('hidden');});
+  try{ if(window.Guide) Guide.init(); }catch(e){}
+  await sleep(600);
   var S=XX._s;
   /* 1. 引导层级 / 点击推进 / 弹窗让位 */
   var g=document.getElementById('taixu-bubble');

@@ -2140,7 +2140,9 @@ const DIAG = `
     const advR0 = XX._s.rank, advE0 = XX._s.exp, advS0 = XX._s.stone, advA0 = XX._s.acts.train;
     const ev1 = XX._act('train');                                            // 走真实入口（含次数/冷却）
     L('advOpen', ev1 && ev1.desc && !document.getElementById('enc-modal').classList.contains('hidden') &&
-                 document.getElementById('enc-text').textContent === ev1.desc ? 'ok' : 'bad');
+                 document.getElementById('enc-text').textContent.indexOf(ev1.desc) === 0 &&
+                 document.getElementById('enc-text').textContent.indexOf('对手【') > 0 &&
+                 document.getElementById('enc-text').textContent.indexOf('战力') > 0 ? 'ok' : 'bad');
     L('advOpts', document.querySelectorAll('#enc-opts .enc-opt').length);    // = 事件选项数（2）
     L('advActs', XX._s.acts.train === advA0 + 1 ? 'ok' : 'bad');             // 历练次数照常计数
     // 必赢对决（rank 30 战力碾压全妖兽池）→ 按当前层需求缩放后的灵石 + 资源栏刷新

@@ -13,7 +13,7 @@ VIEWS.today = {
       <section class="card wide">
         <h2>今日清单</h2>
         <div class="today-list" id="today-list"></div>
-        <p class="hint">每日 08:00 统一重置；这里汇总今天还能做的事。打勾＝已完成/已领取。</p>
+        <p class="hint">每日 08:00 统一重置；日课按每项进度累计，满进度才算 1 项达成。打勾＝已完成/已领取。</p>
       </section>
     </div>
   </section>`
