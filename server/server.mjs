@@ -206,7 +206,9 @@ const ENHANCE_POW_RATE = 0.05;                  // BAL.enhancePowRate
 const ENHANCE_MAX = 20;                         // BAL.enhanceMax
 const RANK_CAP = 25;                            // 飞升 = rank 25（RANK_NAMES 共 26 项，game.js:119-126）
 const GONG_CAP = 10;                            // GONGS[].max
-const ART_BG_MAX = 0.56;                        // ART_FX.bg 最高档（game.js:954）
+const ART_BG_MAX = 0.86;                        // ART_FX.bg 最高 0.56 + 强化 20 级 ×1.5% = 0.86（game.js:1034,3048）
+/* artPowPct() 把法宝强化加成算在同一分数里，旧副本只取 0.56 会低估满强化角色；
+   这里对齐客户端现行合法最大值，不改公式本体。 */
 /* ---------------- 汇总项上限：一律取"客户端合法最大值"，不是"留余量" ----------------
  * 第 123 轮 ChatGPT 独立审查的核心发现：原来这些上限比真实满级宽 1.9~66 万倍，
  * 攻击者不用碰 body.power，只构造一个"各项都填到服务端上限"的快照就能拿到 1e10
@@ -221,7 +223,7 @@ const AFFIX_POW_CAP_PCT = 22;                   // 词缀条数 = min(4,法宝�
                                                 //   没有任何"可合法产生重复词条"的证据，留 88 等于白送 1.54 倍乘区。
 const DAN_POW_CAP_FRAC = 0.55;                  // 淬体丹 ct.pct 最高档 0.55（DAN_FX，game.js:780）
 const DT_POW_CAP_PCT = 22.5;                    // 朱明洞天 pow 满级 15，主洞 ×1.5 = 22.5（DONGTIAN，game.js:2401）
-const PET_POWER_CAP = 2160000;                  // 3 槽 × 满级 30：最强妖兽 900000 × 0.2 × (1+3.0) × 3（game.js:2221,364）
+const PET_TOTAL_CAP = 0.40;                     // 灵兽合计封顶 = 40% × 境界基础战力（game.js:2938,2956）
 const EQUIP_POWER_CAP = 4500;                   // 三槽最强 1800+1500+1200（ITEMS，game.js:4809-4829）
 
 function clampNum(v, lo, hi, dflt) {
@@ -246,7 +248,9 @@ function recomputePower(snap) {
   const danPowPct = clampNum(snap.danPowPct, 0, DAN_POW_CAP_FRAC, 0);   // 分数制
   const dtPowPct = clampNum(snap.dtPowPct, 0, DT_POW_CAP_PCT, 0);       // 百分比制
   const mult = (1 + affixPct / 100) * (1 + wuPct / 100) * (1 + artBgPct) * (1 + danPowPct) * (1 + dtPowPct / 100);
-  const petPower = clampNum(snap.petPower, 0, PET_POWER_CAP, 0);
+  /* 灵兽合计封顶随境界走，与客户端 petPowerSum 同口径；固定 2,160,000 会低估高境界合法灵兽 */
+  const petCap = Math.floor(PET_TOTAL_CAP * 10 * POW_K * Math.pow(1.5, rank));
+  const petPower = Math.min(clampNum(snap.petPower, 0, Number.MAX_SAFE_INTEGER, 0), petCap);
   const equipPower = clampNum(snap.equipPower, 0, EQUIP_POWER_CAP, 0);
   const power = clampNum(Math.floor(core * mult) + petPower + equipPower, 1, MAX_POWER);
   return { power, source: 'snapshot' };
@@ -1349,8 +1353,14 @@ process.on('uncaughtException', () => {
   /* 任何异步漏网异常都不打崩进程 */
 });
 
-server.listen(CFG.port, CFG.host, () => {
-  console.log('listening on http://' + CFG.host + ':' + CFG.port + ' static root ' + CFG.root
-    + ' | legacyPower=' + (LEGACY_POWER ? 'ON(cap=' + LEGACY_POWER_CAP + ')' : 'OFF')
-    + ' | profileMode=' + PROFILE_MODE);
-});
+/* 测试钩子：同值回归直接 import recomputePower 时用 SERVER_NO_LISTEN=1 阻止监听；
+   正常启动（不带该 env）行为不变。 */
+if (process.env.SERVER_NO_LISTEN !== '1') {
+  server.listen(CFG.port, CFG.host, () => {
+    console.log('listening on http://' + CFG.host + ':' + CFG.port + ' static root ' + CFG.root
+      + ' | legacyPower=' + (LEGACY_POWER ? 'ON(cap=' + LEGACY_POWER_CAP + ')' : 'OFF')
+      + ' | profileMode=' + PROFILE_MODE);
+  });
+}
+
+export { recomputePower, ART_BG_MAX, PET_TOTAL_CAP, EQUIP_POWER_CAP, AFFIX_POW_CAP_PCT, WU_POW_CAP_PCT, DAN_POW_CAP_FRAC, DT_POW_CAP_PCT, POW_K, RANK_CAP };

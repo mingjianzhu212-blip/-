@@ -89,6 +89,7 @@ document.getElementById('diag').textContent='G='+JSON.stringify(o);})();`;
 const f = path.join(PAGE.SCRATCH, '._b5s2.html');
 PAGE.writePage(f, html.replace('</head>', seed + '\n</head>').replace('</body>', FREEZE + '<div id="diag" style="position:fixed;left:0;bottom:0;font:10px monospace;background:#000;color:#0f0;max-width:100%;word-break:break-all"></div><script>window.addEventListener("load",function(){setTimeout(function(){' + DIAG + '},800);});</script></body>'));
 const ud = path.join('D:/xx-scratch', 'xxb5s2' + Date.now());
+(async function main(){
 let exitCode = 1;
 try {
   const out = execEdge(['--headless=new', '--disable-gpu', '--no-first-run', '--hide-scrollbars', '--user-data-dir=' + ud, '--virtual-time-budget=18000', '--window-size=430,900', '--dump-dom', 'file:///' + f.replace(/\\/g, '/')], { timeout: 180000, encoding: 'utf8', maxBuffer: 1 << 26 });
@@ -97,11 +98,18 @@ try {
   console.log(r);
   let o = null; try { o = JSON.parse(r.replace(/^G=/, '')); } catch (e) {}
   if (o && o.ok) {
+    /* server.mjs 的重算也进同值回归（SERVER_NO_LISTEN=1 只 import 不监听） */
+    process.env.SERVER_NO_LISTEN = '1';
+    const mjs = await import(require('node:url').pathToFileURL(path.join(ROOT, 'server', 'server.mjs')).href + '?v=' + Date.now());
     o.parity.forEach((p, i) => {
       const srv = recomputePower(p.snap);
       const same = srv && srv.power === p.client;
       console.log('PARITY[' + i + '] client=' + p.client + ' server=' + (srv ? srv.power : 'null') + ' ' + (same ? 'SAME' : 'DIFF'));
       if (!same) o.errs.push('服务端重算与 combatPower 不同值 idx=' + i + ' client=' + p.client + ' server=' + (srv && srv.power));
+      const mjsSrv = mjs.recomputePower(p.snap);
+      const mjsSame = mjsSrv && mjsSrv.power === p.client;
+      console.log('PARITY_MJS[' + i + '] client=' + p.client + ' server.mjs=' + (mjsSrv ? mjsSrv.power : 'null') + ' ' + (mjsSame ? 'SAME' : 'DIFF'));
+      if (!mjsSame) o.errs.push('server.mjs 重算与 combatPower 不同值 idx=' + i + ' client=' + p.client + ' server.mjs=' + (mjsSrv && mjsSrv.power));
     });
   }
   const ok = !!(o && o.ok && o.errs.length === 0);
@@ -110,3 +118,4 @@ try {
 } catch (e) { console.log('ERR ' + e.message); }
 finally { try { fs.rmSync(f, { force: true }); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {} }
 process.exit(exitCode);
+})();

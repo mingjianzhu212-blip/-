@@ -34,8 +34,8 @@ const GONGS = [{ rate: 1.03 }, { rate: 1.04 }, { rate: 1.05 }];
 const WEAPON_MULT = [1.0, 1.05, 1.10, 1.20, 1.35, 1.44, 1.53, 1.63, 1.73, 1.85];
 const CAPS = {
   RANK: 25, GONG: 10, ENHANCE: 20, ENHANCE_RATE: 0.05,
-  AFFIX_PCT: 22, WU_PCT: 52, ART_BG: 0.56, DAN_FRAC: 0.55, DT_PCT: 22.5,
-  PET: 2160000, EQUIP: 4500, MAX: 1e10
+  AFFIX_PCT: 22, WU_PCT: 52, ART_BG: 0.86, DAN_FRAC: 0.55, DT_PCT: 22.5,
+  PET_TOTAL: 0.40, EQUIP: 4500, MAX: 1e10
 };
 const clampNum = (v, lo, hi, dflt) => {
   const n = (typeof v === 'number' && Number.isFinite(v)) ? v : dflt;
@@ -53,15 +53,16 @@ function expectedPower(snap) {
     * (1 + clampNum(snap.artBgPct, 0, CAPS.ART_BG, 0))
     * (1 + clampNum(snap.danPowPct, 0, CAPS.DAN_FRAC, 0))
     * (1 + clampNum(snap.dtPowPct, 0, CAPS.DT_PCT, 0) / 100);
-  const flat = clampNum(snap.petPower, 0, CAPS.PET, 0) + clampNum(snap.equipPower, 0, CAPS.EQUIP, 0);
+  const petCap = Math.floor(CAPS.PET_TOTAL * 10 * 100 * Math.pow(1.5, rank));
+  const flat = Math.min(clampNum(snap.petPower, 0, Number.MAX_SAFE_INTEGER, 0), petCap) + clampNum(snap.equipPower, 0, CAPS.EQUIP, 0);
   return clampNum(Math.floor(core * mult) + flat, 1, CAPS.MAX);
 }
 
 /* 合法满级快照：每项都取客户端源码里的理论最大 */
 const LEGIT_MAX = {
   rank: 25, gongLvs: [10, 10, 10], weapon: 9, weaponLv: 20,
-  affixPct: 22, wuPct: 52, artBgPct: 0.56, danPowPct: 0.55, dtPowPct: 22.5,
-  petPower: 2160000, equipPower: 4500
+  affixPct: 22, wuPct: 52, artBgPct: 0.86, danPowPct: 0.55, dtPowPct: 22.5,
+  petPower: 10100467, equipPower: 4500
 };
 /* 组合攻击：每项都填天文数字，靠钳制落地 */
 const CHEAT = {
@@ -111,7 +112,7 @@ test('E2 逐项钳制：单项超限等价于该项取合法上限，而不是�
   const capOf = {
     rank: CAPS.RANK, weapon: WEAPON_MULT.length - 1, weaponLv: CAPS.ENHANCE,
     affixPct: CAPS.AFFIX_PCT, wuPct: CAPS.WU_PCT, artBgPct: CAPS.ART_BG,
-    danPowPct: CAPS.DAN_FRAC, dtPowPct: CAPS.DT_PCT, petPower: CAPS.PET, equipPower: CAPS.EQUIP
+    danPowPct: CAPS.DAN_FRAC, dtPowPct: CAPS.DT_PCT, petPower: 400, equipPower: CAPS.EQUIP
   };
   const ZERO = {
     rank: 0, gongLvs: [0, 0, 0], weapon: 0, weaponLv: 0, affixPct: 0, wuPct: 0,
@@ -135,7 +136,7 @@ test('E3 合法满级快照不得被削弱（上限收太窄会误伤真玩家�
   const legit = await join(uniq('真满级'), LEGIT_MAX);
   assert.equal(legit.ok, true);
   const p = legit.player.power;
-  assert.ok(p > 1.5e9, '满级真号战力应 > 1.5e9（词缀收到 22 后实测基准约 1.67e9），实际 ' + p);
+  assert.ok(p > 1.5e9, '满级真号战力应 > 1.5e9（法宝 0.86 / 灵兽随境界封顶后实测约 1.99e9），实际 ' + p);
   assert.ok(p < 2e9, '满级真号战力应 < 2e9，实际 ' + p);
 });
 
@@ -158,6 +159,8 @@ test('E5 源码守卫：六个汇总项上限必须等于实测推导值', () =>
   assert.equal(grab('WU_POW_CAP_PCT'), 52, '悟道锋芒全满 = 52');
   assert.equal(grab('DAN_POW_CAP_FRAC'), 0.55, '淬体丹最高档 = 0.55');
   assert.equal(grab('DT_POW_CAP_PCT'), 22.5, '洞天 pow 15 × 主洞 1.5 = 22.5');
-  assert.equal(grab('PET_POWER_CAP'), 2160000, '3 槽满级灵兽 = 216 万');
+  assert.equal(grab('ART_BG_MAX'), 0.86, '法宝战力最高 = ART_FX.bg 0.56 + 强化 20 级 ×1.5% = 0.86');
+  assert.equal(grab('PET_TOTAL_CAP'), 0.40, '灵兽合计封顶 = 40% × 境界基础战力（随 rank 计算）');
+  assert.ok(!/const\s+PET_POWER_CAP\s*=/.test(src), '不得再留固定 216 万灵兽上限（会低估高境界合法灵兽）');
   assert.equal(grab('EQUIP_POWER_CAP'), 4500, '三槽最强装备 = 4500');
 });

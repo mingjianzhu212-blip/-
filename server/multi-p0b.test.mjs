@@ -35,8 +35,8 @@ const GONGS = [{ rate: 1.03, max: 10 }, { rate: 1.04, max: 10 }, { rate: 1.05, m
 const WEAPON_MULT = [1.0, 1.05, 1.10, 1.20, 1.35, 1.44, 1.53, 1.63, 1.73, 1.85];
 const ENHANCE_POW_RATE = 0.05, ENHANCE_MAX = 20, RANK_CAP = 25, GONG_CAP = 10;
 /* 上限常量必须与服务端保持一致（第 123 轮按客户端真实合法最大值收紧，见 server.mjs 注释） */
-const ART_BG_MAX = 0.56, WU_POW_CAP_PCT = 52, AFFIX_POW_CAP_PCT = 22, DAN_POW_CAP_FRAC = 0.55, DT_POW_CAP_PCT = 22.5;
-const PET_POWER_CAP = 2160000, EQUIP_POWER_CAP = 4500, MAX_POWER = 1e10;
+const ART_BG_MAX = 0.86, WU_POW_CAP_PCT = 52, AFFIX_POW_CAP_PCT = 22, DAN_POW_CAP_FRAC = 0.55, DT_POW_CAP_PCT = 22.5;
+const PET_TOTAL_CAP = 0.40, EQUIP_POWER_CAP = 4500, MAX_POWER = 1e10;
 function clampNum(v, lo, hi, dflt) { const n = (typeof v === 'number' && Number.isFinite(v)) ? v : dflt; return Math.min(hi, Math.max(lo, n)); }
 function expectedPower(snap) {
   const rank = clampNum(snap.rank, 0, RANK_CAP, 0);
@@ -53,7 +53,8 @@ function expectedPower(snap) {
   const danPowPct = clampNum(snap.danPowPct, 0, DAN_POW_CAP_FRAC, 0);
   const dtPowPct = clampNum(snap.dtPowPct, 0, DT_POW_CAP_PCT, 0);
   const mult = (1 + affixPct / 100) * (1 + wuPct / 100) * (1 + artBgPct) * (1 + danPowPct) * (1 + dtPowPct / 100);
-  const petPower = clampNum(snap.petPower, 0, PET_POWER_CAP, 0);
+  const petCap = Math.floor(PET_TOTAL_CAP * 10 * 100 * Math.pow(1.5, rank));
+  const petPower = Math.min(clampNum(snap.petPower, 0, Number.MAX_SAFE_INTEGER, 0), petCap);
   const equipPower = clampNum(snap.equipPower, 0, EQUIP_POWER_CAP, 0);
   return clampNum(Math.floor(core * mult) + petPower + equipPower, 1, MAX_POWER);
 }
@@ -228,7 +229,7 @@ test('T6 武器/强化必须真实流入服务器重算：weapon=9/weaponLv=20 �
   /* 用一份"合法满级玩家"快照，仅切换武器/强化两字段，验证服务器确实按快照里的武器与强化重算，
      而不是把这两项当 0（这正是第 119 轮审查发现的客户端 multiSnapshot 大小写 typo 的后果）。 */
   /* 一份"合法满级玩家"快照：每项都取客户端源码给出的真实上限（第 123 轮核对） */
-  const base = { rank: 25, gongLvs: [10, 10, 10], affixPct: 22, wuPct: 52, artBgPct: 0.56, danPowPct: 0.55, dtPowPct: 22.5, petPower: 2160000, equipPower: 4500 };
+  const base = { rank: 25, gongLvs: [10, 10, 10], affixPct: 22, wuPct: 52, artBgPct: 0.86, danPowPct: 0.55, dtPowPct: 22.5, petPower: 10100467, equipPower: 4500 };
   const armed = { ...base, weapon: 9, weaponLv: 20 };
   const bare  = { ...base, weapon: 0, weaponLv: 0 };
   const jArmed = await joinSnap('甲' + Math.floor(Math.random() * 900 + 100), armed, 1e9);
