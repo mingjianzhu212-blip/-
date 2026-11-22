@@ -24,6 +24,8 @@ const SCRIPT = `
   var em=document.getElementById('enc-modal');if(em&&!em.classList.contains('hidden'))XX._closeEncounter();
   /* 补2：实做一次打坐、一次历练，读今日清单与藏经阁日课页眉 */
   ROUTER.open('today');await sleep(400);
+  o.todayHeader=(document.getElementById('today-reset')||{}).textContent||'';
+  if(o.todayHeader.indexOf('已达成 ')<0) o.errs.push('今日页页眉缺达成计数: '+o.todayHeader);
   function rowsNow(){return Array.prototype.map.call(document.querySelectorAll('#today-list .today-row'),function(r){return r.textContent;}).filter(function(x){return /打坐练气|外出历练/.test(x);});}
   o.rows0=rowsNow();
   XX._act('sit');await sleep(1200);

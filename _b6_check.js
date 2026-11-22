@@ -14,8 +14,12 @@ const SCRIPT = `
   await sleep(900);
   /* 探针清场后显式起引导：层级测试只关心气泡与弹窗的相对关系 */
   document.querySelectorAll('.modal').forEach(function(m){m.classList.add('hidden');});
-  try{ if(window.Guide) Guide.init(); }catch(e){}
-  await sleep(600);
+  try{
+    var S0=XX._s;
+    S0.guide={step:0,done:false,skipped:false,started:true,flags:{},rewardClaims:{},toldSystems:{}};
+    if(window.Guide) Guide.reset();
+  }catch(e){}
+  await sleep(700);
   var S=XX._s;
   /* 1. 引导层级 / 点击推进 / 弹窗让位 */
   var g=document.getElementById('taixu-bubble');

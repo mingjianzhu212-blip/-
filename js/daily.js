@@ -55,10 +55,46 @@
   }
 
   /* 所有会碰 st 的入口共用这一把锁（init / claim / 启动恢复），避免出现两套锁逻辑。 */
+    /* 跨标签页互斥：优先 Web Locks；不受安全上下文支持时退到 localStorage 租约锁。
+     batch6 补单：真机部署在 http:// 下时 navigator.locks 不可用，旧逻辑直接 NO_LOCK，
+     打坐/历练进度永远 0。租约锁仍做「写 token → 回读确认」，拿不到就重试，
+     过期 4 秒自动释放；只在本标签串行写，避免「页面能玩、日课永远不涨」。 */
+  const LOCAL_LOCK_KEY = 'jxwd_daily_claim_ls_v1';
+  function withLocalLock(fn){
+    return new Promise(resolve => {
+      const token = Date.now().toString(36) + '.' + Math.random().toString(36).slice(2);
+      const until = Date.now() + 1600;
+      let done = false;
+      const finish = out => { if(done) return; done = true; resolve(out); };
+      (function attempt(){
+        let cur = null;
+        try{ cur = JSON.parse(localStorage.getItem(LOCAL_LOCK_KEY) || 'null'); }catch(e){}
+        const now = Date.now();
+        if(!cur || now - (cur.at || 0) > 4000 || cur.token === token){
+          try{ localStorage.setItem(LOCAL_LOCK_KEY, JSON.stringify({ token: token, at: now })); }catch(e){}
+          let got = false;
+          try{ got = (JSON.parse(localStorage.getItem(LOCAL_LOCK_KEY) || '{}').token === token); }catch(e){}
+          if(got){
+            let out;
+            try{ out = fn(); }
+            finally{
+              try{
+                const c = JSON.parse(localStorage.getItem(LOCAL_LOCK_KEY) || 'null');
+                if(c && c.token === token) localStorage.removeItem(LOCAL_LOCK_KEY);
+              }catch(e){}
+            }
+            finish(out); return;
+          }
+        }
+        if(Date.now() > until){ try{ finish(fn()); }catch(e){ finish(undefined); } return; }
+        setTimeout(attempt, 25 + Math.random() * 35);
+      })();
+    });
+  }
   function withClaimLock(fn){
     const nav = (typeof navigator !== 'undefined') ? navigator : null;
-    if(!(nav && nav.locks && typeof nav.locks.request === 'function')) return null;
-    return nav.locks.request(CLAIM_LOCK, fn);
+    if(nav && nav.locks && typeof nav.locks.request === 'function') return nav.locks.request(CLAIM_LOCK, fn);
+    return withLocalLock(fn);
   }
   /* 只读的跨天判定：不改 st、不写盘。true = 按今日口径应视为"已重置"。
      顺带做一次只读自愈：未 init 时先 load()（load 只读盘、不 save），

@@ -6941,7 +6941,9 @@ function towerBossCompLetter(){
     if(nameEl) nameEl.textContent = '历练 · 山野遭逢';
     if(advStage === 0){
       const foe = advFoeCur || (advFoeCur = advFoe());
-      const gap = arenaGapText(combatPower(), foe.power).replace(/<[^>]*>/g, '');
+      const cp = combatPower();
+      const gap = arenaGapText(cp, foe.power).replace(/<[^>]*>/g, '');
+      const edge = cp >= foe.power ? '占优' : ('差 ' + fmt(foe.power - cp) + ' 战力');
       /* 补1：选项前明示敌方战力 + 差距解读（口径与论剑台同一函数） */
       textEl.textContent = ev.desc + ' 对手【' + foe.name + '】战力 ' + fmt(foe.power) + '；' + gap + '。';
       /* 内联 onclick 直连全局 handleAdventureChoice：不依赖 #enc-opts 的委托绑定
@@ -6951,7 +6953,7 @@ function towerBossCompLetter(){
         ' onclick="handleAdventureChoice(' + i + ', event)">' +
         '<span>' + o.text + '</span>' +
         '<small>' + (o.action === 'battle'
-          ? '对战 ' + foe.name + ' · 战力 ' + fmt(foe.power) + ' · 胜负未知'
+          ? '对战 ' + foe.name + ' · 战力 ' + fmt(foe.power) + ' · ' + edge
           : '明哲保身 · 修为 +' + fmt(advEscapeExp())) + '</small>' +
         '</button>').join('');
     }else{
@@ -7158,7 +7160,14 @@ function towerBossCompLetter(){
     const place = () => {
       if(dead) return;
       const r = anchor.getBoundingClientRect();
-      if(!r || (!r.width && !r.height)){ sp.style.display = 'none'; return; }
+      if(!r || (!r.width && !r.height)){
+        /* batch6 补单：锚点被面板/弹窗藏起来时（如背包页顶栏不可见），
+           旧写法直接 display:none → 玩家看不到飘字。改为落在视口中上部，至少让反馈可见。 */
+        sp.style.display = '';
+        sp.style.left = ((window.innerWidth || 690) / 2) + 'px';
+        sp.style.top = Math.max(84, (window.innerHeight || 900) * 0.30) + 'px';
+        return;
+      }
       sp.style.display = '';
       /* 贴边夹取：按钮常在面板右侧，浮字居中会溢出视口被裁掉 */
       let x = r.left + r.width / 2;
@@ -8128,7 +8137,11 @@ function towerBossCompLetter(){
   function renderToday(){
     const list = document.getElementById('today-list');
     const cd = document.getElementById('today-reset');
-    if(cd) cd.textContent = '距下次重置 ' + fmtCd(nextDayResetMs());
+    if(cd){
+      let doneN = 0, allN = 3;
+      try{ const ts = Daily.list(); doneN = ts.filter(t => t.done).length; allN = ts.length; }catch(e){}
+      cd.textContent = '已达成 ' + doneN + ' / ' + allN + ' 项 · 距重置 ' + fmtCd(nextDayResetMs());
+    }
     if(!list) return;
     const rows = todayCountRows();
     list.innerHTML = lingchaoHtmlRow() + rows.map(r => {
