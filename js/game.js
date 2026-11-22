@@ -442,6 +442,7 @@ const XX = (function(){
     arenaLoseStoneK: 0.2, // 负：灵石 = 需求 × 0.2
     arenaWinRep: 10,      // 胜：声望 +10
     arenaLoseRep: 3,      // 负：声望 +3
+    arenaProxyStoneK: 0.6, // batch5：雇人代打价格 = 当前一层需求 ×0.6（每日限 1 场，占今日出战）
     /* 限时活动：七日签到（断签重置）+ 仙盟争霸（7 天赛季，战功换强化材料） */
     unionDays: 7,         // 一个赛季 7 天
     unionWinMerit: 60,    // 出战胜：战功 +60 上下
@@ -2483,6 +2484,44 @@ const XX = (function(){
     }, k => { if(k) challengeArena(i, k); });
     return true;
   }
+  /* batch5 第 5 项（甲案）：雇人代打。
+     每日限 1 场，占今日出战次数；价格 = 当前一层需求 ×0.6 灵石；
+     胜负仍走 challengeArena('plain') 的随机判定与现有结算，不另开奖励、不加服务端记录。
+     不新增存档字段：只在「今日一场未打」（left === arenaDaily）时开放；用掉后 left-1，
+     刷新/重登仍是 left<daily → 当日无法二次代打；次日 resetArenaDay 回满再开放。 */
+  function arenaProxyCost(){ return Math.max(1, Math.floor(needOf(S.rank) * BAL.arenaProxyStoneK)); }
+  function arenaProxyEligible(){ resetArenaDay(); return S.arena.left === BAL.arenaDaily && S.arena.foes.some(f => !f.beat); }
+  function arenaProxyPick(i){
+    resetArenaDay();
+    if(!arenaProxyEligible()){
+      log(S.arena.left <= 0 ? '今日论剑次数用尽了，明日再来。' : '今日已出过手；雇人代打每日只在未出手时可用 1 场。', 'bad');
+      return false;
+    }
+    const f = S.arena.foes[i];
+    if(!f || f.beat) return false;
+    const cost = arenaProxyCost();
+    if(S.stone < cost){ log('灵石不足，雇人代打要 ' + fmt(cost) + ' 灵石。', 'bad'); return false; }
+    pickStance({
+      icon: '⚔', title: '论剑台 · 雇人代打',
+      text: '请一位道友替你打【' + escHTML(f.name) + '】（战力 <b>' + fmt(f.power) + '</b>）。' +
+        '<br>费用 <b>' + fmt(cost) + '</b> 灵石（当前一层需求 ×' + BAL.arenaProxyStoneK + '），并消耗今日出战 <b>1</b> 次。' +
+        '<br>胜负随机，按现有论剑结算（声望/灵石照发）；胜率低也允许。',
+      opts: [{ k: 'ok', n: '确认代打', d: '灵石 -' + fmt(cost) + ' · 出战 -1' }],
+      foot: '取消不扣灵石、不扣次数。代打每日限 1 场，且只在今日未出手时可用。'
+    }, k => { if(k === 'ok') doArenaProxy(i, cost); });
+    return true;
+  }
+  function doArenaProxy(i, cost){
+    resetArenaDay();
+    if(!arenaProxyEligible()) return false;
+    const f = S.arena.foes[i];
+    if(!f || f.beat) return false;
+    if(S.stone < cost){ log('灵石不足，雇人代打要 ' + fmt(cost) + ' 灵石。', 'bad'); return false; }
+    S.stone -= cost;
+    log('💸 花 ' + fmt(cost) + ' 灵石雇人代打【' + f.name + '】。', 'note');
+    challengeArena(i, 'plain');
+    return true;
+  }
   /* 第三批 P0：论剑商店兑换二次确认（声望余额/换后余额）；真正扣声望下沉到 doBuyRep */
   function buyRep(idx){
     const it = ARENA_SHOP[idx];
@@ -2584,6 +2623,7 @@ const XX = (function(){
         '<div class="ar-line"><span>声望</span><b>' + S.arena.rep + '</b></div>' +
         '<div class="ar-line"><span>战绩</span><b>' + S.arena.win + ' 胜 ' + S.arena.lose + ' 负</b></div>' +
         '<div class="ar-line"><span>今日挑战</span><b>' + S.arena.left + ' / ' + BAL.arenaDaily + '</b></div>' +
+        '<div class="ar-line"><span>代打</span><b>' + (arenaProxyEligible() ? '今日可代打 1 场' : '不可用（今日已出手）') + '</b></div>' +
         (next ? '<div class="ar-next">再攒 ' + (next.rep - S.arena.rep) + ' 声望升「' + next.name + '」</div>'
               : '<div class="ar-next">已至九霄道尊，无人可敌</div>');
     }
@@ -2594,11 +2634,15 @@ const XX = (function(){
         const cp = combatPower();
         const odds = cp / f.power;
         const tag = odds >= 1.25 ? '稳操胜券' : odds >= 1 ? '旗鼓相当' : odds >= 0.8 ? '略有不敌' : '凶多吉少';
+        const canProxy = arenaProxyEligible();
         html += '<div class="ar-row' + (f.beat ? ' done' : '') + '">' +
           '<div class="ar-main"><b>' + f.name + '<small>' + RANK_NAMES[rankByPower(f.power)] + '</small></b>' +
           '<span>战力 ' + fmt(f.power) + ' · ' + tag + '</span></div>' +
           (f.beat ? '<span class="ar-res">已挑战</span>'
-            : '<button class="ar-btn" data-fight="' + i + '"' + (S.arena.left <= 0 ? ' disabled' : '') + '>切磋</button>') +
+            : '<div class="ar-ops">' +
+              '<button class="ar-btn" data-fight="' + i + '"' + (S.arena.left <= 0 ? ' disabled' : '') + '>切磋</button>' +
+              (canProxy ? '<button class="ar-btn proxy" data-proxy="' + i + '">代打</button>' : '') +
+              '</div>') +
           '</div>';
       });
       fBox.innerHTML = html;
@@ -2606,7 +2650,9 @@ const XX = (function(){
         fBox.dataset.d_binded = '1';
         fBox.addEventListener('click', ev => {
           const b = ev.target.closest('[data-fight]');
-          if (b) { ev.stopPropagation(); arenaPick(Number(b.dataset.fight)); }
+          if (b) { ev.stopPropagation(); arenaPick(Number(b.dataset.fight)); return; }
+          const p = ev.target.closest('[data-proxy]');
+          if (p) { ev.stopPropagation(); arenaProxyPick(Number(p.dataset.proxy)); }
         });
       }
     }
@@ -15968,6 +16014,7 @@ function towerBossCompLetter(){
     _passFloatState: () => ({ at: passFloatAt, acc: { exp: passAcc.exp, stone: passAcc.stone, ore: passAcc.ore } }),
     _ovEntries: ovEntries, _ovPending: ovPending, _ovLetter: () => (S.letters || []).filter(x => !x.open && ovEntries(x).length)[0] || null,
     _arena: () => S.arena, _challengeArena: challengeArena, _arenaPick: arenaPick, _buyRep: buyRep, _doBuyRep: doBuyRep, _tierOf: tierOf,
+    _arenaProxy: arenaProxyPick, _arenaProxyCost: arenaProxyCost, _arenaProxyEligible: arenaProxyEligible,
     _arenaShop: ARENA_SHOP, _towerFight: towerFightCurrent, _towerBossCompLetter: towerBossCompLetter,
     _closeStance: closeStance,
     _stanceOpen: () => { const m = document.getElementById('stance-modal'); return !!m && !m.classList.contains('hidden'); },
