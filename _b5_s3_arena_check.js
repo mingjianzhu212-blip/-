@@ -14,10 +14,12 @@ const SCRIPT = `
   var S=XX._s;
   function seedArena(){
     S.arena.day=XX._todayKey(); S.arena.left=5; S.arena.win=0; S.arena.lose=0; S.arena.rep=0;
+    S.arena.proxyDay='';
     S.arena.foes=[];
     for(var i=0;i<6;i++)S.arena.foes.push({name:'道友'+i,power:100+i,beat:false});
     S.stone=100000;
   }
+  o.oldSave={has:'proxyDay' in S.arena,type:typeof S.arena.proxyDay,val:S.arena.proxyDay};
   seedArena();
   ROUTER.open('arena','ar-board');await sleep(600);
   o.cost=XX._arenaProxyCost();
@@ -40,31 +42,58 @@ const SCRIPT = `
   var bm=document.getElementById('battle-modal');if(bm&&!bm.classList.contains('hidden')){var sk=document.getElementById('bt-skip');if(sk)sk.click();}
   await sleep(300);
   o.done={left:S.arena.left,stone:S.stone,beat:S.arena.foes[0].beat,wins:S.arena.win,losses:S.arena.lose,
+    proxyDay:S.arena.proxyDay,today:XX._todayKey(),
     log0:(S.log[0]&&S.log[0].t)||'',log1:(S.log[1]&&S.log[1].t)||'',
     buttons:document.querySelectorAll('#xx-arena-foes [data-proxy]').length,elig:XX._arenaProxyEligible(),
     keys:Object.keys(S.arena).sort().join(',')};
   o.spent=100000-o.done.stone;
   if(!(o.done.left===4&&o.done.beat===true&&(o.done.wins+o.done.losses)===1&&o.done.buttons===0&&!o.done.elig)) o.errs.push('代打结算异常: '+JSON.stringify(o.done));
+  if(!(o.done.proxyDay===o.done.today&&o.done.today)) o.errs.push('代打日键未落 08:00 日界: '+JSON.stringify(o.done));
   if(!(/花 .*灵石雇人代打/.test(o.done.log1)&&o.cost===o.expectCost)) o.errs.push('代打灵石扣款异常: '+JSON.stringify({spent:o.spent,cost:o.cost,log1:o.done.log1}));
   if(!/论剑胜|不敌/.test(o.done.log0+o.done.log1)) o.errs.push('未走现有论剑结算日志: '+JSON.stringify([o.done.log0,o.done.log1]));
-  if(o.done.keys!=='day,foes,left,lose,rep,tier,win') o.errs.push('论剑存档新增字段: '+o.done.keys);
+  if(o.done.keys!=='day,foes,left,lose,proxyDay,rep,tier,win') o.errs.push('论剑存档字段不符: '+o.done.keys);
+  if(!(o.oldSave.has&&o.oldSave.type==='string'&&o.oldSave.val==='')) o.errs.push('旧档缺 proxyDay 未按未用处理: '+JSON.stringify(o.oldSave));
   /* 同日出第二场：拒绝且不扣 */
   var left0=S.arena.left,tot0=S.arena.win+S.arena.lose;
   var again=XX._arenaProxy(1);await sleep(200);
   o.again={ok:again,left:S.arena.left,log:(S.log[0]&&S.log[0].t)||''};
-  if(!(again===false&&o.again.left===left0&&(S.arena.win+S.arena.lose)===tot0&&/今日已出过手/.test(o.again.log))) o.errs.push('同日二次代打未拒绝: '+JSON.stringify(o.again));
-  /* 今日已手动出手：不可代打 */
-  seedArena();S.arena.left=4;XX._render();await sleep(400);
-  o.manual={elig:XX._arenaProxyEligible(),buttons:document.querySelectorAll('#xx-arena-foes [data-proxy]').length};
-  if(!(!o.manual.elig&&o.manual.buttons===0)) o.errs.push('手动出手后仍可代打: '+JSON.stringify(o.manual));
-  /* 灵石不足：可点但拒绝，不扣次数 */
+  if(!(again===false&&o.again.left===left0&&(S.arena.win+S.arena.lose)===tot0&&/今日已代打/.test(o.again.log))) o.errs.push('同日二次代打未拒绝: '+JSON.stringify(o.again));
+  /* 顺序 A：先手动 1 场，再代打 */
+  seedArena();XX._challengeArena(0,'plain');await sleep(400);
+  var bm1=document.getElementById('battle-modal');if(bm1&&!bm1.classList.contains('hidden')){var sk1=document.getElementById('bt-skip');if(sk1)sk1.click();}
+  await sleep(300);XX._render();await sleep(300);
+  o.manualFirst={left:S.arena.left,elig:XX._arenaProxyEligible(),buttons:document.querySelectorAll('#xx-arena-foes [data-proxy]').length,proxyDay:S.arena.proxyDay};
+  if(!(o.manualFirst.left===4&&o.manualFirst.elig&&o.manualFirst.buttons===5&&o.manualFirst.proxyDay==='')) o.errs.push('先手动后不可代打: '+JSON.stringify(o.manualFirst));
+  document.querySelector('#xx-arena-foes [data-proxy="1"]').click();await sleep(200);
+  document.querySelector('#st-opts [data-st="ok"]').click();await sleep(500);
+  var bm2=document.getElementById('battle-modal');if(bm2&&!bm2.classList.contains('hidden')){var sk2=document.getElementById('bt-skip');if(sk2)sk2.click();}
+  await sleep(300);
+  o.manualThenProxy={left:S.arena.left,proxyDay:S.arena.proxyDay,foe1:S.arena.foes[1].beat,elig:XX._arenaProxyEligible()};
+  if(!(o.manualThenProxy.left===3&&o.manualThenProxy.proxyDay===XX._todayKey()&&o.manualThenProxy.foe1===true&&!o.manualThenProxy.elig)) o.errs.push('先手动后代打异常: '+JSON.stringify(o.manualThenProxy));
+  /* 顺序 B：先代打，再手动 1 场 */
+  seedArena();XX._render();await sleep(300);
+  document.querySelector('#xx-arena-foes [data-proxy="0"]').click();await sleep(200);
+  document.querySelector('#st-opts [data-st="ok"]').click();await sleep(500);
+  var bm3=document.getElementById('battle-modal');if(bm3&&!bm3.classList.contains('hidden')){var sk3=document.getElementById('bt-skip');if(sk3)sk3.click();}
+  await sleep(300);
+  o.proxyThenManual={left:S.arena.left,proxyDay:S.arena.proxyDay,elig:XX._arenaProxyEligible()};
+  XX._challengeArena(1,'plain');await sleep(400);
+  var bm4=document.getElementById('battle-modal');if(bm4&&!bm4.classList.contains('hidden')){var sk4=document.getElementById('bt-skip');if(sk4)sk4.click();}
+  await sleep(300);
+  o.proxyThenManual.leftAfter=S.arena.left;o.proxyThenManual.foe1=S.arena.foes[1].beat;
+  if(!(o.proxyThenManual.left===4&&o.proxyThenManual.proxyDay===XX._todayKey()&&!o.proxyThenManual.elig&&o.proxyThenManual.leftAfter===3&&o.proxyThenManual.foe1===true)) o.errs.push('先代打后手动异常: '+JSON.stringify(o.proxyThenManual));
+  /* 跨日：旧日键按未用处理 */
+  seedArena();S.arena.proxyDay='2000-1-3';XX._render();await sleep(300);
+  o.nextDay={elig:XX._arenaProxyEligible(),buttons:document.querySelectorAll('#xx-arena-foes [data-proxy]').length};
+  if(!(o.nextDay.elig&&o.nextDay.buttons===6)) o.errs.push('旧日键未按未用处理: '+JSON.stringify(o.nextDay));
+  /* 灵石不足：可点但拒绝，不扣次数、不写日键 */
   seedArena();S.stone=0;XX._render();await sleep(400);
   var btn=document.querySelector('#xx-arena-foes [data-proxy="0"]');
   o.poor={btn:!!btn,elig:XX._arenaProxyEligible()};
   if(!(btn&&o.poor.elig)) o.errs.push('灵石不足时入口应保留并给提示: '+JSON.stringify(o.poor));
   btn.click();await sleep(250);
-  o.poor.left=S.arena.left;o.poor.log=(S.log[0]&&S.log[0].t)||'';
-  if(!(o.poor.left===5&&/灵石不足/.test(o.poor.log))) o.errs.push('灵石不足未拒绝: '+JSON.stringify(o.poor));
+  o.poor.left=S.arena.left;o.poor.proxyDay=S.arena.proxyDay;o.poor.log=(S.log[0]&&S.log[0].t)||'';
+  if(!(o.poor.left===5&&o.poor.proxyDay===''&&/灵石不足/.test(o.poor.log))) o.errs.push('灵石不足未拒绝: '+JSON.stringify(o.poor));
 `;
 const DIAG = `(async function(){var o={ok:true,errs:[]};var sleep=ms=>new Promise(r=>setTimeout(r,ms));
 try{${SCRIPT}}catch(e){o.ok=false;o.errs.push(String(e&&e.stack||e));}

@@ -20,7 +20,7 @@ HUBKIT.define({
       body: `      <section class="card wide" id="ar-board-sec">
         <h2>今日论剑榜</h2>
         <div class="ar-foes" id="xx-arena-foes"></div>
-        <p class="hint">每日 5 次切磋，胜负看战力也看临场发挥（±15%）· 榜每日一换 · 代打每日 1 场：今日未出手时可用，花 需求×0.6 灵石，占 1 次出战，胜负随机。</p>
+        <p class="hint">每日 5 次切磋，胜负看战力也看临场发挥（±15%）· 榜每日一换 · 代打每日 1 场：今日未代打且还有场次即可用（先手动后代打也可），花 需求×0.6 灵石，占 1 次出战，胜负随机。</p>
       </section>` },
     { key: 'ar-shop', view: 'arena_shop', name: '声望兑换', note: '声望换丹 · 换材料',
       ico: 'ic_gift.png', sealId: 'xx-hub-ar-shop',

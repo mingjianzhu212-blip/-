@@ -213,7 +213,7 @@ const XX = (function(){
     /* 坊市（每日货架 + 寄售行情） */
     market: { day: '', goods: [], buyRate: 1, sellRate: 1, sold: 0, freeRefresh: 1 },
     /* 论剑台（每日挑战 + 段位） */
-    arena: { day: '', left: 0, foes: [], tier: 0, win: 0, lose: 0, rep: 0 },
+    arena: { day: '', left: 0, foes: [], tier: 0, win: 0, lose: 0, rep: 0, proxyDay: '' },
     /* 限时活动：七日签到（断签重置）+ 仙盟争霸（7 天赛季，战功换强化材料） */
     sign: { days: 0, last: '' },
     /* 每日任务奖励的「已入账凭据」（D-006 J-1）：形如 'sit@2026-11-08'。
@@ -2487,14 +2487,18 @@ const XX = (function(){
   /* batch5 第 5 项（甲案）：雇人代打。
      每日限 1 场，占今日出战次数；价格 = 当前一层需求 ×0.6 灵石；
      胜负仍走 challengeArena('plain') 的随机判定与现有结算，不另开奖励、不加服务端记录。
-     不新增存档字段：只在「今日一场未打」（left === arenaDaily）时开放；用掉后 left-1，
-     刷新/重登仍是 left<daily → 当日无法二次代打；次日 resetArenaDay 回满再开放。 */
+     日界与全局 08:00 同口径：S.arena.proxyDay 记「今天已代打」的日键；旧档缺字段按未用处理。 */
   function arenaProxyCost(){ return Math.max(1, Math.floor(needOf(S.rank) * BAL.arenaProxyStoneK)); }
-  function arenaProxyEligible(){ resetArenaDay(); return S.arena.left === BAL.arenaDaily && S.arena.foes.some(f => !f.beat); }
+  function arenaProxyEligible(){
+    resetArenaDay();
+    return S.arena.left > 0 && S.arena.proxyDay !== todayKey() && S.arena.foes.some(f => !f.beat);
+  }
   function arenaProxyPick(i){
     resetArenaDay();
     if(!arenaProxyEligible()){
-      log(S.arena.left <= 0 ? '今日论剑次数用尽了，明日再来。' : '今日已出过手；雇人代打每日只在未出手时可用 1 场。', 'bad');
+      log(S.arena.left <= 0 ? '今日论剑次数用尽了，明日再来。'
+          : S.arena.proxyDay === todayKey() ? '今日已代打过了，明日再来。'
+          : '榜上已无可代打的对手。', 'bad');
       return false;
     }
     const f = S.arena.foes[i];
@@ -2507,7 +2511,7 @@ const XX = (function(){
         '<br>费用 <b>' + fmt(cost) + '</b> 灵石（当前一层需求 ×' + BAL.arenaProxyStoneK + '），并消耗今日出战 <b>1</b> 次。' +
         '<br>胜负随机，按现有论剑结算（声望/灵石照发）；胜率低也允许。',
       opts: [{ k: 'ok', n: '确认代打', d: '灵石 -' + fmt(cost) + ' · 出战 -1' }],
-      foot: '取消不扣灵石、不扣次数。代打每日限 1 场，且只在今日未出手时可用。'
+      foot: '取消不扣灵石、不扣次数。代打每日限 1 场；先手动切磋、后代打也可以。'
     }, k => { if(k === 'ok') doArenaProxy(i, cost); });
     return true;
   }
@@ -2518,6 +2522,7 @@ const XX = (function(){
     if(!f || f.beat) return false;
     if(S.stone < cost){ log('灵石不足，雇人代打要 ' + fmt(cost) + ' 灵石。', 'bad'); return false; }
     S.stone -= cost;
+    S.arena.proxyDay = todayKey();          /* 日键与 08:00 日界同口径；写盘由 challengeArena 的 save 一并落 */
     log('💸 花 ' + fmt(cost) + ' 灵石雇人代打【' + f.name + '】。', 'note');
     challengeArena(i, 'plain');
     return true;
@@ -2618,12 +2623,14 @@ const XX = (function(){
     if(meBox){
       const t = tierOf();
       const next = ARENA_TIERS[t + 1];
+      const proxyTxt = S.arena.proxyDay === todayKey() ? '今日已代打'
+        : (S.arena.left > 0 ? '今日可代打 1 场' : '不可用（次数用尽）');
       meBox.innerHTML =
         '<div class="ar-tier">' + ARENA_TIERS[t].name + '</div>' +
         '<div class="ar-line"><span>声望</span><b>' + S.arena.rep + '</b></div>' +
         '<div class="ar-line"><span>战绩</span><b>' + S.arena.win + ' 胜 ' + S.arena.lose + ' 负</b></div>' +
         '<div class="ar-line"><span>今日挑战</span><b>' + S.arena.left + ' / ' + BAL.arenaDaily + '</b></div>' +
-        '<div class="ar-line"><span>代打</span><b>' + (arenaProxyEligible() ? '今日可代打 1 场' : '不可用（今日已出手）') + '</b></div>' +
+        '<div class="ar-line"><span>代打</span><b>' + proxyTxt + '</b></div>' +
         (next ? '<div class="ar-next">再攒 ' + (next.rep - S.arena.rep) + ' 声望升「' + next.name + '」</div>'
               : '<div class="ar-next">已至九霄道尊，无人可敌</div>');
     }
@@ -5250,6 +5257,8 @@ const XX = (function(){
         S.arena.win = (typeof a.win === 'number' && isFinite(a.win)) ? Math.max(0, a.win | 0) : 0;
         S.arena.lose = (typeof a.lose === 'number' && isFinite(a.lose)) ? Math.max(0, a.lose | 0) : 0;
         S.arena.rep = (typeof a.rep === 'number' && isFinite(a.rep)) ? Math.max(0, a.rep | 0) : 0;
+        /* batch5：旧档没有 proxyDay → 按「今日未代打」处理（空串），不报错、不改其余字段 */
+        S.arena.proxyDay = typeof a.proxyDay === 'string' ? a.proxyDay : '';
         /* 战力刻度迁移：旧档（powScale 未标记或 ≠ 当前 POW_K）持久化的对手战力按倍率补正 */
         const pwK = (typeof o.powScale === 'number' && o.powScale > 0 && o.powScale !== POW_K) ? (POW_K / o.powScale)
                   : (typeof o.powScale === 'number' && o.powScale > 0) ? 1 : POW_K;
@@ -11098,7 +11107,7 @@ function towerBossCompLetter(){
     S.tower = 1;                                 /* 镇妖塔当前层重置（战力归零），保留历史最高 */
     S.trun = null;                               /* 转世不问塔里那一局：局随这一世一起散 */
     S.secret.prog = S.secret.prog.slice(); S.secret.day = ''; S.secret.swept = 0;   /* 秘境进度保留，扫荡重置 */
-    S.arena.foes = []; S.arena.day = ''; S.arena.left = BAL.arenaDaily;   /* 论剑榜重排（段位声望保留） */
+    S.arena.foes = []; S.arena.day = ''; S.arena.left = BAL.arenaDaily; S.arena.proxyDay = '';   /* 论剑榜重排（段位声望保留） */
     S.market = { day: '', goods: [], buyRate: 1, sellRate: 1, sold: 0, freeRefresh: 1 };   /* 坊市重新进货 */
     S.coopBoss = { week: '', hpMax: 0, dmg: 0, claimed: [], parts: 0 };   /* 转世：协力进度从头 */
     S.lingchao = { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 };
@@ -15423,7 +15432,7 @@ function towerBossCompLetter(){
     S.towerBossMail = 0;                              /* 重开 = 新档，旧档补发标记一并清零 */
     S.trun = null; S.trunLast = null;                 /* 塔里那一局与上一局账本一并作废 */
     S.secret = { prog: [0, 0, 0, 0], day: '', swept: 0 };
-    S.arena = { day: '', left: 0, foes: [], tier: 0, win: 0, lose: 0, rep: 0 };
+    S.arena = { day: '', left: 0, foes: [], tier: 0, win: 0, lose: 0, rep: 0, proxyDay: '' };
     S.sign = { days: 0, last: '' };
     S.union = { start: Date.now(), day: '', left: 0, merit: 0, claimed: [], season: 1 };
     S.gate = { lv: 0, disciples: [], grad: 0 };         /* 山门弟子一并散尽（重开 = 一无所有） */
