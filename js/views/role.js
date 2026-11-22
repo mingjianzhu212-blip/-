@@ -48,6 +48,7 @@ HUBKIT.define({
           <button type="button" data-role-jump="xx-role-wu">悟道</button>
           <button type="button" data-role-jump="xx-role-story">断天门</button>
           <button type="button" data-role-jump="xx-role-npc">识人 · 沈碑</button>
+          <button type="button" data-codex>法宝图鉴</button>
         </div>
         <p class="hint">装备点圈即可穿/卸；四族法宝位点进去去炼制或强化。这里只报自己的账，功能入口不在此页。</p>
       </section>` },

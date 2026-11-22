@@ -6056,3 +6056,23 @@ html,body{ background:var(--jx-paper); }
 .coop-step small{ display:block; font-size:9px; color:#ffe8d6; }
 .coop-step:disabled{ color:#8a8172; background:rgba(247,243,233,.85); border-color:rgba(120,100,60,.22); cursor:default; }
 .coop-step.done{ color:#2e6b4f; background:rgba(61,107,88,.10); border-color:rgba(61,107,88,.25); }
+
+/* batch5：法宝图鉴 + 功能解锁插屏前往按钮 */
+.codex-top{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-bottom:10px; }
+.codex-bar{ flex:1 1 160px; height:9px; border-radius:5px; background:rgba(107,98,82,.16); overflow:hidden; }
+.codex-bar i{ display:block; height:100%; width:0; background:linear-gradient(90deg,#a5302a,#c83e37); border-radius:5px; transition:width .4s; }
+.codex-top span{ font-size:11px; color:#6b6252; }
+.codex-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.codex-card{ display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 6px;
+  border-radius:10px; background:rgba(252,250,245,.92); border:1px solid rgba(138,109,59,.22); text-align:center; }
+.codex-card.owned{ border-color:rgba(181,137,46,.55); box-shadow:0 3px 10px rgba(181,137,46,.12); }
+.codex-card.locked{ opacity:.55; filter:grayscale(1); }
+.codex-card .cc-img{ width:34px; height:34px; display:grid; place-items:center; }
+.codex-card .cc-img img{ max-width:34px; max-height:34px; object-fit:contain; }
+.codex-card b{ font-size:12px; color:#2b2720; line-height:1.3; }
+.codex-card small{ font-size:10px; color:#6b6252; }
+.codex-card .cc-owned{ font-size:10px; color:#7a5a20; line-height:1.35; }
+.codex-card .cc-src{ font-size:9.5px; color:#8a8172; line-height:1.35; word-break:break-all; }
+.codex-open{ display:inline-block; margin:2px 0 8px; }
+@media (max-width:430px){ .codex-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+#craft-settle .settle-act{ margin-top:10px; }

@@ -231,6 +231,8 @@ const XX = (function(){
     coopBoss: { week: '', hpMax: 0, dmg: 0, claimed: [], parts: 0 },
     /* P2 灵潮（周六 20:00–20:15；进场后每 20 秒一杀，30 杀封顶） */
     lingchao: { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 },
+    /* batch5：已弹过的功能解锁插屏 id（不重复弹；老档见 load 种子） */
+    unlocks: [],
     /* 山门议事（第 103 轮）：每日一条议题三选一。n = 已议过几条（决定今天轮到哪条议题，
        只增不减），last = 上一条的结论文本（议事页与日志各留一处） */
     council: { day: '', n: 0, last: '' },
@@ -3111,6 +3113,58 @@ const XX = (function(){
       mats:[ [{t:'mat_eye',n:2}], [{t:'mat_eye',n:6}], [{t:'boss_heart',n:2}] ],
       desc:'地脉通灵，一呼一吸皆成修为。' }
   ];
+  /* batch5：破境之外的功能解锁点总表（只列现有系统/数据；不新增数值）。
+     插屏只报「新功能名 + 一句话用途 + 前往」，已弹过的不再重复。 */
+  const UNLOCK_POINTS = [
+    { id:'secret2', rank:6, name:'秘境 · 幽谷秘境', desc:'新秘境章节：产炼丹/炼器材料与 Boss 料', go:['secret'] },
+    { id:'gate', rank:BAL.gateUnlock, name:'宗门 · 山门', desc:'可收弟子、派差事；离线也照算', go:['zong','xx-gate'] },
+    { id:'gong2', rank:9, name:'功法 · 凝神诀', desc:'第二门功法，修炼速度再上一阶', go:['xiu','xx-gong-sec'] },
+    { id:'secret3', rank:12, name:'秘境 · 北冥玄境', desc:'更高阶秘境：产高阶材料与 Boss 料', go:['secret'] },
+    { id:'gong3', rank:12, name:'功法 · 金丹大道', desc:'第三门功法，修炼速度再上一阶', go:['xiu','xx-gong-sec'] },
+    { id:'dt-qing', rank:15, name:'洞天 · 青华洞天', desc:'洞天开辟：永久修炼与灵石加成', go:['dong','xx-dongtian-sec'] },
+    { id:'dt-zhu', rank:16, name:'洞天 · 朱明洞天', desc:'洞天开辟：永久修炼与灵石加成', go:['dong','xx-dongtian-sec'] },
+    { id:'dt-su', rank:17, name:'洞天 · 素灵洞天', desc:'洞天开辟：永久修炼与灵石加成', go:['dong','xx-dongtian-sec'] },
+    { id:'secret4', rank:18, name:'秘境 · 九霄天域', desc:'终章秘境：产最高阶材料与 Boss 料', go:['secret'] },
+    { id:'dt-xuan', rank:18, name:'洞天 · 玄冥洞天', desc:'洞天开辟：永久修炼与灵石加成', go:['dong','xx-dongtian-sec'] },
+    { id:'dt-huang', rank:19, name:'洞天 · 黄庭洞天', desc:'洞天开辟：永久修炼与灵石加成', go:['dong','xx-dongtian-sec'] }
+  ];
+  function unlockSeen(){ return Array.isArray(S.unlocks) ? S.unlocks : (S.unlocks = []); }
+  const unlockPending = [];
+  /* 只在「本次破境跨过门槛」时入队，不按当前 rank 扫描——避免旧档/测试改 rank 时一次弹一串 */
+  function queueUnlocks(rankBefore, rankAfter){
+    if(!(rankAfter > rankBefore)) return;
+    const seen = unlockSeen();
+    UNLOCK_POINTS.forEach(p => {
+      if(p.rank > rankBefore && p.rank <= rankAfter && seen.indexOf(p.id) < 0 && unlockPending.indexOf(p.id) < 0)
+        unlockPending.push(p.id);
+    });
+  }
+  function unlockTick(){
+    if(!unlockPending.length) return;
+    const cs = document.getElementById('craft-settle');
+    if(cs && !cs.classList.contains('hidden')) return;
+    if(document.querySelector('.modal:not(.hidden)')) return;
+    const seen = unlockSeen();
+    const id = unlockPending[0];
+    const next = UNLOCK_POINTS.find(p => p.id === id);
+    if(!next){ unlockPending.shift(); return; }
+    unlockPending.shift();
+    seen.push(next.id);
+    save();
+    showSettle({
+      icon: '✨', title: '新功能解锁 · ' + next.name,
+      sub: next.desc,
+      rows: [settleLine('解锁条件', '境界 ' + RANK_NAMES[next.rank] + '（已达成）', 'good')],
+      note: '只报本次新解锁；已解锁过的不再重复。'
+    });
+    const box = document.getElementById('cs-rows');
+    if(box && next.go){
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn-main settle-act'; b.textContent = '前往 · ' + next.name;
+      b.onclick = () => { const m = document.getElementById('craft-settle'); if(m) m.classList.add('hidden'); try{ ROUTER.open(next.go[0], next.go[1] || undefined); }catch(e){} };
+      box.appendChild(b);
+    }
+  }
   const dtCave = id => DONGTIAN.find(c => c.id === id) || null;
   const dtLv = id => Math.max(0, Math.min(DT_MAX, (S.dt && S.dt[id]) | 0));
   function dtMainId(){
@@ -5006,6 +5060,9 @@ const XX = (function(){
         S.coopBoss.parts = (typeof c.parts === 'number' && isFinite(c.parts)) ? Math.max(0, c.parts | 0) : 0;
         S.coopBoss.claimed = Array.isArray(c.claimed) ? c.claimed.filter(x => typeof x === 'number' && x >= 0 && x < 4) : [];
       }
+      /* batch5：老档没有 unlocks → 把当前已越过的解锁点直接记为已弹，避免上线一次弹一串 */
+      if(Array.isArray(o.unlocks)) S.unlocks = o.unlocks.filter(id => typeof id === 'string' && UNLOCK_POINTS.some(p => p.id === id));
+      else S.unlocks = UNLOCK_POINTS.filter(p => S.rank >= p.rank).map(p => p.id);
       if(o.lingchao && typeof o.lingchao === 'object'){
         const c = o.lingchao;
         S.lingchao.week = typeof c.week === 'string' ? c.week : '';
@@ -5991,6 +6048,7 @@ function towerBossCompLetter(){
       const lifeBefore = lifeMax();
       S.exp -= need;
       S.rank += 1;
+      try{ queueUnlocks(rankBefore, S.rank); }catch(e){}
       /* P1：跨大境界的世界通告（与聊天分开，限流在 announce 内） */
       try{
         if(breakTierOf(S.rank).from !== breakTierOf(rankBefore).from)
@@ -11918,6 +11976,7 @@ function towerBossCompLetter(){
     renderTownHub();
     renderAlchemy();
     renderForge();
+    renderCodex();
     renderEnhance();
     renderHunt();
     renderQuest();
@@ -11932,6 +11991,7 @@ function towerBossCompLetter(){
     renderArena();
     renderEvent();
     renderToday();       /* 今日清单（P0）：不在场自动跳过；顶栏/主界面小钮红点同步 */
+    unlockTick();        /* batch5：功能解锁插屏（一次一条，已弹过不重复） */
     renderEncounter();   /* 奇遇气泡：在场就显隐（弹窗不受影响，避免被全量重绘打掉） */
     renderGate();        /* 山门名册（不在宗门面板时自动跳过） */
     renderCouncil();     /* 山门议事（第 103 轮，不在场自动跳过） */
@@ -12585,6 +12645,40 @@ function towerBossCompLetter(){
   /* 炼器坊面板：匠道线 + 「阶位签」分阶折叠（2026-11-18）。
      四族同阶并在一签里，默认展开当前能炼的最高一阶；族别仍由行内纹色与图标区分。
      行构造仍走 forgeRow：已装备/未解锁/缺料与点击绑定原样。 */
+  /* batch5：法宝图鉴（纯展示 ART_LIST 现有数据；不新增掉落） */
+  function renderCodex(){
+    const box = document.getElementById('xx-codex');
+    if(!box) return;
+    const total = ART_LIST.length;
+    const ownedN = ART_LIST.filter(d => artSeg(d.fam) >= d.seg).length;
+    const prog = document.getElementById('codex-progress');
+    if(prog) prog.textContent = ownedN + ' / ' + total;
+    const bar = document.getElementById('codex-bar');
+    if(bar) bar.style.width = (total ? ownedN / total * 100 : 0).toFixed(1) + '%';
+    const fams = document.getElementById('codex-fams');
+    if(fams){
+      fams.textContent = ART_FAMS.map(f => {
+        const n = ART_LIST.filter(d => d.fam === f && artSeg(f) >= d.seg).length;
+        return ART_FAM[f].name + ' ' + n + '/9';
+      }).join(' · ');
+    }
+    box.innerHTML = ART_LIST.map(d => {
+      const owned = artSeg(d.fam) >= d.seg;
+      const rec = RECIPES[d.id] || null;
+      const src = rec
+        ? ('炼器坊 Lv.' + rec.reqLv + (rec.reqM && rec.reqM > 1 ? ' · 器师 ' + rec.reqM + ' 阶' : '') +
+           ' · ' + matLedger(rec.mats))
+        : '炼器坊图谱';
+      return '<div class="codex-card' + (owned ? ' owned' : ' locked') + '" data-fam="' + d.fam + '">' +
+        '<div class="cc-img"><img src="' + d.img + '" alt=""></div>' +
+        '<b>' + d.name + '</b>' +
+        '<small>' + ART_FAM[d.fam].name + ' · 第 ' + d.seg + ' 阶</small>' +
+        (owned
+          ? '<span class="cc-owned">已得 · ' + artEffectText(d.fam, d.seg) + '</span>'
+          : '<span class="cc-src">出处：' + src + '</span>') +
+        '</div>';
+    }).join('');
+  }
   function renderForge(){
     const box = document.getElementById('xx-forge');
     if(!box) return;
@@ -15016,6 +15110,7 @@ function towerBossCompLetter(){
     S.market = { day: '', goods: [], buyRate: 1, sellRate: 1, sold: 0, freeRefresh: 1 };
     S.coopBoss = { week: '', hpMax: 0, dmg: 0, claimed: [], parts: 0 };
     S.lingchao = { week: '', started: 0, startedAt: 0, kills: 0, claimed: [], pv: 0 };
+    S.unlocks = [];
     /* 寿元 / 道统（第 96 轮）：重开 = 换一个全新的人，连"转世过几世"都不该记得。
        新档寿元是开着的（on=true），所以重开之后也开着。 */
     S.life = { age: 0, on: true, brk: 0 }; S.zuo = 0; S.legacy = { gens: 0, relic: null, hist: [], pick: null };
@@ -15621,6 +15716,8 @@ function towerBossCompLetter(){
     _showSettle: showSettle, _claimSign: claimSign, _claimDailyToday: claimDailyToday,
     _showEquipDrop: showEquipDrop, _equipDropInfo: equipDropInfo, _powerGapAdvice: powerGapAdvice,
     _renderToday: renderToday, _nextResetMs: nextDayResetMs, _todayKey: todayKey, _todayNo: todayNo,
+    _unlockPoints: UNLOCK_POINTS, _unlockTick: unlockTick, _unlockSeen: unlockSeen, _queueUnlocks: queueUnlocks,
+    _renderCodex: renderCodex, _artList: ART_LIST,
     _announce: announce, _annState: () => ({ q: annQueue.length, busy: annBusy, last: annLastAt }),
     _todayKeyAt: todayKeyAt, _todayNoAt: todayNoAt,
     _passFloatState: () => ({ at: passFloatAt, acc: { exp: passAcc.exp, stone: passAcc.stone, ore: passAcc.ore } }),

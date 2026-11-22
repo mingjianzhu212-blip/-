@@ -98,6 +98,8 @@
     h.querySelectorAll('[data-role-jump]').forEach(b => b.addEventListener('click', () => {
       open('role', b.dataset.roleJump);
     }));
+    /* batch5：法宝图鉴入口（人物页 / 炼器页） */
+    h.querySelectorAll('[data-codex]').forEach(b => b.addEventListener('click', () => open('codex')));
     /* P0.5：料仓 ↔ 背包互指 */
     h.querySelectorAll('[data-cross]').forEach(b => b.addEventListener('click', () => {
       const p = b.dataset.cross;
