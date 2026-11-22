@@ -144,8 +144,23 @@
     return true;
   }
 
+  /* batch6：气泡层降到所有弹窗之下（最高弹窗 z80），且弹窗在场时整组让位。
+     根因：旧版写死高 z-index（9000），比破境确认（z50）/奇遇（z50）/剧情（z65）/渡劫（z80）都高，
+     气泡会盖住弹窗文字按钮；被盖住时玩家点不到，同一句台词就长期悬在那里。 */
+  function popupOpen(){
+    try{
+      var list = document.querySelectorAll('.modal');
+      for(var i = 0; i < list.length; i++){
+        if(!list[i].classList.contains('hidden') && list[i].style.display !== 'none') return true;
+      }
+    }catch(e){}
+    return false;
+  }
+
   function tick() {
     if (!state || state.done || state.skipped) return;
+    /* 任一弹窗在场：气泡让位（不抢层级、不压按钮）；弹窗关闭后的下一拍自动复出 */
+    if (popupOpen()) { setGuideHidden(); return; }
     // C2：每轮重定位（主游戏重绘/切页后目标可能移动）；目标暂时不在时整组隐藏、回来自动复出
     if (view) { positionBubble(); applyLocks(); }
     if (pendingAfter) return;   /* 追叙播放中，等其结束再判定 */
@@ -236,6 +251,7 @@
   function render() {
     if (!state || state.done || state.skipped || !view) { hideBubble(); return; }
     var d = def(state.step); if (!d) { hideBubble(); return; }
+    if (popupOpen()) { setGuideHidden(); return; }   /* 弹窗在场：让位，不压文字按钮 */
     view.querySelector('.tb-text').textContent = d.text;
     if (d.dan && !state.rewardClaims[DAN_CLAIM]) claimDan();  /* 进入背包步即发丹（幂等，随主存档同事务） */
     if (d.click) view.classList.add('tb-click'); else view.classList.remove('tb-click');
@@ -437,7 +453,7 @@
     s.textContent =
       /* B1 形态（2026-11-20）：真气泡——圆角＋小尾巴、贴目标、浮层不挤布局、
          宽 ≤ 屏宽 70%（小屏不再吃满）、高度一到两行 */
-      '#taixu-bubble{position:fixed;z-index:9000;max-width:min(280px,70vw);background:#1c1726;color:#f3e9d8;' +
+      '#taixu-bubble{position:fixed;z-index:49;max-width:min(280px,70vw);background:#1c1726;color:#f3e9d8;' +
       'border:1px solid #6b4f8a;border-radius:14px;padding:9px 12px;font:14px/1.5 "PingFang SC","Microsoft YaHei",sans-serif;' +
       'box-shadow:0 6px 20px rgba(0,0,0,.4);pointer-events:auto;}' +
       '#taixu-bubble .tb-text{white-space:pre-wrap;}' +
@@ -452,7 +468,7 @@
       '#taixu-bubble.tb-pass .tb-tail{pointer-events:none;}' +
       '#taixu-bubble.tb-click{cursor:pointer;}' +
       '#taixu-bubble.tb-click .tb-text::after{content:"  ›";color:#b9a7d6;}' +
-      '#taixu-skip{position:fixed;z-index:9000;font:12px/1.2 "PingFang SC","Microsoft YaHei",sans-serif;' +
+      '#taixu-skip{position:fixed;z-index:49;font:12px/1.2 "PingFang SC","Microsoft YaHei",sans-serif;' +
       'color:#b9a7d6;background:rgba(28,23,38,.82);border:1px solid #6b4f8a;border-radius:8px;' +
       'padding:3px 8px;cursor:pointer;}' +
       '#taixu-skip:hover{color:#fff;}' +

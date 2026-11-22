@@ -2072,6 +2072,12 @@ const XX = (function(){
      连签天数照涨，改回去再改一次还能继续 —— 七天大奖可以无限刷。
      dayNo 兼容历史未补零的 last（'2026-11-8'）。 */
   const signCanClaim = () => dayNo(S.sign.last) < todayNo();
+  /* batch6：签到天数显示口径——已签今天时显示「刚签的那一天」，未签时显示「今天可签的那一天」。
+     旧写法一律 (days%7)+1，签完第 7 天后会显示第 1 天，和实际操作对不上。 */
+  const signDayLabel = () => {
+    const m = (S.sign.days | 0) % 7;
+    return signCanClaim() ? (m + 1) : (m === 0 ? 7 : m);
+  };
   function claimSign(){
     if(!signCanClaim()){ log('今日已签到，明日再来。', 'bad'); return; }
     /* 断签重置：除空值外，只有"上次签到正好是昨天"才保留连签，
@@ -2120,7 +2126,7 @@ const XX = (function(){
         (signMail > 0 ? '（背包已满，' + signMail + ' 件丹药暂存信匣）' : ''), rw.big ? 'gold' : 'good');
     showSettle({
       icon: '🎁', title: '签到结算 · 第 ' + S.sign.days + ' 天', sub: rw.txt,
-      rows: srows, note: '奖励与签到配置逐项对应；断签重置与蛋篓封顶规则未动。'
+      rows: srows, note: '逐项按本次实际入账列明；断签会从头计，蛋篓满时不再收蛋。'
     });
     sfx.win();
     save(); render(); renderEvent(); renderBag();
@@ -2464,6 +2470,16 @@ const XX = (function(){
       });
     }
   }
+  /* 论剑对决前的战力解读：落后复用 P0.5 的 powerGapAdvice；领先给等价口径的领先幅度 */
+  function arenaGapText(cp, foe){
+    cp = Math.max(0, Number(cp) || 0); foe = Math.max(0, Number(foe) || 0);
+    if(cp >= foe){
+      const lead = cp - foe;
+      const pct = foe > 0 ? Math.round(lead / foe * 100) : 0;
+      return '你领先 <b>' + fmt(lead) + '</b> 战力（约 ' + pct + '%），占优';
+    }
+    return powerGapAdvice(cp, foe);
+  }
   /* 论剑台的入口：先问起手式，选完才交给 challengeArena 结算 */
   function arenaPick(i){
     resetArenaDay();
@@ -2471,10 +2487,12 @@ const XX = (function(){
     const f = S.arena.foes[i];
     if(!f || f.beat) return false;
     const need = needOf(S.rank);
+    const cpNow = combatPower();
     pickStance({
       icon: '⚔', title: '论剑台 · 起手式',
-      text: '对手【' + escHTML(f.name) + '】战力 <b>' + fmt(f.power) + '</b>，你有 <b>' + fmt(combatPower()) +
-        '</b>。<br>同一把剑，起手不同，收成不同——胜灵石 ' + fmt(Math.floor(need * BAL.arenaWinStoneK)) + '、败灵石 ' +
+      text: '对手【' + escHTML(f.name) + '】战力 <b>' + fmt(f.power) + '</b>，你有 <b>' + fmt(cpNow) +
+        '</b>。<br>' + arenaGapText(cpNow, f.power) + '。<br>同一把剑，起手不同，收成不同——胜灵石 ' +
+        fmt(Math.floor(need * BAL.arenaWinStoneK)) + '、败灵石 ' +
         fmt(Math.floor(need * BAL.arenaLoseStoneK)) + '（基准）。',
       opts: [
         { k: 'rush',  n: '抢攻', d: '掷骰放宽（×0.80–1.24）· 胜：声望 ×1.5、灵石 ×1.2 · 负：灵石 ×0.4' },
@@ -2786,7 +2804,7 @@ const XX = (function(){
         title: ch.name + ' · 第 ' + f + ' 层' + (f >= SECRET_FLOORS ? ' · 妖王伏诛' : ''),
         sub: '已推进一层 · ' + (f >= SECRET_FLOORS ? '十层尽通' : '守关战力不变'),
         rows: srows,
-        note: '取财/取料的倍率按现行规则，数值未改；背包满的材料已注明入信匣。'
+        note: '取财多得灵石、取料多得材料；背包满的材料已转入信匣。'
       });
     }
     markDayDec('risk');   /* 阶段三收尾：今日四类决策 · 风险推进（秘境开打） */
@@ -3761,7 +3779,7 @@ const XX = (function(){
         rows.push(settleLine('巡山弟子 · 悟道值', '+' + fmt(got.wis), 'good'));
       }
       showSettle({ icon: '⛩️', title: '弟子回山 · 派遣结算', sub: got.n + ' 人回山 · 自动回到可派遣名册',
-        rows, note: '派遣时长与产出沿用现有差事（闭关 4h / 采药 2h / 巡山 6h），未新增数值。' });
+        rows, note: '弟子已回山：闭关 4 小时、采药 2 小时、巡山 6 小时，按实际完成的差事结算。' });
     }
     save(); render();
     return got.n;
@@ -6785,7 +6803,7 @@ function towerBossCompLetter(){
     if(f.insight) p.push('顿悟 +' + f.insight);
     if(f.stone) p.push('灵石 +' + f.stone);
     if(f.boost) p.push('修炼 ×' + (1 + f.boost.mult).toFixed(2) + ' / ' + Math.round(f.boost.sec / 60) + ' 分');
-    return p.join(' · ') || '无所得';
+    return p.join(' · ') || '只留一段见闻';
   }
   function closeEncounter(){
     const modal = document.getElementById('enc-modal');
@@ -7155,6 +7173,8 @@ function towerBossCompLetter(){
     spendFloatCleanup = cleanup;
     setTimeout(cleanup, 900);
   }
+  /* batch6：正向飘字复用同一套浮字（服丹生效 / 喂食经验），只换一个颜色 class */
+  function gainFloat(txt, fromEl){ spendFloat(txt, fromEl, 'gain'); }
   function flashEl(el, cls){
     if(!el) return;
     el.classList.remove(cls || 'flash');
@@ -8030,7 +8050,7 @@ function towerBossCompLetter(){
     const rows = [];
     const reset = '08:00 重置';
     /* 七日签到 */
-    rows.push({ name: '七日签到', icon: '🎁', sub: '第 ' + ((S.sign.days % 7) + 1) + ' 天 · ' + reset,
+    rows.push({ name: '七日签到', icon: '🎁', sub: '第 ' + signDayLabel() + ' 天 · ' + reset,
       done: !signCanClaim(), state: signCanClaim() ? '可签' : '已签',
       claim: signCanClaim() ? 'sign' : '', go: '' });
     /* 日课 3 项 */
@@ -8712,7 +8732,7 @@ function towerBossCompLetter(){
     });
     if(!d.success){
       if(d.settleBack && d.settleBack.length){
-        d.settleBack.forEach(b => rows.push(line('返还 · ' + matName(b.t), '+' + fmt(b.n) + '（按 30% 口径）', 'good')));
+        d.settleBack.forEach(b => rows.push(line('返还 · ' + matName(b.t), '+' + fmt(b.n) + '（按三成返还）', 'good')));
       }else{
         rows.push(line('返还', '无（材料尽化灰烬）', 'bad'));
       }
@@ -8733,7 +8753,7 @@ function towerBossCompLetter(){
     if(title) title.textContent = d.success ? '炼制成功' : '炼制失败';
     if(sub) sub.textContent = '【' + rec.name + '】 · 本次成功率 ' + Math.round(d.rate * 100) + '%';
     if(box) box.innerHTML = rows.join('');
-    if(note) note.textContent = d.success ? '消耗与产出已按实际状态逐项列账。' : '灵石不返还；失败材料已按现行口径返还并逐项列明。';
+    if(note) note.textContent = d.success ? '消耗与产出已按实际状态逐项列账。' : '灵石不返还；失败时已返还的部分材料逐项列明。';
     m.classList.remove('hidden');
   }
   /* 法宝名（灵器族按持有阶查表；wp1..wp4 与 wp5..wp9 同走这一处） */
@@ -8763,7 +8783,7 @@ function towerBossCompLetter(){
   const EATABLE = DAN_LIST.reduce((a, d) => { a[d.id] = 1; return a; }, {});
   /* 服食分派（第 89 节）：四族四种结算写成一张表，加一族只加一个分支而不是五段 if-else。
      老五枚（dan1..dan5）的结算语义与文案格式一字不改，只是把数字挪进了 DAN_FX。 */
-  function eatDan(id){
+  function eatDan(id, fromEl){
     const d = DAN_BY_ID[id];
     if(!d) return false;
     const min = Math.round(BAL.pillDur / 60);
@@ -8774,9 +8794,11 @@ function towerBossCompLetter(){
       S.pillUntil = until; S.pillBonus = d.buff;
       log('💊 服下' + d.name + '，修为 +' + fmt(got) +
         '，突破成功率 +' + danPct(d.buff) + '（' + min + ' 分钟）', d.tier >= 2 ? 'gold' : 'good');
+      gainFloat('+ ' + fmt(got) + ' 修为', fromEl || document.getElementById('sc-exp-num'));
     }else{
       danTake(d.fam, d);
       log('💊 服食「' + d.name + '」，' + danEffectText(d) + '。', d.tier >= 3 ? 'gold' : 'good');
+      gainFloat('已生效 · ' + danEffectText(d), fromEl || document.getElementById('sc-exp-num'));
     }
     if(d.tier >= 2) sfx.win(); else sfx.score();
     markDayDec('grow');   /* 阶段三收尾：今日四类决策 · 成长投资（服食丹药） */
@@ -9026,7 +9048,7 @@ function towerBossCompLetter(){
     showSettle({
       icon: '🌾', title: '收获结算', sub: '一键收获 ' + n + ' 畦 · 直入炼丹房料仓',
       rows: Object.keys(got).map(k => settleLine('产出 · ' + k, '+' + got[k], 'good')),
-      note: '以上为本次实际入仓数；灵田产量与成熟规则未动。'
+      note: '以上为本次实际入仓数；灵田按成熟作物照常收获。'
     });
     if(bldLevel('alchemy') >= 1 && S.herb >= RECIPES.dan1.mats[0].n)
       log('💡 料仓灵草已够开炉，去炼丹房炼【下品破境丹】吧。', 'sys');
@@ -11386,6 +11408,26 @@ function towerBossCompLetter(){
     setTxt('sc-name', S.name || '无名散修');
     setTxt('sc-char-name', S.name || '无名散修');
   }
+  /* batch6：子页常驻六项资源行（灵石/修为/寿元/灵草/矿石/战力），口径与主场景顶栏同源。
+   只读 S 与 combatPower()，不新增字段；子页 DOM 每次重开由 views/kit.js 重建。 */
+  function renderPageRes(){
+    const boxes = document.querySelectorAll('.page-res');
+    if(!boxes.length) return;
+    const need = needOf(S.rank);
+    const full = S.exp >= need && secludeLeftMs() <= 0;
+    const expTxt = full ? Math.round(S.exp / need * 100) + '%' : fmt(S.exp);
+    const lifeTxt = isZuo() ? '坐化' : !lifeOn() ? '未开'
+      : (!isFinite(lifeMax()) ? '无量' : lifeAge() + '/' + lifeMax());
+    boxes.forEach(box => {
+      const put = (k, v) => { const e = box.querySelector('[data-pr="' + k + '"]'); if(e) e.textContent = v; };
+      put('stone', fmt(S.stone));
+      put('exp', expTxt);
+      put('life', lifeTxt);
+      put('herb', fmt(S.herb));
+      put('ore', fmt(S.ore));
+      put('power', fmt(combatPower()));
+    });
+  }
   /* 场景顶部资源栏 + 中央角色铭牌 + 顶部修为条/突破按钮（一念逍遥式） */
   function renderScene(){
     setTxt('sc-rank', RANK_NAMES[S.rank]);
@@ -11749,8 +11791,15 @@ function towerBossCompLetter(){
     if(st.last) bits.push('下品破境丹 ×1');
     if(mailN > 0) bits.push(mailN + ' 件暂存信匣');
     log('📜 入门第' + TRAIL_CN.charAt(i) + '事 · ' + st.name + '：' + bits.join('，') + '。', 'gold');
+    /* batch6：任务卡完成/收起必须有可见结算，不许无声消失 */
+    try{ gainChip('📜 入门第' + TRAIL_CN.charAt(i) + '事完成 · ' + st.name, 'gold'); }catch(e){}
     if(st.last){
       log('🧭 入门八事已了。往后：山门每日有事可议，塔每日可扫，论剑、猎场、秘境也都开着。', 'sys');
+      try{
+        showSettle({ icon: '📜', title: '入门八事 · 完成', sub: '任务卡到此收起',
+          rows: [settleLine('已入账', bits.join('、'), 'good')],
+          note: '八事奖励逐项入账；纸签收起后，往后每日可做的事在「今日」清单里。' });
+      }catch(e){}
       sfx.win();
     }else{
       sfx.pop();
@@ -12102,6 +12151,7 @@ function towerBossCompLetter(){
     setTxt('xx-treasure', '🗺️ 探索秘境 · 灵石 ' + fmt(treasureCost()));
     renderAvatar();
     renderScene();
+    renderPageRes();   /* batch6：子页常驻六项资源行 */
     setTxt('xx-rank', RANK_NAMES[S.rank]);
     const rb = document.getElementById('xx-root');
     if(rb){ rb.textContent = rootOf().name; rb.dataset.tone = rootOf().name; }
@@ -12517,7 +12567,7 @@ function towerBossCompLetter(){
     if(document.getElementById('xx-hub-ev-daily')){
       const tasks = (typeof Daily !== 'undefined') ? Daily.list() : [];
       seal('xx-hub-ev-daily', tasks.filter(t => t.done && !t.claimed).length + ' 可领');
-      seal('xx-hub-ev-sign', '第' + ((S.sign.days % 7) + 1) + '天');
+      seal('xx-hub-ev-sign', '第' + signDayLabel() + '天');
       seal('xx-hub-ev-union', (S.union.merit | 0) + ' 功');
       seal('xx-hub-ev-rew', (S.union.claimed || []).length + '/' + UNION_REWARD.length);
     }
@@ -13229,6 +13279,7 @@ function towerBossCompLetter(){
     const b = BEASTS.find(x => x.id === p.bid);
     markDayDec('grow');   /* 阶段三收尾：今日四类决策 · 成长投资（喂食灵兽） */
     log('🍖 喂食灵兽【' + (b ? b.name : p.bid) + '】（灵草 −' + herbCost + '、灵石 −' + fmt(stoneCost) + '），' + (ups > 0 ? '灵兽升到 ' + p.lv + ' 级！' : '经验 +' + BAL.petExpPerFeed + '。'), ups > 0 ? 'gold' : 'good');
+    gainFloat('+ ' + BAL.petExpPerFeed + ' 经验' + (ups > 0 ? ' · Lv.' + p.lv : ''), document.getElementById('xx-pet-cond'));
     sfx.pop(); save(); render(); renderPets();
   }
   function releasePet(idx){
@@ -14019,7 +14070,7 @@ function towerBossCompLetter(){
       const srows = [settleLine('灵石', '+' + fmt(stone), 'good')];
       if(got > 0) srows.push(settleLine('兽骨', '+' + got, 'good'));
       showSettle({ icon: '🏯', title: '塔层扫荡结算', sub: '已扫荡 ' + can + ' 层 · 按 ' + Math.round(BAL.towerSweepRatio * 100) + '% 收益',
-        rows: srows, note: '扫荡比例与掉落口径未改；每 3 层给 1 个材料的规则照旧。' });
+        rows: srows, note: '按已通关层的扫荡比例结算；每 3 层另得 1 份材料。' });
     }
     sfx.pop();
     save(); render(); renderTower(); renderBag();
@@ -14176,7 +14227,7 @@ function towerBossCompLetter(){
       title: isBoss ? ('妖王伏诛 · 第 ' + floor + ' 层') : ('第 ' + floor + ' 层通关'),
       sub: first ? '首通 · 掉落逐项列账' : '再战 · 掉落逐项列账',
       rows: srows,
-      note: '掉落数值按定版甲案，本层账目未改；背包满的部分已注明入信匣。'
+      note: '本层掉落逐项列明；背包满的部分已转入信匣。'
     });
     if(eq) appendEquipAction(eq);
     save(); render(); renderTower(); renderBag();

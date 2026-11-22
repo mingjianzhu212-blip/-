@@ -15,7 +15,7 @@ VIEWS.codex = {
           <span id="codex-fams"></span>
         </div>
         <div class="codex-grid" id="xx-codex"></div>
-        <p class="hint">已得的法宝点亮并按当前阶位显示效果；未得的显示灰影与炼器出处。只展示现有图谱，不新增掉落。</p>
+        <p class="hint">已得的法宝点亮并按当前阶位显示效果；未得的显示灰影与炼器出处。出处以现有炼器与掉落为准。</p>
       </section>
     </div>
   </section>`

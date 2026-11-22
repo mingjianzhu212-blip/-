@@ -48,7 +48,21 @@ ${cfg.secs.map(cellHtml).join('\n')}
   </section>`;
   }
 
-  /* 子页：← 回 hub（栈弹一层）、面包屑也回 hub、标题带题签图，简版账条（strip）可选。
+  /* batch6：子页常驻六项资源行（与主场景顶栏同口径）。只有一行，不再叠加面板自带 strip，
+     避免双层账条把可视区顶掉一截。 */
+  function resHtml(){
+    return `    <div class="page-res" aria-label="资源">
+      <span><i>灵石</i><b data-pr="stone">0</b></span>
+      <span><i>修为</i><b data-pr="exp">0</b></span>
+      <span><i>寿元</i><b data-pr="life">—</b></span>
+      <span><i>灵草</i><b data-pr="herb">0</b></span>
+      <span><i>矿石</i><b data-pr="ore">0</b></span>
+      <span><i>战力</i><b data-pr="power">0</b></span>
+    </div>
+`;
+  }
+
+  /* 子页：← 回 hub（栈弹一层）、面包屑也回 hub、标题带题签图，六项资源行常驻。
      s.tag = 页眉右侧那个由 game.js 现填的数字位（如人物的「战力 1500」），空着等 render。 */
   function subHtml(cfg, s){
     return `  <section class="panel-page ink-page hub-sub" id="page-${cfg.panel}" data-panel="${cfg.panel}" data-sec="${s.key}">
@@ -57,7 +71,7 @@ ${cfg.secs.map(cellHtml).join('\n')}
       <h2><img class="tag-ic" src="ui/icons/${s.ico}" alt="">${s.name}</h2>
 ${s.tag ? `      <span class="panel-sub" id="${s.tag}"></span>\n` : ''}      <button class="crumb" data-go-hub>${cfg.crumb || cfg.title}</button>
     </header>
-${cfg.strip ? `    <div class="res-bar">${cfg.strip}</div>\n` : ''}    <div class="panel-body">
+${resHtml()}    <div class="panel-body">
 ${s.body}
     </div>
   </section>`;

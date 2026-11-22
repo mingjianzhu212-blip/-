@@ -31,8 +31,30 @@
   /* 修复单 P1：给游戏侧购买/升级失败用同一个可见提示 */
   try{ window.toast = toast; }catch(e){}
 
+  /* batch6：所有子页（不止 HUBKIT 生成的那些）都补一条六项资源行。
+     kit 生成的页已自带 .page-res；这里只补 codex/today/bag/beast/tower 等旧模板，
+     挂在页眉之后，且整页只挂一条——不复制主场景两层顶栏的高度。 */
+  function ensurePageRes(){
+    const h = host(); if(!h) return;
+    const page = h.querySelector('.panel-page') || h;
+    if(!page || page.querySelector('.page-res')) return;
+    const head = page.querySelector('.panel-head');
+    if(!head) return;
+    const d = document.createElement('div');
+    d.className = 'page-res';
+    d.setAttribute('aria-label', '资源');
+    d.innerHTML = '<span><i>灵石</i><b data-pr="stone">0</b></span>' +
+      '<span><i>修为</i><b data-pr="exp">0</b></span>' +
+      '<span><i>寿元</i><b data-pr="life">—</b></span>' +
+      '<span><i>灵草</i><b data-pr="herb">0</b></span>' +
+      '<span><i>矿石</i><b data-pr="ore">0</b></span>' +
+      '<span><i>战力</i><b data-pr="power">0</b></span>';
+    head.insertAdjacentElement('afterend', d);
+  }
+
   /* 绑定当前 view 内的按钮：下一秒重新 open 时 DOM 整体替换，旧监听随元素回收 */
   function bindPanel(){
+    ensurePageRes();
     const h = host(); if(!h) return;
     h.querySelectorAll('.panel-back').forEach(b => b.addEventListener('click', back));
     const fb = h.querySelector('#xx-field-buy'); if(fb) fb.addEventListener('click', () => XX._buyField(fb));
@@ -331,13 +353,24 @@
     if(tm) tm.addEventListener('click', ev => { if(ev.target === tm) tm.classList.add('hidden'); });
     const bm = document.getElementById('break-modal');
     const bc = document.getElementById('b-close');
-    if(bc && bm) bc.addEventListener('click', () => bm.classList.add('hidden'));
-    if(bm) bm.addEventListener('click', ev => { if(ev.target === bm) bm.classList.add('hidden'); });
-    /* A1 炼制结算（炼器/炼丹）：只手动关闭，不自动消失 */
+    const closeBreakResult = () => {
+      bm.classList.add('hidden');
+      try{ if(window.XX && XX._unlockTick) XX._unlockTick(); }catch(e){}
+    };
+    if(bc && bm) bc.addEventListener('click', closeBreakResult);
+    if(bm) bm.addEventListener('click', ev => { if(ev.target === bm) closeBreakResult(); });
+    /* A1 炼制结算（炼器/炼丹）：只手动关闭，不自动消失。
+       batch6：关闭后立刻查功能解锁队列——解锁插屏必须当下逐张排，不能等切页的 render。
+       历史根因：queueUnlocks 只在破境时入队，unlockTick 只在 render() 调；破境结算占着弹窗时
+       unlockTick 早退，而结算关闭不会再触发 render，于是要等下次切页才弹。 */
     const csm = document.getElementById('craft-settle');
     const csc = document.getElementById('cs-close');
-    if(csc && csm) csc.addEventListener('click', () => csm.classList.add('hidden'));
-    if(csm) csm.addEventListener('click', ev => { if(ev.target === csm) csm.classList.add('hidden'); });
+    const closeSettle = () => {
+      csm.classList.add('hidden');
+      try{ if(window.XX && XX._unlockTick) XX._unlockTick(); }catch(e){}
+    };
+    if(csc && csm) csc.addEventListener('click', closeSettle);
+    if(csm) csm.addEventListener('click', ev => { if(ev.target === csm) closeSettle(); });
     /* 阶段三 S2：突破确认页 */
     const bcm = document.getElementById('break-confirm-modal');
     const bcok = document.getElementById('bc-ok');

@@ -59,7 +59,7 @@ const STRIP = '<style>#char-modal{display:none!important}</style>' +
   '<script>setTimeout(()=>{' +
   'try{Guide.skip();XX._s.name="青玄子";XX._s.sex="m";XX._render();ROUTER.open("dong","xx-dongtian-sec");}catch(e){}' +
   'setTimeout(()=>{const d=document.createElement("pre");d.id="st";try{' +
-  'const g=document.querySelector("#page-dong.hub-sub .res-bar .res-grid");' +
+  'const g=document.querySelector("#page-dong.hub-sub .page-res");' +
   'const gr=g.getBoundingClientRect(),cr=g.children[0].getBoundingClientRect();' +
   'const cols=Math.round((gr.width+7)/(cr.width+7));' +
   'const tops=Array.from(new Set(Array.prototype.map.call(g.children,c=>Math.round(c.getBoundingClientRect().top))));' +

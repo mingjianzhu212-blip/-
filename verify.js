@@ -1927,6 +1927,9 @@ const DIAG = `
     // ② 新档起盘：14 拍（2026-11-20 呆呆审结论；台词拍点击推进 / 动作拍读状态）
     gkill(); delete XX._s.guide;
     XX._s.rank = 0; XX._s.exp = 0; XX._s.stone = 10; XX._s.stats.sit = 0; XX._s.plots = []; XX._s.bag = [];
+    /* batch6：引导层级降到所有弹窗之下，弹窗在场时主动让位。
+       本段是隔离的业务测试，先清掉前序用例可能留下的弹窗，再验气泡本身。 */
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
     window.Guide.init();
     const gclick = () => { const b = gbub(); if (b) b.click(); };
     const gto = async (n) => { for (let i = 0; i < 60 && gstep() !== n; i++) { gclick(); await sleep(120); } return gstep() === n; };
@@ -3394,6 +3397,8 @@ const DIAG = `
       let bubNow = 'nodom', yieldNow = null, legacyNow = '00';
       try{
         S.rank = 0; S.stats.sit = 0; S.plots = [];
+        /* batch6：八事完成会弹结算；引导现在必须给弹窗让位。本段只测纸签让位，先清场。 */
+        document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
         S.guide = { step: 0, done: false, skipped: false, started: false, flags: {}, rewardClaims: {}, toldSystems: {} };
         if(window.Guide) Guide.reset();
         bubNow = (function(){ const b = document.getElementById('taixu-bubble');

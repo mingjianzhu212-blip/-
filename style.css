@@ -1421,6 +1421,18 @@
   .panel-head h2{ margin:0; font-size:15px; font-family:'Ma Shan Zheng','ZCOOL XiaoWei',serif; color:#5a4a2e; letter-spacing:2px; }
   .panel-head .panel-sub{ margin-left:auto; font-size:10.5px; color:var(--muted); }
   .panel-head .panel-sub.over{ color:var(--red); }
+  /* batch6：子页常驻六项资源行——一行紧凑账条，贴在页眉下，不复制主场景两层顶栏的高度 */
+  .page-res{
+    position:sticky; top:54px; z-index:2; display:grid; grid-template-columns:repeat(6,1fr);
+    gap:4px; padding:4px 10px 5px; background:rgba(247,243,233,.96);
+    border-bottom:1px solid rgba(90,74,46,.12); backdrop-filter:blur(10px);
+  }
+  .page-res span{ display:flex; flex-direction:column; align-items:center; gap:0; min-width:0; }
+  .page-res i{ font-style:normal; font-size:9.5px; color:var(--muted); letter-spacing:0; }
+  .page-res b{
+    font-size:11.5px; color:#5a4a2e; font-weight:600; max-width:100%;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums;
+  }
   .panel-body{ max-width:940px; margin:0 auto; padding:12px 14px 40px; }
   /* 旧「洞府产业长页吸顶锚点条」.cave-nav 已随第 87 轮 hub 拆页作废：
      现在入口是 hub 页的一格一功能，网格样式在末段墨皮块里（.hub-nav）。 */
@@ -2753,6 +2765,8 @@
     animation:spendRise .86s ease forwards; }
   /* over 变体：珍宝揭晓弹窗铺满全屏（z50），浮字要浮到弹窗之上才看得见 */
   .spend-float.over{ z-index:56; }
+  /* 正向飘字（服丹生效 / 喂食经验）：与花费同一套动画，只换墨色 */
+  .spend-float.gain{ color:#3d6b58; }
   @keyframes spendRise{
     0%{ opacity:0; transform:translate(-50%,8px); }
     16%{ opacity:1; transform:translate(-50%,-2px); }
@@ -6105,3 +6119,35 @@ html,body{ background:var(--jx-paper); }
 .codex-open{ display:inline-block; margin:2px 0 8px; }
 @media (max-width:430px){ .codex-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
 #craft-settle .settle-act{ margin-top:10px; }
+
+/* ============ batch6：矮窗口可达性（CSS 级） ============
+   目标：弹窗按钮不被裁、圆钮不互相压、底部导航不遮内容按钮。
+   做法：弹窗改成「从顶部排 + 自身可滚 + 卡片限高」，矮屏两侧圆钮压缩并允许独立滚动；
+   底部导航压一档高度，面板底部留出安全区。 */
+@media (max-height: 640px){
+  .modal{ padding:6px; align-items:flex-start; overflow-y:auto; }
+  .modal > .m-card{ max-height:calc(100vh - 12px); overflow-y:auto; }
+  .modal > .battle-stage{ max-height:calc(100vh - 12px); overflow-y:auto; }
+  .modal .m-btns{ position:sticky; bottom:0; padding-top:6px; background:var(--card-solid); }
+  .act-rail, .sys-rail{
+    top:62px; gap:5px; max-height:calc(100vh - 132px); overflow-y:auto; padding:2px;
+    scrollbar-width:none;
+  }
+  .act-rail::-webkit-scrollbar, .sys-rail::-webkit-scrollbar{ display:none; }
+  .sys-btn{ width:36px; height:36px; }
+  .sys-btn .sys-ic{ width:19px; height:19px; }
+  .sys-btn svg{ width:18px; height:18px; }
+  .scene-tabs{ padding-bottom:max(env(safe-area-inset-bottom, 0px), 2px); }
+  .scene-tab{ min-height:46px; padding:4px 0 6px; }
+  .panel-head{ padding:6px 10px; }
+  .page-res{ top:48px; padding:3px 8px 4px; }
+  .panel-page, .app > .scene-tabs + .panel-page{ padding-bottom:56px; }
+}
+@media (max-height: 520px){
+  .act-rail, .sys-rail{ top:54px; max-height:calc(100vh - 112px); gap:4px; }
+  .sys-btn{ width:32px; height:32px; }
+  .scene-tab{ min-height:42px; }
+  .scene-tab .tab-ic{ width:20px; height:20px; }
+  .scene-tab small{ font-size:9px; letter-spacing:0; }
+  .panel-body{ padding-top:8px; }
+}
