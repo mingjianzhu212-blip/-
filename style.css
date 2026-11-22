@@ -5913,3 +5913,30 @@ html,body{ background:var(--jx-paper); }
 /* P0.5：灵田生长期提示（倒计时 + 可先去做） */
 .farm-wait{ margin:6px 0 0; font-size:11.5px; line-height:1.6; color:#7a5a20; }
 .farm-wait:empty{ display:none; }
+
+/* P1：可破境时突破按钮上的「下次 +X%」徽记（入口本身常驻，不另起浮层） */
+#page-scene .tb-break{ position:relative; }
+#page-scene .tb-break-badge{
+  position:absolute; right:-6px; top:-3px; padding:0 4px; border-radius:6px;
+  font-style:normal; font-size:8.5px; line-height:1.5; color:#f3efe6; background:#a5302a;
+  border:1px solid #8f2a24; white-space:nowrap;
+}
+#page-scene .tb-break-badge.hidden{ display:none; }
+
+/* P1：世界通告条（独立于聊天；一次一条，限流） */
+#page-scene .world-ann{
+  position:absolute; left:50%; top:74px; transform:translateX(-50%); z-index:8;
+  display:flex; align-items:center; gap:6px; max-width:calc(100vw - 28px);
+  padding:4px 10px; border-radius:999px; font-size:11px; color:#5a4a2e;
+  background:rgba(252,250,245,.94); border:1px solid rgba(181,137,46,.45);
+  box-shadow:0 4px 12px rgba(60,50,30,.12); pointer-events:none;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+#page-scene .world-ann.hidden{ display:none; }
+#page-scene .world-ann .wa-seal{
+  flex:0 0 auto; width:16px; height:16px; border-radius:50%; display:grid; place-items:center;
+  font-size:9px; color:#f3efe6; background:#a5302a;
+}
+#page-scene .world-ann.show{ animation:waIn .3s ease-out; }
+@keyframes waIn{ from{ opacity:0; transform:translate(-50%,-6px); } to{ opacity:1; transform:translate(-50%,0); } }
+@media (max-width:430px){ #page-scene .world-ann{ top:70px; font-size:10px; } }

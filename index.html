@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1210">
 <title>九霄问道 · 放置挂机</title>
-<link rel="stylesheet" href="style.css?v=20261122b4b">
+<link rel="stylesheet" href="style.css?v=20261122b4c">
 <script src="js/img_fallback.js"></script>  <!-- A6：全站图片失败/超时文字兜底（NPC 立绘走 npc_art） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,7 +32,7 @@
             <span id="sc-rank">炼气一层</span>
             <div class="tb-exp"><i id="sc-expbar"></i></div>
           </div>
-          <button class="tb-break" id="sc-break" disabled>修为不足</button>
+          <button class="tb-break" id="sc-break" disabled>修为不足<i class="tb-break-badge hidden" id="sc-break-badge"></i></button>
         </div>
       </div>
       <div class="tb-res" role="group" aria-label="资源">
@@ -126,16 +126,16 @@
            尺寸按功能主次分大/小两档（主玩法三座用 .btn-large）。刻意不对齐、不成环、不留中央空地
            本体是 ui/icons/bld_*.png 水墨立绘，class 只留 bk-<座名> 一处给 CSS 认（第 88 轮） -->
       <div class="town-blds">
-        <button class="bld art bk-market btn-large" data-bld="market" style="left:44%;top:62%;--rot:2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title"><i>坊</i><i>市</i></b></span></button>
-        <button class="bld art bk-tianji btn-small" data-bld="market" data-scroll="xx-tianji" style="left:86%;top:68%"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">天机阁</b></span></button>
-        <button class="bld art bk-pagoda btn-large" data-bld="tower" style="left:24%;top:27%;--rot:-3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">镇妖塔</b></span></button>
-        <button class="bld art bk-arena btn-small" data-bld="arena" style="left:12%;top:53%;--rot:4deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">论剑台</b></span></button>
+        <button class="bld art bk-market btn-large" data-bld="market" title="坊市 · 买炼丹/炼器材料，也可寄售背包成品" style="left:44%;top:62%;--rot:2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title"><i>坊</i><i>市</i></b></span></button>
+        <button class="bld art bk-tianji btn-small" data-bld="market" data-scroll="xx-tianji" title="天机阁 · 悟道值/灵石换破境保底道具" style="left:86%;top:68%"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">天机阁</b></span></button>
+        <button class="bld art bk-pagoda btn-large" data-bld="tower" title="镇妖塔 · 掉装备与炼器材料" style="left:24%;top:27%;--rot:-3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">镇妖塔</b></span></button>
+        <button class="bld art bk-arena btn-small" data-bld="arena" title="论剑台 · 声望换丹药/材料，丹药在背包服食" style="left:12%;top:53%;--rot:4deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">论剑台</b></span></button>
         <button class="bld art bk-rank btn-small" data-bld="rank" style="left:26%;top:84%;--rot:-2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">天骄榜</b><i class="bld-sub">群雄排名</i></span></button>
-        <button class="bld art bk-secret btn-small" data-bld="secret" style="left:77%;top:44%;--rot:3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title"><i>上</i><i>古</i><i>秘</i><i>境</i></b></span></button>
-        <button class="bld art bk-zong btn-small" data-bld="zong" style="left:60%;top:79%;--rot:-4deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">宗门</b><i class="bld-sub">互助探索</i></span></button>
-        <button class="bld art bk-xiu btn-large" data-bld="xiu" style="left:68%;top:20%;--rot:2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">藏经阁</b><i class="bld-sub">功法突破</i></span></button>
+        <button class="bld art bk-secret btn-small" data-bld="secret" title="上古秘境 · 产炼丹/炼器材料与 Boss 料" style="left:77%;top:44%;--rot:3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title"><i>上</i><i>古</i><i>秘</i><i>境</i></b></span></button>
+        <button class="bld art bk-zong btn-small" data-bld="zong" title="宗门 · 弟子差事产修为/灵草/矿石/悟道" style="left:60%;top:79%;--rot:-4deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">宗门</b><i class="bld-sub">互助探索</i></span></button>
+        <button class="bld art bk-xiu btn-large" data-bld="xiu" title="藏经阁 · 功法/修为/任务，破境在此" style="left:68%;top:20%;--rot:2deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">藏经阁</b><i class="bld-sub">功法突破</i></span></button>
         <button class="bld art bk-fu btn-small" data-bld="xiu" data-scroll="xx-quest" style="left:8%;top:72%;--rot:5deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">福缘</b><i class="bld-sub">日常任务</i></span></button>
-        <button class="bld art bk-vault btn-small" data-bld="event" style="left:40%;top:38%;--rot:-3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">宝藏阁</b><i class="bld-sub">签到领奖</i></span></button>
+        <button class="bld art bk-vault btn-small" data-bld="event" title="宝藏阁 · 签到/活动奖励，丹药入背包" style="left:40%;top:38%;--rot:-3deg"><span class="art-shape"></span><span class="art-txt"><b class="bld-title">宝藏阁</b><i class="bld-sub">签到领奖</i></span></button>
       </div>
     </div>
 
@@ -165,7 +165,10 @@
     <button class="today-btn" id="sc-today" type="button" aria-label="今日清单">
       <b>今</b><small>今日</small><i class="e-dot" id="sc-today-dot"></i>
     </button>
+    <!-- 世界通告（P1）：独立滚动条，与传音聊天分开 -->
+    <div class="world-ann hidden" id="world-ann" aria-live="polite"><span class="wa-seal">世</span><span id="world-ann-text"></span></div>
 
+    
     <!-- 右侧系统按钮：人物/背包已收进底部五签，这里只留功法/设置两枚 -->
     <aside class="sys-rail">
       <button class="sys-btn" data-bld="xiu">
@@ -594,7 +597,7 @@
 <script src="js/multi-ledger.js"></script> <!-- 联机结算幂等账（123 轮）：必须先于 game.js；纯逻辑，不碰 DOM/存储 -->
 <script src="js/multi-local.js"></script>  <!-- 阶段四 C3（D4 A2-LOCAL）：本地陪练五层引擎；必须先于 game.js；纯逻辑，常量逐项抄自 server/server.mjs，server/ 零改动 -->
 <script src="js/npc_art.js"></script>           <!-- NPC 立绘公共缓存（B3）：预加载 / 3 秒超时重试 / 本地兜底 / 四呈现位共用；缺失时各视图退回「碑」字块 -->
-<script src="js/game.js?v=20261122b4b"></script>
+<script src="js/game.js?v=20261122b4c"></script>
 <script src="js/trib.js"></script>
 <script src="js/npc_memory.js"></script>       <!-- NPC 记忆存储（独立键 jxwd_npc_memory_v1，不碰主存档；缺失时对话静默回退） -->
 <script src="js/npc_memory_voice.js"></script> <!-- NPC 称呼语气（按记忆分档；缺失/异常时静默回退） -->
@@ -626,7 +629,7 @@
      须置于 router.js 之前：router.js 末尾同步触发 boot() → finishBoot() 内的 Guide.init()。
      guide_taixu.js 为自包含 IIFE，加载时不依赖 DOM，前移安全。 -->
 <script src="js/guide_taixu.js?v=20261122b4b"></script>
-<script src="js/router.js?v=20261122b4b"></script>
+<script src="js/router.js?v=20261122b4c"></script>
 
 </body>
 </html>

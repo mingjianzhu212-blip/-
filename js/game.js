@@ -3568,6 +3568,18 @@ const XX = (function(){
       const pool = GATE_VOICE_HOME[v.key][v.hb];
       log('💬 ' + v.name + '：「' + pool[gateHash(String(v.id)) % pool.length] + '」', '');
     });
+    /* P1：派遣完成软结算（沿用现有差事时长与产出，不新增数值） */
+    {
+      const rows = [];
+      if(got.kinds.seclude) rows.push(settleLine('闭关弟子 · 修为', '+' + fmt(got.exp), 'good'));
+      if(got.kinds.herb) rows.push(settleLine('采药弟子 · 灵草', '+' + fmt(got.herb) + (got.herb100 ? '、百年灵草 +' + got.herb100 : ''), 'good'));
+      if(got.kinds.patrol){
+        rows.push(settleLine('巡山弟子 · 矿石', '+' + fmt(got.ore), 'good'));
+        rows.push(settleLine('巡山弟子 · 悟道值', '+' + fmt(got.wis), 'good'));
+      }
+      showSettle({ icon: '⛩️', title: '弟子回山 · 派遣结算', sub: got.n + ' 人回山 · 自动回到可派遣名册',
+        rows, note: '派遣时长与产出沿用现有差事（闭关 4h / 采药 2h / 巡山 6h），未新增数值。' });
+    }
     save(); render();
     return got.n;
   }
@@ -3617,7 +3629,8 @@ const XX = (function(){
     const empt = Math.max(0, gateCap() - list.length);
     for(let i = 0; i < Math.min(empt, 8); i++) h += '<div class="dcard empty"><span>空位</span></div>';
     h += '</div><p class="gate-note">点资质可点化（' + fmt(gateAptCost()) + ' 灵石一档）' +
-      ' · 满 ' + BAL.gateGradSvc + ' 趟差事可送弟子出师，空出的位子再收新的</p>' +
+      ' · 满 ' + BAL.gateGradSvc + ' 趟差事可送弟子出师，空出的位子再收新的' +
+      ' · 差事到点自动回山并回到可派遣名册，离线也照算</p>' +
       '<p class="hint">闭关补的是境界的账；能不能立刻破境，另看境界壁垒——这两件事如今不是一回事。</p><div class="gate-foot">' +
       '<button type="button" class="gate-btn" data-gact="recruit"' + (list.length >= gateCap() ? ' disabled' : '') + '>收徒' +
       '<small>' + fmt(gateRecruitCost()) + ' 灵石</small></button>' +
@@ -5804,6 +5817,11 @@ function towerBossCompLetter(){
       const lifeBefore = lifeMax();
       S.exp -= need;
       S.rank += 1;
+      /* P1：跨大境界的世界通告（与聊天分开，限流在 announce 内） */
+      try{
+        if(breakTierOf(S.rank).from !== breakTierOf(rankBefore).from)
+          announce('破境', (S.name || '一位道友') + ' 破入【' + RANK_NAMES[S.rank] + '】');
+      }catch(e){}
       /* 路 3：跨大境界成功即落闸（失败不触发、不延长）；CD 从成功这一刻的墙钟起算。 */
       const gateMsNow = gateCdMs(rankBefore);
       if(gateMsNow > 0) S.secludeUntil = Date.now() + gateMsNow;
@@ -7741,7 +7759,7 @@ function towerBossCompLetter(){
     if(eb) eb.style.width = Math.max(0, Math.min(100, S.exp / need * 100)).toFixed(1) + '%';
     const et = document.getElementById('cs-exptxt');
     if(et) et.textContent = (S.exp >= need && secludeLeftMs() <= 0)
-      ? '可突破 · 溢出 ' + fmt(S.exp - need)
+      ? Math.round(S.exp / need * 100) + '% · 溢出 ' + fmt(S.exp - need)
       : fmt(S.exp) + ' / ' + fmt(need);
     const lb = document.getElementById('cs-lifebar');
     const lt = document.getElementById('cs-lifetxt');
@@ -8115,6 +8133,11 @@ function towerBossCompLetter(){
         if(bld === 'alchemy') S.stats.craftPill = (S.stats.craftPill || 0) + 1;   /* 炼丹次数（任务进度） */
         log('🧪 炼制成功！获得【' + rec.name + '】（成功率 ' + Math.round(rate * 100) + '%）。', 'gold');
         settleProduct = rec.name + ' ×1（已入背包）';
+      }
+      /* P1：高阶大成上世界通告（三阶及以上；沿用现有 tier，不另设阈值） */
+      if((rec.tier | 0) >= 3){
+        announce(rec.bld === 'alchemy' ? '炼丹大成' : '炼器大成',
+          (S.name || '一位道友') + ' 炼成【' + rec.name + '】');
       }
       sfx.win();
     }else{
@@ -10882,7 +10905,8 @@ function towerBossCompLetter(){
     const en = document.getElementById('sc-exp-num');
     if(en){
       const full = S.exp >= need && secludeLeftMs() <= 0;
-      en.textContent = full ? '溢出 ' + fmt(S.exp - need) : fmt(S.exp);
+      const pct = need > 0 ? Math.round(S.exp / need * 100) : 0;
+      en.textContent = full ? pct + '%' : fmt(S.exp);
       en.classList.toggle('warn', full);
       en.title = expReadout(S.exp, need).title;
     }
@@ -10896,6 +10920,28 @@ function towerBossCompLetter(){
       b.onclick = nb.action === 'reincarnate' ? reincarnate : (nb.action === 'doBreak' ? doBreak : null);
     }
     renderLifeChip();
+    renderBreakReady();
+  }
+  /* P1：可破境时给顶栏突破按钮挂「下次 +X%」小徽记（入口本身常驻，不另起浮层） */
+  function renderBreakReady(){
+    /* 突破按钮每拍 set textContent 会把徽记子节点冲掉：这里缺了就补回来 */
+    const b0 = document.getElementById('sc-break');
+    let el = document.getElementById('sc-break-badge');
+    if(!el && b0){
+      el = document.createElement('i');
+      el.id = 'sc-break-badge';
+      el.className = 'tb-break-badge hidden';
+      b0.appendChild(el);
+    }
+    if(!el) return;
+    const need = needOf(S.rank);
+    const cdLeft = gateCdMs(S.rank) > 0 ? secludeLeftMs() : 0;
+    const ready = S.rank < TOP && S.exp >= need && cdLeft <= 0;
+    const fb = Math.min(WISDOM.failCap, S.failBonus || 0);
+    el.classList.toggle('hidden', !(ready && fb > 0));
+    if(ready && fb > 0) el.textContent = '下次 +' + (Math.round(fb * 1000) / 10) + '%';
+    const b = document.getElementById('sc-break');
+    if(b) b.title = expReadout(S.exp, need).title + (fb > 0 ? ' · 下次成功率 +' + (Math.round(fb * 1000) / 10) + '%' : '');
   }
   /* 顶栏寿元 chip（第 96 轮）：一眼看到"还剩几年"，告急转朱砂，坐化变成一颗按钮。
      四种态写死在这里，UI 不许自己判——不然 chip 和寿元页迟早说出两个不同的数。 */
@@ -11589,11 +11635,12 @@ function towerBossCompLetter(){
       setTxt('xx-exptxt', '闭关中 · 余 ' + fmtCd(secludeLeftMs()));
       setTxt('xx-expgap', gateLockNote() + '。可做：' + gateGoals().join('、') + '。');
     }else{
+      const expPct = need > 0 ? Math.round(S.exp / need * 100) : 0;
       setTxt('xx-exptxt', expFull
-        ? '可突破 · 溢出 ' + fmt(S.exp - need)
+        ? expPct + '% · 溢出 ' + fmt(S.exp - need)
         : fmt(S.exp) + ' / ' + fmt(need));
       setTxt('xx-expgap', expFull
-        ? '修为已满，可突破（溢出 ' + fmt(S.exp - need) + '）'
+        ? '修为已满（真实进度 ' + expPct + '%）· 溢出 ' + fmt(S.exp - need)
         : '距下一境还差 ' + fmt(Math.max(0, need - S.exp)) + '（本行是当前存量，不是今日所得）');
     }
     const bar = document.getElementById('xx-expbar');
@@ -13070,6 +13117,36 @@ function towerBossCompLetter(){
   /* 战斗结算浮字（2026-10-25）：同一件事——"打赢了"——不管在哪打，都该有同一种反馈。
      第 93 轮起镇妖塔/论剑/秘境三处都上整场演出 + 战利品行（见 openBattleAnim 的 opts）；
      chip 仍然留着——扫荡这类一次结十层的高频操作只飘字，verify 也靠它做即时反馈断言。 */
+  /* P1：世界通告——独立条，与传音聊天分开；一次一条，6 秒限流，队列最多 5 条 */
+  const annQueue = [];
+  let annBusy = false, annLastAt = 0, annTimer = 0;
+  function announce(kind, text){
+    if(!kind || !text) return;
+    if(annQueue.length >= 5) annQueue.shift();
+    annQueue.push({ kind, text });
+    annTick();
+  }
+  function annTick(){
+    const el = document.getElementById('world-ann');
+    const tx = document.getElementById('world-ann-text');
+    if(!el || !tx) return;
+    if(annBusy || !annQueue.length) return;
+    const now = Date.now();
+    if(now - annLastAt < 6000){
+      if(annTimer) clearTimeout(annTimer);
+      annTimer = setTimeout(annTick, 6000 - (now - annLastAt));
+      return;
+    }
+    const a = annQueue.shift();
+    annBusy = true; annLastAt = now;
+    tx.textContent = '【' + a.kind + '】' + a.text;
+    el.classList.remove('hidden');
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    annTimer = setTimeout(() => {
+      el.classList.add('hidden'); el.classList.remove('show');
+      annBusy = false; annTick();
+    }, 4200);
+  }
   function gainChip(txt, cls){
     const host = document.getElementById('loot-toast');
     if(!host) return;
@@ -13461,6 +13538,7 @@ function towerBossCompLetter(){
         log('👑 第 ' + floor + ' 层 Boss 专属 · ' + bd.name + ' ×' + bd.n +
           (bd.mailed ? '（其中 ' + bd.mailed + ' 枚暂存信匣）' : '') + '。', 'gold');
         srows.push(settleLine('Boss 专属 · ' + bd.name, '+' + bd.n + (bd.mailed ? '（部分入信匣）' : ''), 'good'));
+        announce('稀有掉落', bd.name + ' ×' + bd.n);
       }
     }
     if(window.playLevelUpSound) playLevelUpSound();
@@ -13470,6 +13548,7 @@ function towerBossCompLetter(){
     let eq = null;
     if(floor > S.towerMax){
       S.towerMax = floor;
+      announce('塔层首通', (S.name || '一位道友') + ' 首通镇妖塔第 ' + floor + ' 层');
       eq = towerEqGrant(floor);
       if(eq) srows.push(settleLine('首通装备 · ' + eq.name, '战力 +' + fmt(eq.power || 0), 'good'));
       try{ if(window.NpcMemory) NpcMemory.record('cuijiu', '你登塔破了第 ' + S.towerMax + ' 层', 'combat'); }catch(e){}
@@ -15343,6 +15422,7 @@ function towerBossCompLetter(){
     _showSettle: showSettle, _claimSign: claimSign, _claimDailyToday: claimDailyToday,
     _showEquipDrop: showEquipDrop, _equipDropInfo: equipDropInfo, _powerGapAdvice: powerGapAdvice,
     _renderToday: renderToday, _nextResetMs: nextDayResetMs, _todayKey: todayKey, _todayNo: todayNo,
+    _announce: announce, _annState: () => ({ q: annQueue.length, busy: annBusy, last: annLastAt }),
     _todayKeyAt: todayKeyAt, _todayNoAt: todayNoAt,
     _passFloatState: () => ({ at: passFloatAt, acc: { exp: passAcc.exp, stone: passAcc.stone, ore: passAcc.ore } }),
     _ovEntries: ovEntries, _ovPending: ovPending, _ovLetter: () => (S.letters || []).filter(x => !x.open && ovEntries(x).length)[0] || null,

@@ -301,7 +301,7 @@
     /* 第三批 P0：主界面「今日」小钮 → 今日清单 */
     const td = document.getElementById('sc-today');
     if(td) td.addEventListener('click', () => open('today'));
-    /* 入门八事纸签（第 105 轮）：同样常驻主 DOM，只绑一次 */
+        /* 入门八事纸签（第 105 轮）：同样常驻主 DOM，只绑一次 */
     const tr = document.getElementById('sc-trail');
     if(tr) tr.addEventListener('click', () => { try{ XX._trail.go(); }catch(e){} });
   }
