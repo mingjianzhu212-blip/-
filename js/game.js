@@ -11919,7 +11919,16 @@ function towerBossCompLetter(){
             : ' → ×' + next.toFixed(2) + '（+' + Math.round((g.rate - 1) * 100) + '%/级）');
           if(!full && S.stone < cost) sub += ' · 灵石差 ' + fmt(cost - S.stone);
         }
-        t.innerHTML = '<b><img class="upg-ico" src="' + g.img + '" alt=""> ' + g.name + '</b><small>' + sub + '</small>';
+        const costTxt = full ? '已圆满' : ('灵石 ' + fmt(cost));
+        const detail = '<div class="gong-detail">' +
+          '<span>当前效果：修炼 ×' + cur.toFixed(2) + '</span>' +
+          '<span>下一级：' + (full ? '—' : '×' + next.toFixed(2) + '（+' + Math.round((g.rate - 1) * 100) + '%）') + '</span>' +
+          '<span>领悟条件：境界【' + RANK_NAMES[g.unlock] + '】' + (full ? '' : ' · ' + costTxt) + '</span>' +
+          '<span>类型：被动功法 · 冷却无 · 伤害倍率无（非战斗技能）</span>' +
+          '<span>前置链：' + (i === 0 ? '无（入门）' : '按境界逐门解锁（无前置技能等级）') + '</span>' +
+          '<span>获取方式：整篇领悟（无残篇/碎片）</span>' +
+          '</div>';
+        t.innerHTML = '<b><img class="upg-ico" src="' + g.img + '" alt=""> ' + g.name + '</b><small>' + sub + '</small>' + detail;
       }
       const btn = row.querySelector('button');
       if(!btn) return;

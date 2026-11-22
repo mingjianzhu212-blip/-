@@ -5940,3 +5940,102 @@ html,body{ background:var(--jx-paper); }
 #page-scene .world-ann.show{ animation:waIn .3s ease-out; }
 @keyframes waIn{ from{ opacity:0; transform:translate(-50%,-6px); } to{ opacity:1; transform:translate(-50%,0); } }
 @media (max-width:430px){ #page-scene .world-ann{ top:70px; font-size:10px; } }
+
+/* ===== P2 · 视觉统一收口（只动 CSS，不改模板/资产） =====
+   口径：宣纸面板 + 烫金标题 + 毛笔感按钮 + 入口黑底金字圆徽 + 品级四色
+   （金 / 青蓝 / 紫 / 朱砂红），只在面板与弹层内生效，不碰主场景布局。 */
+:root{
+  --q-gold:#b5892e; --q-blue:#3d6b58; --q-purple:#6b4f8a; --q-red:#a5302a;
+}
+.panel-page .card,
+.modal .m-card{
+  background:
+    radial-gradient(120% 70% at 12% 0%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%),
+    linear-gradient(165deg, rgba(252,250,245,.98), rgba(242,236,222,.96));
+  border:1px solid rgba(181,137,46,.38);
+  border-radius:14px;
+  box-shadow:0 10px 26px rgba(60,50,30,.10);
+}
+.panel-head h2,
+.panel-page .card > h2,
+.modal .m-card > h3{
+  color:#7a5a20;
+  letter-spacing:1px;
+  border-bottom:1px solid rgba(181,137,46,.35);
+  padding-bottom:5px;
+}
+.hub-cell .hc-seal,
+.panel-head .crumb{
+  background:#1c1726; color:#e8c87a; border-color:rgba(232,200,122,.45);
+}
+.hub-cell .hc-seal{ min-width:30px; border-radius:50%; padding:3px 4px; text-align:center; }
+.btn-main,.btn-sub,.field-btn,.gate-btn,.mk-refresh,.bag-buy,.treasure-btn{
+  border-radius:11px 15px 10px 14px / 14px 10px 15px 11px;
+  border:1px solid rgba(143,42,36,.65);
+  background:linear-gradient(180deg, rgba(184,58,50,.96), rgba(165,48,42,.98));
+  color:#f7efe2; box-shadow:0 3px 0 rgba(120,30,26,.18);
+}
+.btn-plain,.btn-mini,.mk-buy{
+  border-radius:10px 13px 9px 12px / 12px 9px 13px 10px;
+  border:1px solid rgba(181,137,46,.38);
+  background:linear-gradient(180deg,#fdfbf6,#efe7d5);
+  color:#6b6252;
+}
+.bag-name.gold,.item-head h3.gold,.t-card h3.gold,.bt-loot-row .lr-name.gold{ color:var(--q-gold); }
+.bag-name.good,.item-head h3.good,.t-card h3.good,.bt-loot-row .lr-name.good{ color:var(--q-blue); }
+.bag-name.purple,.item-head h3.purple{ color:var(--q-purple); }
+.panel-page .bad,.panel-page .log p.bad{ color:var(--q-red); }
+
+/* P2：功法详情（现有数据写全；不编造冷却/伤害/残篇） */
+.gong-detail{ display:grid; gap:2px; margin-top:6px; padding:7px 9px; border-radius:8px;
+  background:rgba(181,137,46,.07); border:1px dashed rgba(181,137,46,.28); }
+.gong-detail span{ font-size:11px; line-height:1.55; color:#6b6252; }
+
+/* P2 视觉收口补强：压过各面板既有的 ID 级样式，保证全站一致 */
+.panel-page .card,
+.modal .m-card{
+  background:linear-gradient(165deg, rgba(252,250,245,.98), rgba(242,236,222,.96)) !important;
+  border:1px solid rgba(181,137,46,.38) !important;
+  border-radius:14px !important;
+  box-shadow:0 10px 26px rgba(60,50,30,.10) !important;
+}
+.panel-head h2,
+.panel-page .card > h2,
+.modal .m-card > h3{
+  color:#7a5a20 !important;
+  border-bottom:1px solid rgba(181,137,46,.35) !important;
+  padding-bottom:5px !important;
+}
+.hub-cell .hc-seal{
+  background:linear-gradient(180deg,#2a2233,#1c1726) !important; color:#e8c87a !important;
+  border-color:rgba(232,200,122,.45) !important; border-radius:50% !important;
+}
+.btn-main,.btn-sub,.field-btn,.gate-btn,.mk-refresh,.bag-buy,.treasure-btn,.q-btn{
+  border-radius:11px 15px 10px 14px / 14px 10px 15px 11px !important;
+  border:1px solid rgba(143,42,36,.65) !important;
+  background:linear-gradient(180deg, rgba(184,58,50,.96), rgba(165,48,42,.98)) !important;
+  color:#f7efe2 !important;
+}
+.btn-plain,.btn-mini,.mk-buy{
+  border-radius:10px 13px 9px 12px / 12px 9px 13px 10px !important;
+  border:1px solid rgba(181,137,46,.38) !important;
+  background:linear-gradient(180deg,#fdfbf6,#efe7d5) !important;
+  color:#6b6252 !important;
+}
+
+/* P2：面板内动作按钮也统一毛笔感（只改外观） */
+.panel-page .ups .upg button,
+.panel-page .craft > button,
+.panel-page .gate-btn,
+.panel-page .dact,
+.panel-page .dgrad{
+  border-radius:10px 14px 9px 13px / 13px 9px 14px 10px !important;
+  border:1px solid rgba(143,42,36,.55) !important;
+  background:linear-gradient(180deg, rgba(184,58,50,.94), rgba(165,48,42,.96)) !important;
+  color:#f7efe2 !important;
+}
+.panel-page .ups .upg button:disabled,
+.panel-page .craft > button:disabled{
+  background:rgba(247,243,233,.9) !important;
+  color:#8a8172 !important; border-color:rgba(120,100,60,.22) !important; box-shadow:none !important;
+}
