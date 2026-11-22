@@ -38,7 +38,7 @@
     ARRAY_PCT: 0.85,                              /* server.mjs:173 const ARRAY_PCT = 0.85 */
     ENHANCE_MAX: 20,                              /* server.mjs:206 const ENHANCE_MAX = 20 */
     WEAPON_MAX_IDX: 9,                            /* server.mjs:204 WEAPON_MULT 共 10 项 → length-1 = 9 */
-    ART_BG_MAX: 0.56,                             /* server.mjs:209 const ART_BG_MAX = 0.56 */
+    ART_BG_MAX: 0.86,                             /* server.mjs:209 const ART_BG_MAX = 0.86（含强化 20 级 ×1.5%） */
     WU_POW_CAP_PCT: 52,                           /* server.mjs:217 const WU_POW_CAP_PCT = 52 */
     AFFIX_POW_CAP_PCT: 22,                        /* server.mjs:218 const AFFIX_POW_CAP_PCT = 22 */
     DAN_POW_CAP_FRAC: 0.55,                       /* server.mjs:222 const DAN_POW_CAP_FRAC = 0.55 */

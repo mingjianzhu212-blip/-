@@ -101,6 +101,10 @@ try {
     /* server.mjs 的重算也进同值回归（SERVER_NO_LISTEN=1 只 import 不监听） */
     process.env.SERVER_NO_LISTEN = '1';
     const mjs = await import(require('node:url').pathToFileURL(path.join(ROOT, 'server', 'server.mjs')).href + '?v=' + Date.now());
+    const local = require('./js/multi-local.js');
+    const localConstSame = local.AUTH.ART_BG_MAX === mjs.ART_BG_MAX;
+    console.log('PARITY_LOCAL_CONST ART_BG_MAX=' + local.AUTH.ART_BG_MAX + '/' + mjs.ART_BG_MAX + ' ' + (localConstSame ? 'SAME' : 'DIFF'));
+    if (!localConstSame) o.errs.push('multi-local ART_BG_MAX 与 server.mjs 不同值: ' + local.AUTH.ART_BG_MAX + '/' + mjs.ART_BG_MAX);
     o.parity.forEach((p, i) => {
       const srv = recomputePower(p.snap);
       const same = srv && srv.power === p.client;
@@ -110,6 +114,20 @@ try {
       const mjsSame = mjsSrv && mjsSrv.power === p.client;
       console.log('PARITY_MJS[' + i + '] client=' + p.client + ' server.mjs=' + (mjsSrv ? mjsSrv.power : 'null') + ' ' + (mjsSame ? 'SAME' : 'DIFF'));
       if (!mjsSame) o.errs.push('server.mjs 重算与 combatPower 不同值 idx=' + i + ' client=' + p.client + ' server.mjs=' + (mjsSrv && mjsSrv.power));
+      const axes = ['weapon', 'guard', 'dan', 'wu'], paths = ['sword', 'body', 'dan', 'array'];
+      let axisOk = true, synOk = true;
+      const parts = [];
+      axes.forEach(a => {
+        const lv = local.pathAxisScore(p.snap, a), sv = mjs.pathAxisScore(p.snap, a);
+        if (Math.abs(lv - sv) > 1e-12) axisOk = false;
+        parts.push(a + '=' + lv.toFixed(4) + '/' + sv.toFixed(4));
+      });
+      paths.forEach(pt => {
+        const lv = local.synergyMult(p.snap, pt), sv = mjs.pathSynergyMult(p.snap, pt);
+        if (Math.abs(lv - sv) > 1e-12) synOk = false;
+      });
+      console.log('PARITY_LOCAL[' + i + '] axis=' + (axisOk ? 'SAME' : 'DIFF') + ' synergy=' + (synOk ? 'SAME' : 'DIFF') + ' ' + parts.join(' '));
+      if (!axisOk || !synOk) o.errs.push('multi-local 共鸣与 server.mjs 不同值 idx=' + i);
     });
   }
   const ok = !!(o && o.ok && o.errs.length === 0);
