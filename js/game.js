@@ -13244,6 +13244,39 @@ function towerBossCompLetter(){
   /* A77：灵兽园每秒被无条件重建，按钮 mousedown/mouseup 常被中途打断 → 表现为「点了没反应」。
      内容签名守卫：状态没变就留着行元素，一次点击才能完整走完。 */
   let petBox = null, petSig = '';
+  /* batch5 第 6 项（甲案）：灵兽资质鉴定——纯展示，不新增存档字段、不改战力/产出。
+     评级由现有品阶与等级现算；同一只灵兽在升级前每次鉴定结果一致。 */
+  const PET_APT_NAMES = ['凡品', '灵品', '仙品', '神品', '祖品'];
+  const PET_APT_LINES = [
+    ['根骨单薄', '灵性未开', '凶性潜藏'],
+    ['根骨尚可', '灵性初显', '凶性温顺'],
+    ['根骨清奇', '灵性通透', '凶性有度'],
+    ['根骨如铁', '灵性近道', '凶性慑人'],
+    ['根骨通玄', '灵性通神', '凶性如渊']
+  ];
+  function petAptitude(p){
+    const b = p && BEASTS.find(x => x.id === p.bid);
+    if(!b) return null;
+    const lv = Math.max(1, p.lv | 0), tier = b.tier | 0;
+    const score = (tier - 1) * 2 + Math.floor((lv - 1) / 6);
+    const grade = score >= 10 ? 4 : score >= 8 ? 3 : score >= 6 ? 2 : score >= 4 ? 1 : 0;
+    return { grade, name: PET_APT_NAMES[grade], score, lines: PET_APT_LINES[grade], tier, lv, beast: b };
+  }
+  function showPetApt(i){
+    const a = petAptitude(S.pets[i]);
+    if(!a){ log('灵兽不存在。', 'bad'); return; }
+    showSettle({
+      icon: '🔮', title: '灵兽鉴定 · ' + a.beast.name, sub: '仅作评鉴，不影响战力与产出',
+      rows: [
+        settleLine('评级', a.name, 'good'),
+        settleLine('根骨', a.lines[0]),
+        settleLine('灵性', a.lines[1]),
+        settleLine('凶性', a.lines[2]),
+        settleLine('依据', BEAST_TIER_NAME[a.tier] + ' · Lv.' + a.lv)
+      ],
+      note: '免费鉴定，按当前品阶与等级现算；不写入存档，不改变战力/产出。升级后评级会随现况变化。'
+    });
+  }
   function renderPetBadge(){
     const b = document.getElementById('sc-pet-badge');
     if(!b) return;
@@ -13293,6 +13326,7 @@ function towerBossCompLetter(){
           '</div><div class="pet-ops">' +
           (p.lv < BAL.petMaxLv ? '<button data-feed="' + i + '" title="每次喂食：灵草 ×' + BAL.petFeedHerb +
             '、灵石 ×' + fmt(petFeedStoneCost()) + '（经验 +' + BAL.petExpPerFeed + '）">喂食</button>' : '') +
+          '<button class="ghost" data-apt="' + i + '">鉴定</button>' +
           '<button class="ghost" data-release="' + i + '">放生</button>' +
           '</div></div>';
       });
@@ -13327,6 +13361,8 @@ function towerBossCompLetter(){
         if(b){ ev.stopPropagation(); feedPet(Number(b.dataset.feed)); }
         const br = ev.target.closest('[data-release]');
         if(br){ ev.stopPropagation(); releasePet(Number(br.dataset.release)); }
+        const ba = ev.target.closest('[data-apt]');
+        if(ba){ ev.stopPropagation(); showPetApt(Number(ba.dataset.apt)); }
         const bh = ev.target.closest('[data-hatch]');
         if(bh){ ev.stopPropagation(); hatchEgg(Number(bh.dataset.hatch)); }
         const sb = ev.target.closest('[data-slot]');
@@ -15946,6 +15982,7 @@ function towerBossCompLetter(){
     _renderMirror: renderMirror,
     _renderLifeChip: renderLifeChip, _tick: tick, _load: load,
     _hatch: hatchEgg, _feedPet: feedPet, _petPower: petPowerOf, _petPowerSum: petPowerSum, _petFeedStone: petFeedStoneCost,
+    _petApt: petAptitude, _showPetApt: showPetApt,
     _pets: () => S.pets, _eggs: () => S.eggs,
     _sceneFX: buildSceneFX,
     _towerEnter: towerRunStart, _towerDoor: towerRunDoor, _towerQuit: towerRunQuit, _trunSettle: trunSettle,

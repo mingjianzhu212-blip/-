@@ -13,6 +13,7 @@ VIEWS.chong = {
       <p class="pet-cond" id="xx-pet-cond"></p>
       <div class="pet-list" id="xx-pets"></div>
       <p class="hint">猎妖拾「妖兽蛋」→ 孵化成灵兽 → 喂养升级 → 出战加战力。灵兽越强，能打的妖兽越高级。</p>
+      <p class="hint">鉴定免费，仅作评鉴，不影响战力与产出；评级按当前品阶与等级现算。</p>
     </section>
     </div>
   </section>`
