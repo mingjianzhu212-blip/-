@@ -2552,7 +2552,11 @@ const XX = (function(){
     if(S.arena.rep < it.rep){ log('声望不足，换【' + it.name + '】要 ' + it.rep + ' 声望。', 'bad'); return; }
     if(it.id === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
     if(it.id === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满，先去灵兽园孵化。', 'bad'); return; }
-    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && S.bag.length >= bagCap()){ log('背包已满，先腾点地方。', 'bad'); return; }
+    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && S.bag.length >= bagCap()){
+      const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再换。';
+      log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
+      return;
+    }
     pickStance({
       icon: '🏅', title: '论剑台 · 确认兑换',
       text: '物品：<b>' + escHTML(it.name) + '</b> ×1' +
@@ -2568,7 +2572,11 @@ const XX = (function(){
     if(S.arena.rep < it.rep){ log('声望不足，换【' + it.name + '】要 ' + it.rep + ' 声望。', 'bad'); return; }
     if(it.id === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
     if(it.id === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满，先去灵兽园孵化。', 'bad'); return; }
-    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && S.bag.length >= bagCap()){ log('背包已满，先腾点地方。', 'bad'); return; }
+    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && S.bag.length >= bagCap()){
+      const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再换。';
+      log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
+      return;
+    }
     S.arena.rep -= it.rep;
     if(it.id === 'bag'){ S.bagSize = Math.min(BAG_CAP, S.bagSize + BAG_STEP); log('🏅 换得储物袋，背包扩到 ' + S.bagSize + ' 格。', 'gold'); }
     else if(it.id === 'egg'){
@@ -4811,7 +4819,7 @@ const XX = (function(){
         petSlots: 99,              /* 灵兽槽：BAL.petMaxSlots 之上再留余量，避免常量未定义时被钳成 0 */
         gong1: 10, gong2: 10, gong3: 10,  /* 功法等级上限 */
         guardMirror: 9999, guardArray: 9999, tianji: 9999,  /* 道具计数 */
-        insight: 999, failBonus: 1, swordAura: 3, huntProg: 1e9,
+        insight: 999, swordAura: 3, huntProg: 1e9,
         tower: 99, towerMax: 99, towerSwept: 9999, weaponBless: 99, zuo: 1e6
       };
       Object.keys(CAPS).forEach(k => {
@@ -4820,6 +4828,10 @@ const XX = (function(){
         const cap = CAPS[k];
         S[k] = Math.max(0, Math.min(cap, Math.floor(v)));
       });
+      /* 失败加成是小数（每次 +0.05、上限 +0.30），绝不能进上面的整数 CAPS：
+         Math.floor(0.05) = 0，曾导致「破境失败后刷新页面，加成凭空消失」。
+         这里只夹范围，不取整。 */
+      S.failBonus = Math.max(0, Math.min(WISDOM.failCap, Number(S.failBonus) || 0));
       /* 布尔/字符串型标记不做数值处理，但必须挡住"数字混进字符串位"的脏档 */
       if(typeof S.name !== 'string') S.name = '';
       if(!Array.isArray(S.log)) S.log = [];
@@ -7280,7 +7292,11 @@ function towerBossCompLetter(){
     const g = marketItem(slot.id);
     if(!g){ log('这格货的数据缺失，已为你换新货。', 'bad'); rollMarket(); renderMarket(); return; }
     if(S.stone < slot.price){ const m='灵石不足，买【' + g.name + '】要 ' + fmt(slot.price) + ' 灵石（差 ' + fmt(slot.price - S.stone) + '）。'; log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){} return; }
-    if(g.kind === 'item' && S.bag.length >= bagCap()){ log('背包已满，先卖点东西再来。', 'bad'); return; }
+    if(g.kind === 'item' && S.bag.length >= bagCap()){
+      const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再买。';
+      log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
+      return;
+    }
     if(g.kind === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满（' + BAL.petEggMax + ' 枚），先去灵兽园孵化。', 'bad'); return; }
     if(g.kind === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
     const qty = g.kind === 'res' ? 20 : g.kind === 'bag' ? BAG_STEP : 1;
@@ -7302,7 +7318,11 @@ function towerBossCompLetter(){
     const g = marketItem(slot.id);
     if(!g){ log('这格货的数据缺失，已为你换新货。', 'bad'); rollMarket(); renderMarket(); return; }
     if(S.stone < slot.price){ const m='灵石不足，买【' + g.name + '】要 ' + fmt(slot.price) + ' 灵石（差 ' + fmt(slot.price - S.stone) + '）。'; log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){} return; }
-    if(g.kind === 'item' && S.bag.length >= bagCap()){ log('背包已满，先卖点东西再来。', 'bad'); return; }
+    if(g.kind === 'item' && S.bag.length >= bagCap()){
+      const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再买。';
+      log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
+      return;
+    }
     if(g.kind === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满（' + BAL.petEggMax + ' 枚），先去灵兽园孵化。', 'bad'); return; }
     if(g.kind === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
     S.stone -= slot.price;
@@ -8633,7 +8653,11 @@ function towerBossCompLetter(){
         log(matName(m.t) + '不足，炼【' + rec.name + '】要 ' + m.n + ' 个。', 'bad'); return;
       }
     }
-    if(rec.out !== 'weapon' && rec.out !== 'art' && S.bag.length >= bagCap()){ log('背包已满，先腾点地方或扩个储物袋。', 'bad'); return; }
+    if(rec.out !== 'weapon' && rec.out !== 'art' && S.bag.length >= bagCap()){
+      const m = '背包已满（' + bagCap() + ' 格），先腾地方或扩个储物袋再炼。';
+      log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
+      return;
+    }
     /* A1 结算（2026-11-20）：扣料前拍快照，结算层每个数字都用「实际差值」回填，不看文案推测 */
     const stoneBefore = S.stone;
     const matBefore = {};

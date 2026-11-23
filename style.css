@@ -6363,3 +6363,25 @@ html,body{ background:var(--jx-paper); }
 }
 .upg-mirror.anchor-ready .upg-state{ color:#8a5a16; background:rgba(216,178,90,.16); }
 .upg-mirror.anchor-locked .upg-state{ color:#8a7a5c; }
+
+/* ===== batch7 跟进单第 2 项：城镇页道途横幅避让建筑 =====
+   原来 top 92 居中横跨，左压「清虚观 · 城镇」题签、右压藏经阁塔顶，且整条是按钮会吞建筑点击。
+   城镇里改到题签右侧的顶栏空白带（y 104–144），隐藏次要提示保持单行，不碰题签/藏经阁/镇妖塔。 */
+#page-scene.in-town .sc-trail{
+  left:142px; right:10px; width:auto; max-width:none; transform:none;
+  top:104px; z-index:6; padding:6px 10px; gap:6px; border-radius:10px;
+}
+#page-scene.in-town .sc-trail .st-hint,
+#page-scene.in-town .sc-trail .st-pips{ display:none; }
+#page-scene.in-town .sc-trail .st-seal{ width:26px; height:26px; font-size:15px; }
+#page-scene.in-town .sc-trail .st-name{ font-size:13px; }
+#page-scene.in-town .sc-trail .st-go{ min-width:22px; }
+@media (max-width:400px){
+  /* 360/390：藏经阁塔顶上移到 y≈128，横幅不能再向右伸——右缘硬限在 238px（塔基左缘 ~240） */
+  #page-scene.in-town .sc-trail{ left:124px; right:calc(100vw - 238px); padding:5px 6px; gap:4px; }
+  #page-scene.in-town .sc-trail .st-kicker{ display:none; }
+  #page-scene.in-town .sc-trail .st-seal{ width:22px; height:22px; font-size:13px; }
+  #page-scene.in-town .sc-trail .st-name{ font-size:12px; max-width:54px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #page-scene.in-town .sc-trail .st-go{ min-width:18px; }
+  #page-scene.in-town .sc-trail .st-go b{ display:none; }
+}

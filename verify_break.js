@@ -432,6 +432,44 @@ const DIAG = `
     L('resHerb100', document.getElementById('xx-herb100').textContent==='7' ? 'ok' : 'bad:'+document.getElementById('xx-herb100').textContent);
     L('resHerb10000', document.getElementById('xx-herb10000').textContent==='3' ? 'ok' : 'bad:'+document.getElementById('xx-herb10000').textContent);
   }catch(e){ L('EXC', e.message); }
+
+  /* ========== 十五、跟进单第 1 项：失败加成跨刷新保真 + 总率=基础+加成 ========== */
+  try{
+    const S = XX._s;
+    /* 本脚本没有种子档，空名档会被 save() 的创角保护拦下、写不进盘；先给名字并收掉创角弹窗 */
+    S.name='青玄子';
+    const cmEl=document.getElementById('char-modal'); if(cmEl) cmEl.classList.add('hidden');
+    S.rank=15; S.exp=1e18; S.failBonus=0; S.insight=0; S.wisdom=0;
+    S.guardMirror=0; S.guardArray=0; S.tianji=0; S.bag=[]; S.dao=0; S.pillUntil=0; S.pillBonus=0; S.rootIdx=1;
+    forceFail(); XX._attemptBreak({});
+    const diskFb1 = (JSON.parse(localStorage.getItem('xiuxian_save')||'{}').failBonus);
+    L('fbDisk1', String(diskFb1));
+    XX._load();
+    L('fbReload1', String(XX._s.failBonus));
+    const p1 = XX._breakParts(null,false,false);
+    const keep1 = XX._s.failBonus; XX._s.failBonus = 0;
+    const b1 = XX._breakParts(null,false,false); XX._s.failBonus = keep1;
+    L('fbDelta1', (p1.final-b1.final).toFixed(4));
+    /* 连败两次：从 0 起算 +0.10 */
+    XX._s.failBonus=0;
+    XX._s.rank=15; XX._s.exp=1e18; forceFail(); XX._attemptBreak({});
+    XX._s.rank=15; XX._s.exp=1e18; forceFail(); XX._attemptBreak({});
+    const diskFb2 = (JSON.parse(localStorage.getItem('xiuxian_save')||'{}').failBonus);
+    L('fbDisk2', String(diskFb2));
+    XX._load();
+    L('fbReload2', String(XX._s.failBonus));
+    const p2 = XX._breakParts(null,false,false);
+    const keep2 = XX._s.failBonus; XX._s.failBonus = 0;
+    const b2 = XX._breakParts(null,false,false); XX._s.failBonus = keep2;
+    L('fbDelta2', (p2.final-b2.final).toFixed(4));
+    /* 主页钮与确认弹窗同源 */
+    XX._render(); XX._openBreakConfirm();
+    const fbBadge = (document.getElementById('sc-break-badge')||{}).textContent||'';
+    const fbParts = (document.getElementById('bc-parts')||{}).textContent||'';
+    XX._closeBreakConfirm();
+    L('fbBadge', fbBadge);
+    L('fbPartsHasFail', fbParts.indexOf('失败积累')>=0 ? 'yes' : 'no');
+  }catch(e){ L('fbEXC', (e.stack||e.message||'').toString().slice(0,200)); }
   Math.random=realRandom;
   const d=document.createElement('pre'); d.id='diag'; d.textContent=out.join(' | '); document.body.appendChild(d);
 })();
@@ -602,6 +640,17 @@ const DIAG = `
     ['resHerb10000', '洞府资源栏显示万年灵草']
   ];
   for (const [k, label] of CASES) ok(F[k] === 'ok', label + '（' + k + '=' + F[k] + '）');
+
+  /* 跟进单 2026-11-23 第 1 项：失败加成存盘/刷新保真与同源展示（值是数字/文本，不走 === 'ok' 表） */
+  ok(F.fbDisk1 === '0.05' && F.fbReload1 === '0.05' && F.fbDelta1 === '0.0500',
+     '失败一次：0.05 真写盘，刷新重载后仍在，总率 = 基础拆账 +5%（'
+       + [F.fbDisk1, F.fbReload1, F.fbDelta1].join(' / ') + '）');
+  ok(F.fbDisk2 === '0.1' && F.fbReload2 === '0.1' && F.fbDelta2 === '0.1000',
+     '连败两次：0.10 真写盘，刷新重载后仍在，总率 = 基础拆账 +10%（'
+       + [F.fbDisk2, F.fbReload2, F.fbDelta2].join(' / ') + '）');
+  ok(F.fbBadge === '下次 +10%' && F.fbPartsHasFail === 'yes',
+     '主页破境钮与确认弹窗同源：钮写「下次 +10%」，拆账列「失败积累」（'
+       + [F.fbBadge, F.fbPartsHasFail].join(' / ') + '）');
 
   console.log('\n通过 ' + pass + ' / 失败 ' + fail);
   process.exit(fail ? 1 : 0);

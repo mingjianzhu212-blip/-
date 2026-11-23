@@ -4514,6 +4514,16 @@ const DIAG = `
   ok(gameSrc.indexOf("t.done && !t.claimed ? ' anchor-ready'") >= 0 &&
      /class="dcard' \+ \(t \? ' busy anchor-locked'/.test(gameSrc),
      '任务可领取 / 宗门弟子可出师走同一套淡金+红点锚点');
+  /* 跟进单 2026-11-23：失败加成刷新保真 / 城镇横幅避让 / 背包满购买提示 */
+  ok(gameSrc.indexOf('S.failBonus = Math.max(0, Math.min(WISDOM.failCap, Number(S.failBonus) || 0));') >= 0 &&
+     gameSrc.indexOf('insight: 999, failBonus: 1') < 0,
+     'load 对 failBonus 只夹范围不取整（修复「失败加成刷新后消失」）');
+  ok(/#page-scene\.in-town \.sc-trail\{[^}]*left:142px[^}]*top:104px/.test(chatCss) &&
+     /@media \(max-width:400px\)\{[\s\S]*?sc-trail\{[^}]*left:124px[^}]*calc\(100vw - 238px\)/.test(chatCss),
+     '城镇道途横幅移到题签右侧；窄屏右缘硬限 238px 避开藏经阁塔基');
+  ok(gameSrc.indexOf("背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再买。") >= 0 &&
+     gameSrc.indexOf("背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再换。") >= 0,
+     '坊市 / 论剑购买背包满时给明确 toast（不再静默）');
   ok(/\.bt-vs-txt\{[^}]*white-space:nowrap/.test(chatCss),
      '「对决」印不许折行（390 窄屏实拍过：不加 nowrap 会竖排成「对/决」两行）');
   /* 第 84 轮 · 战斗面板：源码侧锁住几处「一改就退回旧观」的要点 */
