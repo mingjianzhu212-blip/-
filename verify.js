@@ -1858,7 +1858,14 @@ const DIAG = `
       XX._s.rank = 17; const s2Path17 = XX._pathBonusFor('body');
       XX._s.rank = 0; const s2PathTxt = XX._pathBonusSegText('sword');
       L('pathCur', [s2Path0, s2Path17.toFixed(2)].join('#'));
-      L('pathCardTxt', s2PathTxt);
+      XX._renderPathPreview();
+      const pcTag = document.querySelector('#char-path-picks .char-pick .cp-tag');
+      const pcInfo = document.querySelector('#char-path-picks .cp-info');
+      XX._showPathInfo('sword');
+      L('pathCardTxt', (pcTag ? pcTag.textContent : 'none') + '/' + (pcInfo ? 'info' : 'no'));
+      L('pathDetail', (document.getElementById('cs-title') || {}).textContent + '/' +
+        document.querySelectorAll('#craft-settle #cs-rows .cs-row').length);
+      document.getElementById('cs-close').click();
       /* N13（制作人 2026-11-14 裁定④）：删除「握持」文案，五枚破境丹统一服食口径 */
       L('n13Usage', ['dan1','dan2','dan3','dan4','dan5'].map(id =>
         XX._items[id].usage.indexOf('握持') < 0 && XX._items[id].usage.indexOf('服食') >= 0 ? 1 : 0).join(''));
@@ -4029,8 +4036,9 @@ const DIAG = `
   ok(roleSrc.indexOf("sealTxt: '0/5'") >= 0 && roleSrc.indexOf("sealTxt: '0/6'") < 0,
      'N10 人物页沈碑印章静态初值 0/5（不再 0/6→0/5 跳变）');
   ok(npcSrc.indexOf('var HEARD_CAP = 5;') >= 0, 'N10 沈碑可听上限 HEARD_CAP = 5');
-  ok(gameSrc.indexOf('pathBonusSegText(o.id)') >= 0 && gameSrc.indexOf('cp-bonus') >= 0,
-     'N11 创角/改道卡渲染九段加成（直读 PATH_BONUS 派生表，不另存副本）');
+  ok(gameSrc.indexOf('showPathInfo') >= 0 && gameSrc.indexOf('data-pathinfo') >= 0 &&
+     gameSrc.indexOf('pathBonusPct(id, i)') >= 0 && gameSrc.indexOf('cp-bonus') < 0,
+     'N11 创角卡只露定位/一句话，九段系数收进「?」道途详情（不把数值表当新手说明）');
   ok(gameSrc.indexOf("log('⚔️ 本场道途加成：' + pathBonusLabel(S.path)") >= 0,
      'N11 战斗日志直读当前段矩阵值');
   ok(gameSrc.indexOf("'% 首通奖励</p>'") >= 0, 'N13 塔扫荡提示改为「首通奖励的 60%」口径');
@@ -5292,8 +5300,8 @@ const DIAG = `
   ok(F.pathDrift === 'ok', 'N11 道途九段矩阵漂移断言通过（' + F.pathDrift + '）');
   ok(Number(F.pathSpread) <= 8.0001, 'N11 每段四道途极差 ≤8pp（实测 ' + F.pathSpread + 'pp）');
   ok(F.pathCur === '1.08/1.00#1.08', 'N11 当前段取值：炼气剑 1.08 / 丹 1.00、元婴体 1.08（' + F.pathCur + '）');
-  ok((F.pathCardTxt || '').indexOf('本段炼气期 +8% · 九段 +8/+6/+4/+2/0/0/+2/+4/+6') === 0,
-     'N11 创角道途卡直读九段派生表（' + F.pathCardTxt + '）');
+  ok(F.pathCardTxt === '极致爆发 · 越级杀伐/info' && F.pathDetail === '剑修 · 道途详情/9',
+     'N11 创角道途卡只显定位与「?」；详情弹层 9 段直读 PATH_BONUS（' + F.pathCardTxt + ' / ' + F.pathDetail + '）');
   ok(F.n13Usage === '11111', 'N13 五枚破境丹 usage 均无「握持」且均写「服食」（' + F.n13Usage + '）');
   ok(F.n13DeadPill === 'ok', 'N13 死丹 dan_juqi 文案不再宣称可服食');
   /* 阶段三 S1/S2/S3 回归 */

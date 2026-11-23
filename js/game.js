@@ -15111,12 +15111,19 @@ function towerBossCompLetter(){
     { sex: 'm', gender: 'male', name: '男修', hint: '剑眉星目，青竹般挺拔' },
     { sex: 'f', gender: 'female', name: '女修', hint: '云鬓花颜，一袭水青' }
   ];
-  /* P1-C（D1=(a)）：四道途，id 对齐联机枚举（PATH_IDS）。名称/简介仅展示用。 */
+  /* P1-C（D1=(a)）：四道途，id 对齐联机枚举（PATH_IDS）。创角只露定位与一句话；
+     九段成长系数收进「?」详情，避免把数值表当新手说明。 */
   const PATH_OPTS = [
-    { id: 'sword', name: '剑修', hint: '以剑入道，攻伐凌厉' },
-    { id: 'body',  name: '体修', hint: '淬体强身，稳如山岳' },
-    { id: 'dan',   name: '丹修', hint: '炼丹养元，绵绵不绝' },
-    { id: 'array', name: '阵修', hint: '推演天机，悟性通玄' }
+    { id: 'sword', name: '剑修', tag: '极致爆发 · 越级杀伐', hint: '以剑入道，攻伐凌厉，前期开荒最速' },
+    { id: 'body',  name: '体修', tag: '铜皮铁骨 · 越战越勇', hint: '淬体强身，稳如山岳，中后期容错极高' },
+    { id: 'dan',   name: '丹修', tag: '炼丹养元 · 寿元绵长', hint: '擅长炼丹与续航，资源产出丰厚' },
+    { id: 'array', name: '阵修', tag: '推演天机 · 悟性通玄', hint: '功法领悟极快，大后期上限最高' }
+  ];
+  const PATH_MARK = { sword: '剑', body: '岳', dan: '炉', array: '卦' };
+  /* 道号随机池：放置玩家通常懒得取名，给一个一键可用的入口（不改存档结构） */
+  const CHAR_NAME_POOL = [
+    '青玄子', '无涯客', '寒山雪', '听雪', '问心', '太乙', '长风', '归墟', '孤鸿',
+    '不夜天', '摸鱼真人', '先躺一步', '明天再练', '睡到自然醒', '云间散人'
   ];
   const pathName = id => { const p = PATH_OPTS.find(x => x.id === id); return p ? p.name : ''; };
   /* m/f 与 male/female 互认，方便老档与外部读写 */
@@ -15125,6 +15132,15 @@ function towerBossCompLetter(){
   function initCharUI(){
     const cf = document.getElementById('char-confirm');
     if(cf) cf.addEventListener('click', confirmChar);
+    const dice = document.getElementById('char-dice');
+    if(dice) dice.addEventListener('click', () => {
+      const input = document.getElementById('char-name');
+      if(!input) return;
+      const n = CHAR_NAME_POOL[Math.floor(Math.random() * CHAR_NAME_POOL.length)];
+      input.value = n;
+      input.focus();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     /* P2b：关闭入口（×、Esc、点背板）；仅编辑态生效，不保存未确认改动 */
     const cc = document.getElementById('char-close');
     if(cc) cc.addEventListener('click', closeCharModal);
@@ -15146,9 +15162,10 @@ function towerBossCompLetter(){
     const box = document.getElementById('char-picks');
     if(!box) return;
     box.innerHTML = SEX_OPTS.map(o =>
-      '<button type="button" class="char-pick' + (o.sex === charSex ? ' active' : '') + '" data-sex="' + o.sex + '">' +
+      '<button type="button" class="char-pick' + (o.sex === charSex ? ' active' : '') + '" data-sex="' + o.sex + '" aria-pressed="' + (o.sex === charSex) + '">' +
         '<span class="cp-glow"></span>' +
-        '<img class="cp-img" src="' + heroImg(o.sex) + '" alt="' + o.name + '"' + (o.sex === charSex ? ' class="on"' : '') + '>' +
+        (o.sex === charSex ? '<span class="cp-seal">已选</span>' : '') +
+        '<img class="cp-img" src="' + heroImg(o.sex) + '" alt="' + o.name + '">' +
         '<span class="cp-name">' + o.name + '</span>' +
         '<span class="cp-hint">' + o.hint + '</span>' +
       '</button>'
@@ -15163,6 +15180,22 @@ function towerBossCompLetter(){
       });
     }
   }
+  /* 道途详情：创角卡只留定位；九段系数与当前段在点击「?」后再展开 */
+  function showPathInfo(id){
+    const o = PATH_OPTS.find(x => x.id === id);
+    if(!o) return;
+    const cur = pathSegIndex();
+    const rows = BREAK_TIERS.map((t, i) => settleLine(
+      t.name,
+      pathBonusPct(id, i) + (i === cur ? ' · 当前' : ''),
+      i === cur ? 'good' : ''
+    ));
+    showSettle({
+      icon: '☯', title: o.name + ' · 道途详情', sub: o.tag,
+      rows,
+      note: '道途只影响对战斗伤害的侧重；修行速度、资源产出与存档规则不变。'
+    });
+  }
   /* P1-C（D1=(a)）：道途选择预览。动态注入容器（不依赖 index.html 改动），
      复用 .char-pick 样式；无障碍：文字名称 + aria-pressed 选中态。 */
   function renderPathPreview(){
@@ -15172,14 +15205,16 @@ function towerBossCompLetter(){
       st.id = 'p1c-path-style';
       st.textContent =
         '.char-path-label{text-align:center;font-size:12px;letter-spacing:1px;color:var(--muted);margin:10px 0 6px}' +
-        '.char-path-picks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 10px}' +
-        '.char-path-picks .char-pick{min-height:58px;padding:8px 4px;justify-content:center;cursor:pointer}' +
-        '.char-path-picks .char-pick .cp-name{font-size:14px;letter-spacing:2px}' +
-        '.char-path-picks .char-pick .cp-bonus{font-size:10px;line-height:1.35;color:var(--muted);opacity:.9}' +
-        '.char-path-picks .char-pick.active{box-shadow:0 0 0 1px var(--gold,#8a6d3b) inset}' +
-        '.char-path-picks .char-pick.readonly{cursor:default;opacity:.45}' +
-        '.char-path-picks .char-pick.readonly.active{opacity:1}' +
-        '@media(max-width:420px){.char-path-picks{grid-template-columns:repeat(2,1fr)}}';
+        '.char-path-picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 10px}' +
+        '.char-path-picks .char-pick{min-height:78px;padding:10px 9px 9px;align-items:flex-start;text-align:left;justify-content:center;cursor:pointer}' +
+        '.char-path-picks .char-pick .cp-tag{font-size:11.5px;font-weight:700;color:#8a6d3b;letter-spacing:.5px;padding-right:22px}' +
+        '.char-path-picks .char-pick .cp-hint{font-size:10.2px;line-height:1.5;color:var(--muted);padding-right:20px}' +
+        '.char-path-picks .char-pick .cp-info{position:absolute;right:7px;top:7px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;cursor:help;font:11px/1 "PingFang SC","Microsoft YaHei",sans-serif;color:#8a6d3b;background:rgba(255,253,246,.78);box-shadow:0 0 0 1px rgba(138,109,59,.35)}' +
+        '.char-path-picks .char-pick::before{content:attr(data-mark);position:absolute;right:7px;bottom:2px;font-family:"Ma Shan Zheng","ZCOOL XiaoWei",serif;font-size:34px;line-height:1;color:rgba(138,109,59,.10);pointer-events:none}' +
+        '.char-path-picks .char-pick.active::before{color:rgba(138,109,59,.16)}' +
+        '.char-path-picks .char-pick.readonly{cursor:default;filter:grayscale(.55);opacity:.62}' +
+        '.char-path-picks .char-pick.readonly.active{filter:none;opacity:1}' +
+        '@media(max-width:520px){.char-path-picks{grid-template-columns:repeat(2,minmax(0,1fr))}}';
       document.head.appendChild(st);
     }
     let box = document.getElementById('char-path-picks');
@@ -15197,18 +15232,23 @@ function towerBossCompLetter(){
     const readonly = pathLocked;
     box.innerHTML = PATH_OPTS.map(o => {
       const sel = (o.id === charPath);
+      const mark = PATH_MARK[o.id] || '';
       if(readonly){
         /* 终身道途编辑态：只读展示，当前道途高亮、其余灰显，不可点（禁止转职，GPT 代码审查②） */
-        return '<div class="char-pick' + (sel ? ' active' : '') + ' readonly" data-path="' + o.id + '">' +
+        return '<div class="char-pick' + (sel ? ' active' : '') + ' readonly" data-path="' + o.id + '" data-mark="' + mark + '">' +
+                 (sel ? '<span class="cp-seal">已选</span>' : '') +
                  '<span class="cp-name">' + o.name + '</span>' +
+                 '<span class="cp-tag">' + o.tag + '</span>' +
                  '<span class="cp-hint">' + o.hint + '</span>' +
-                 '<span class="cp-bonus">' + pathBonusSegText(o.id) + '</span>' +
+                 '<span class="cp-info" data-pathinfo="' + o.id + '" role="button" tabindex="0" aria-label="' + o.name + '道途详情">?</span>' +
                '</div>';
       }
-      return '<button type="button" class="char-pick' + (sel ? ' active' : '') + '" data-path="' + o.id + '" aria-pressed="' + sel + '">' +
+      return '<button type="button" class="char-pick' + (sel ? ' active' : '') + '" data-path="' + o.id + '" data-mark="' + mark + '" aria-pressed="' + sel + '">' +
+               (sel ? '<span class="cp-seal">已选</span>' : '') +
                '<span class="cp-name">' + o.name + '</span>' +
+               '<span class="cp-tag">' + o.tag + '</span>' +
                '<span class="cp-hint">' + o.hint + '</span>' +
-               '<span class="cp-bonus">' + pathBonusSegText(o.id) + '</span>' +
+               '<span class="cp-info" data-pathinfo="' + o.id + '" role="button" tabindex="0" aria-label="' + o.name + '道途详情">?</span>' +
              '</button>';
     }).join('');
     let label = document.getElementById('char-path-label');
@@ -15226,6 +15266,8 @@ function towerBossCompLetter(){
     if(!box.dataset.bound){
       box.dataset.bound = '1';
       box.addEventListener('click', ev => {
+        const info = ev.target.closest('[data-pathinfo]');
+        if(info){ ev.stopPropagation(); showPathInfo(info.getAttribute('data-pathinfo')); return; }
         if(pathLocked) return;                 /* 终身道途：编辑态只读，不接受点击改选 */
         const b = ev.target.closest('.char-pick');
         if(!b) return;
@@ -16209,6 +16251,8 @@ function towerBossCompLetter(){
     _pathBonusLabel: pathBonusLabel, _pathBonusTable: pathBonusTable, _pathBonusSegText: pathBonusSegText,
     _assertPathBonusNoDrift: assertPathBonusNoDrift,
     _renderCharPreview: renderCharPreview, _confirmChar: confirmChar,
+    _renderPathPreview: renderPathPreview, _showPathInfo: showPathInfo, _pathOpts: PATH_OPTS,
+    _showCharModal: showCharModal,
     _genderOf: genderOf, _sexOf: sexOf,
     /* ===== 闭关归来弹窗 + 入口红点（2026-10-24）===== */
     _offlineModal: showOffline, _lastOffline: () => lastOfflineInfo, _initDots: initEntryDots, _dots: renderDots,

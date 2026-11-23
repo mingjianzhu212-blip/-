@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1210">
 <title>九霄问道 · 放置挂机</title>
-<link rel="stylesheet" href="style.css?v=20261122b6">
+<link rel="stylesheet" href="style.css?v=20261123ui1">
 <script src="js/img_fallback.js"></script>  <!-- A6：全站图片失败/超时文字兜底（NPC 立绘走 npc_art） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -308,14 +308,19 @@
 <!-- 创立角色（首次进入触发，向大型网游看齐） -->
 <div class="modal hidden" id="char-modal">
   <div class="m-card char-card char-card-lg">
-    <h3>创立角色 <button class="m-close" id="char-close" type="button" style="display:none" aria-label="关闭">×</button></h3>
+    <h3><span class="char-orn l" aria-hidden="true"></span><span class="char-title">创立角色</span><span class="char-orn r" aria-hidden="true"></span><button class="m-close" id="char-close" type="button" style="display:none" aria-label="关闭">×</button></h3>
     <!-- 立绘选择区：两张立绘并排居中，点击选中（放大 + 高亮），下方是道号输入 -->
     <div class="char-picks" id="char-picks"></div>
-    <div class="m-row">
+    <div class="m-row char-name-row">
       <label>道号（1~8 字）</label>
-      <input id="char-name" type="text" maxlength="8" placeholder="如：青玄子">
+      <div class="char-name-wrap">
+        <input id="char-name" type="text" maxlength="8" placeholder="如：青玄子">
+        <button class="char-dice" id="char-dice" type="button" aria-label="随机道号" title="随机道号">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/></svg>
+        </button>
+      </div>
     </div>
-    <button class="btn-main" id="char-confirm">踏入仙途</button>
+    <button class="btn-main char-confirm-main" id="char-confirm">踏入仙途</button>
   </div>
 </div>
 
@@ -597,7 +602,7 @@
 <script src="js/multi-ledger.js"></script> <!-- 联机结算幂等账（123 轮）：必须先于 game.js；纯逻辑，不碰 DOM/存储 -->
 <script src="js/multi-local.js"></script>  <!-- 阶段四 C3（D4 A2-LOCAL）：本地陪练五层引擎；必须先于 game.js；纯逻辑，常量逐项抄自 server/server.mjs，server/ 零改动 -->
 <script src="js/npc_art.js"></script>           <!-- NPC 立绘公共缓存（B3）：预加载 / 3 秒超时重试 / 本地兜底 / 四呈现位共用；缺失时各视图退回「碑」字块 -->
-<script src="js/game.js?v=20261122b6s2"></script>
+<script src="js/game.js?v=20261123ui1"></script>
 <script src="js/trib.js"></script>
 <script src="js/npc_memory.js"></script>       <!-- NPC 记忆存储（独立键 jxwd_npc_memory_v1，不碰主存档；缺失时对话静默回退） -->
 <script src="js/npc_memory_voice.js"></script> <!-- NPC 称呼语气（按记忆分档；缺失/异常时静默回退） -->
