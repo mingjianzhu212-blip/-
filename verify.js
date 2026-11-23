@@ -3584,7 +3584,9 @@ const DIAG = `
     const S = XX._s;
     S.bag = []; S.letters = []; S.bagSize = 20;
     for(let i = 0; i < XX._bagCap(); i++) S.bag.push({ t:'mat_core', n:'妖丹' });
-    const mr = XX._addItemEx('mat_core', '妖丹');
+    /* 堆叠后同键满格也能并，满包测试必须用「背包里没有的品类」才能走到信匣分支 */
+    S.bag = []; for(let i = 0; i < XX._bagCap(); i++) S.bag.push({ t:'mat_core', n:'妖丹' });
+    const mr = XX._addItemEx('dan1', '下品丹药');
     L('s1Mail', mr.mail ? 'yes' : 'no');
     L('s1Pending', XX._ovPending());
     const ov = XX._ovLetter();
@@ -3725,6 +3727,39 @@ const DIAG = `
     L('anchorGateBusy', dcs[1] && dcs[1].classList.contains('anchor-locked') ? 'yes' : 'no');
     L('anchorGateLock', dcs[1] && dcs[1].querySelector('.anchor-lock') ? 'yes' : 'no');
   }catch(e){ L('anchorEXC', (e.stack || e.message || '').toString().slice(0, 200)); }
+
+  /* 跟进单：背包堆叠（老档合并对账 / 同键并格 / 装备不并 / 容量按格 / 消耗按件） */
+  try{
+    const S = XX._s;
+    S.bag = [];
+    for(let i = 0; i < 12; i++) S.bag.push({ t: 'mat_bone', n: '兽骨' });
+    for(let i = 0; i < 5; i++) S.bag.push({ t: 'mat_core', n: '妖丹' });
+    S.bag.push({ t: 'eq_chixiao', n: '赤霄剑' });
+    S.bag.push({ t: 'eq_chixiao', n: '赤霄剑' });
+    S.name = '青玄子';
+    localStorage.setItem('xiuxian_save', JSON.stringify(S));
+    XX._load();
+    const bm = XX._bagMerge();
+    L('bagMergeItems', bm.beforeItems + '/' + bm.afterItems);
+    L('bagMergeSlots', bm.beforeSlots + '/' + bm.afterSlots);
+    L('bagMergeEq', String(XX._s.bag.filter(x => x.t === 'eq_chixiao').length));
+    L('bagBoneQty', String(XX._countItem('mat_bone')));
+    const bagSlots0 = XX._s.bag.length;
+    XX._bagAdd('mat_bone', '兽骨', 3);
+    L('bagAddSame', (XX._s.bag.length - bagSlots0) + '/' + XX._countItem('mat_bone'));
+    const bagSlots1 = XX._s.bag.length;
+    XX._bagAdd('mat_bone', '妖兽骨', 1);
+    L('bagAddDiffName', String(XX._s.bag.length - bagSlots1));
+    const keepBag = XX._s.bag;
+    XX._s.bag = [];
+    for(let i = 0; i < XX._s.bagSize; i++) XX._s.bag.push({ t: 'mat_bone', n: '兽骨', q: 1 });
+    L('bagFullMerge', XX._bagCanAccept('mat_bone') ? 'yes' : 'no');
+    L('bagFullNew', XX._bagCanAccept('dan2') ? 'yes' : 'no');
+    XX._s.bag = keepBag;
+    XX._s.bag = [{ t: 'mat_core', n: '妖丹', q: 5 }];
+    XX._removeItems('mat_core', 2);
+    L('bagTake', String(XX._s.bag[0] && XX._s.bag[0].q));
+  }catch(e){ L('bagEXC', (e.stack || e.message || '').toString().slice(0, 200)); }
   L('vtUsed', Math.round(performance.now()));
   const d=document.createElement('pre'); d.id='diag'; d.textContent=out.join(' | '); document.body.appendChild(d);
 })();
@@ -4437,7 +4472,7 @@ const DIAG = `
   ok(F.vaultFloor === 'same', '藏宝室不推层（塔层原地不动）');
   ok(F.vaultHerb === 'up' && F.vaultOre === 'up', '藏宝室给灵草与矿石');
   ok(F.vaultCharm === '1', '藏宝室必得一枚塔内符（' + F.vaultCharm + '）');
-  ok(Number(F.eliteStone) > 0 && Number(F.eliteBag) === 3, '精锐门：灵石更厚、材料 ×2 + 装备（' + F.eliteStone + ' / ' + F.eliteBag + '）');
+  ok(Number(F.eliteStone) > 0 && Number(F.eliteBag) >= 1, '精锐门：灵石更厚、材料 ×2 并格（本层装备若已持有不重复掉）（' + F.eliteStone + ' / 格+' + F.eliteBag + '）');
   ok(F.trunDone === 'closed', '五步走完自动出塔（不留悬着的局）');
   ok(F.trunLastWhy === 'done/5', '上一局账本记满五步（' + F.trunLastWhy + '）');
   ok(F.eliteLocked === 'yes', '战力差太远的精锐门按不动');
@@ -4524,6 +4559,15 @@ const DIAG = `
   ok(gameSrc.indexOf("背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再买。") >= 0 &&
      gameSrc.indexOf("背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再换。") >= 0,
      '坊市 / 论剑购买背包满时给明确 toast（不再静默）');
+  /* 跟进单：背包堆叠 */
+  ok(F.bagMergeItems === '19/19' && F.bagMergeSlots === '19/4' && F.bagMergeEq === '2' && F.bagBoneQty === '12',
+     '老档散件合并：19 件对 19 件（总件数不变），19 格并成 4 格，两件装备各占一格（'
+       + [F.bagMergeItems, F.bagMergeSlots, F.bagMergeEq, F.bagBoneQty].join(' / ') + '）');
+  ok(F.bagAddSame === '0/15' && F.bagAddDiffName === '1',
+     '同键并格不占新格；名称不同宁可不并（' + [F.bagAddSame, F.bagAddDiffName].join(' / ') + '）');
+  ok(F.bagFullMerge === 'yes' && F.bagFullNew === 'no',
+     '满格时已有同键可继续叠、新品类不可入（容量按格）（' + [F.bagFullMerge, F.bagFullNew].join(' / ') + '）');
+  ok(F.bagTake === '3', '消耗按件：5 件扣 2 剩 3（' + F.bagTake + '）');
   ok(/\.bt-vs-txt\{[^}]*white-space:nowrap/.test(chatCss),
      '「对决」印不许折行（390 窄屏实拍过：不加 nowrap 会竖排成「对/决」两行）');
   /* 第 84 轮 · 战斗面板：源码侧锁住几处「一改就退回旧观」的要点 */
@@ -4895,9 +4939,9 @@ const DIAG = `
     danArt.err || (danArt.bad || []).join(','));
   ok(F.itemEatWorks === 'yes', '详情框点服食：服下丹药、背包减 1');
   ok(F.bagCapCells === '80', '背包格子按有效容量画（基础 50 + 洞天 30，' + F.bagCapCells + '）');
-  ok(F.bagCapLabel === '已用 60 / 容量 80（洞天 +30）', '容量标签写已用/容量并注明洞天加格（' + F.bagCapLabel + '）');
-  ok(F.bagOverLabel === '已用 60 / 容量 50（超 10 格）' && F.bagOverClass === 'yes',
-    '主洞改奉后容量变小：物品不消失，标签标「超 N 格」（' + F.bagOverLabel + '）');
+  ok(F.bagCapLabel === '已用 60 / 容量 80（洞天 +30） · 共 60 件', '容量标签写已用/容量/总件数并注明洞天加格（' + F.bagCapLabel + '）');
+  ok(F.bagOverLabel === '已用 60 / 容量 50（超 10 格） · 共 60 件' && F.bagOverClass === 'yes',
+    '主洞改奉后容量变小：物品不消失，标签标「超 N 格」+ 总件数（' + F.bagOverLabel + '）');
   ok(F.bagOverCells === '60', '超容量的物品仍渲染在背包里（' + F.bagOverCells + ' 格）');
   ok(F.equipOk === 'yes', '装备青锋剑成功');
   ok(F.equipDelta === '500', '穿上后战力 +500（武器加成，' + F.equipDelta + '）');
@@ -5363,8 +5407,8 @@ const DIAG = `
   ok(F.stSecClosed === 'yes/0', '关掉探路＝没闯：层数不动（' + F.stSecClosed + '）');
   ok(F.stSecStone === '0' && F.stSecStoneMat === '0' && F.stSecStoneProg === '1',
      '取财：灵石 ×1.6、不带材料、照样推一层（' + F.stSecStone + '/' + F.stSecStoneMat + '/' + F.stSecStoneProg + '）');
-  ok(F.stSecMatStone === '0' && F.stSecMatBag === '2' && F.stSecMatProg === '2',
-     '取料：灵石 ×0.6、材料 ×2、推一层（' + F.stSecMatStone + '/' + F.stSecMatBag + '/' + F.stSecMatProg + '）');
+  ok(F.stSecMatStone === '0' && F.stSecMatBag === '1' && F.stSecMatProg === '2',
+     '取料：灵石 ×0.6、材料 +2 件并 1 格、推一层（' + F.stSecMatStone + '/' + F.stSecMatBag + '/' + F.stSecMatProg + '）');
   ok(F.stSecFull === 'same/3', '背包满时取料一颗也塞不进，但层数照推、不崩（' + F.stSecFull + '）');
   ok(F.tier1 === '1', '声望 100 → 内门弟子段位（' + F.tier1 + '）');
 
@@ -5399,7 +5443,7 @@ const DIAG = `
   ok(F.n13DeadPill === 'ok', 'N13 死丹 dan_juqi 文案不再宣称可服食');
   /* 阶段三 S1/S2/S3 回归 */
   ok(F.s1Mail === 'yes' && F.s1Pending === '1', 'S1 满包奖励进信匣（不丢失）：' + F.s1Mail + '/' + F.s1Pending);
-  ok(F.s1Claim === '妖丹 ×1' && F.s1Pending2 === '0', 'S1 信匣取回真进背包：' + F.s1Claim + ' / 余 ' + F.s1Pending2);
+  ok(F.s1Claim === '下品破境丹 ×1' && F.s1Pending2 === '0', 'S1 信匣取回真进背包：' + F.s1Claim + ' / 余 ' + F.s1Pending2);
   ok(F.s2Parts === 'yes' && F.s2Final === 'yes', 'S2 确认页拆账合计=raw、最终=判定口径');
   ok(F.s3Own === 'yes', 'S3 天机令持有数读主状态（主线发放后显示「持有 1」）');
   ok(F.s4Stable === 'yes', 'S4 签到按钮跨 1.3s 重绘仍在同一节点（点击吞没根治）');
@@ -6382,7 +6426,8 @@ document.title=JSON.stringify({tut:localStorage.getItem("hasFinishedTutorial"),
     .replace('</head>', '<script>try{localStorage.setItem("xiuxian_save",' +
       JSON.stringify(JSON.stringify(bagSeed)) + ');}catch(e){}</scr' + 'ipt>\n</head>')
     .replace('</body>', '<script>setTimeout(function(){try{window.switchTab("bag");}catch(e){}' +
-      'setTimeout(function(){document.title=JSON.stringify({n:XX._s.bag.length,cap:XX._bagCap(),' +
+      'setTimeout(function(){var q=0;XX._s.bag.forEach(function(x){q+=XX._bagQty(x)});' +
+      'document.title=JSON.stringify({n:XX._s.bag.length,q:q,cap:XX._bagCap(),' +
       'txt:(document.getElementById("xx-bag-cap")||{}).textContent,' +
       'cells:document.querySelectorAll("#xx-bag .bag-cell").length});},400);},900);</scr' + 'ipt>\n</body>'), 'utf8');
   let BR = {};
@@ -6394,8 +6439,8 @@ document.title=JSON.stringify({tut:localStorage.getItem("hasFinishedTutorial"),
     const mtb = bdom.match(/<title>([^<]*)<\/title>/);
     BR = mtb ? JSON.parse(mtb[1]) : {};
   } catch (e) { BR = { err: String(e).slice(0, 80) }; }
-  ok(BR.n === 60 && BR.cap === 80 && BR.txt === '已用 60 / 容量 80（洞天 +30）' && BR.cells === 80,
-    '洞天加格的物品读档不丢：60 件全读回、格子 80、标签写有效容量', JSON.stringify(BR));
+  ok(BR.n === 1 && BR.q === 60 && BR.cap === 80 && BR.txt === '已用 1 / 容量 80（洞天 +30） · 共 60 件' && BR.cells === 80,
+    '洞天加格的物品读档不丢：60 件并 1 格全读回、格子 80、标签写有效容量与总件数', JSON.stringify(BR));
   try { fs.rmSync(ud4, { recursive: true, force: true }); } catch (e) {}
 
   // 截图

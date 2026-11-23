@@ -6364,6 +6364,16 @@ html,body{ background:var(--jx-paper); }
 .upg-mirror.anchor-ready .upg-state{ color:#8a5a16; background:rgba(216,178,90,.16); }
 .upg-mirror.anchor-locked .upg-state{ color:#8a7a5c; }
 
+/* ===== batch7 跟进单：背包堆叠数量角标 ===== */
+.bag-cell .bag-qty{
+  position:absolute; right:3px; top:2px; z-index:2;
+  padding:0 4px; border-radius:8px;
+  font-style:normal; font-size:10px; line-height:1.5; letter-spacing:0;
+  color:#fbf4e6; background:#8a3a2c;
+  box-shadow:0 1px 2px rgba(0,0,0,.28);
+  pointer-events:none;
+}
+
 /* ===== batch7 跟进单第 2 项：城镇页道途横幅避让建筑 =====
    原来 top 92 居中横跨，左压「清虚观 · 城镇」题签、右压藏经阁塔顶，且整条是按钮会吞建筑点击。
    城镇里改到题签右侧的顶栏空白带（y 104–144），隐藏次要提示保持单行，不碰题签/藏经阁/镇妖塔。 */

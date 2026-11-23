@@ -2552,7 +2552,7 @@ const XX = (function(){
     if(S.arena.rep < it.rep){ log('声望不足，换【' + it.name + '】要 ' + it.rep + ' 声望。', 'bad'); return; }
     if(it.id === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
     if(it.id === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满，先去灵兽园孵化。', 'bad'); return; }
-    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && S.bag.length >= bagCap()){
+    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && !bagCanAccept(it.id)){
       const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再换。';
       log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
       return;
@@ -2572,7 +2572,7 @@ const XX = (function(){
     if(S.arena.rep < it.rep){ log('声望不足，换【' + it.name + '】要 ' + it.rep + ' 声望。', 'bad'); return; }
     if(it.id === 'bag' && S.bagSize >= BAG_CAP){ log('背包已到 ' + BAG_CAP + ' 格，装不下了。', 'bad'); return; }
     if(it.id === 'egg' && S.eggs.length >= BAL.petEggMax){ log('蛋篓已满，先去灵兽园孵化。', 'bad'); return; }
-    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && S.bag.length >= bagCap()){
+    if((it.id === 'boss_core' || it.id === 'boss_pearl' || it.id === 'dan3') && !bagCanAccept(it.id)){
       const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再换。';
       log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
       return;
@@ -2880,8 +2880,9 @@ const XX = (function(){
     /* 扫荡只给材料不爆背包：每章按进度给 1 个该章材料 */
     let got = 0;
     SECRET_CH.forEach(ch => {
-      if(secretProg(SECRET_CH.indexOf(ch)) > 0 && S.bag.length < bagCap()){
-        S.bag.push({ t: ch.mat, n: ((ITEMS[ch.mat] || {}).n) || ch.mat }); got++;
+      if(secretProg(SECRET_CH.indexOf(ch)) > 0){
+        const r = bagAddQty(ch.mat, ((ITEMS[ch.mat] || {}).n) || ch.mat, 1);
+        if(r.ok) got++;
       }
     });
     S.secret.swept = 1;
@@ -4758,6 +4759,8 @@ const XX = (function(){
   function clearTutorialMark(){
     try{ localStorage.removeItem('hasFinishedTutorial'); }catch(e){}
   }
+  /* 最近一次读档的背包堆叠对账（UI/测试只读）：{beforeSlots, afterSlots, beforeItems, afterItems} */
+  let lastBagMerge = null;
   function load(){
     /* raw 提升到 try 外：catch 里要拿它做毁档备份（见下）。
        load 是 400 行的长迁移函数，任何一处抛错（往往是代码 bug，不是存档坏了）
@@ -5360,6 +5363,31 @@ const XX = (function(){
           if(meta && meta.n && it.n !== meta.n) it.n = meta.n;
         });
       }catch(e){}
+      /* 背包堆叠迁移（batch7 跟进单）：旧档散件 → 同键并格，总件数必须一件不少。
+         装备/法宝（eq_/art_/有装备槽）不同键、不并；其它按 id+全部变型字段归并。 */
+      try{
+        const beforeSlots = S.bag.length;
+        let beforeItems = 0;
+        S.bag.forEach(it => { beforeItems += bagQtyOf(it); });
+        const merged = [], map = new Map();
+        S.bag.forEach(it => {
+          const q = bagQtyOf(it);
+          const key = bagStackKey(it);
+          if(key && map.has(key)){ map.get(key).q = bagQtyOf(map.get(key)) + q; return; }
+          const copy = Object.assign({}, it);
+          copy.q = q;
+          merged.push(copy);
+          if(key) map.set(key, copy);
+        });
+        let afterItems = 0;
+        merged.forEach(it => { afterItems += bagQtyOf(it); });
+        S.bag = merged;
+        lastBagMerge = { beforeSlots, afterSlots: merged.length, beforeItems, afterItems };
+      }catch(e){ lastBagMerge = { error: String(e && e.message || e).slice(0, 80) }; }
+      if(lastBagMerge && !lastBagMerge.error && lastBagMerge.beforeSlots !== lastBagMerge.afterSlots){
+        try{ console.info('[背包堆叠迁移] 格 ' + lastBagMerge.beforeSlots + '→' + lastBagMerge.afterSlots +
+          '，件 ' + lastBagMerge.beforeItems + '→' + lastBagMerge.afterItems); }catch(e){}
+      }
       /* 任务进度：stats 合并，questsDone 读取 */
       if(o.stats && typeof o.stats === 'object'){
         Object.keys(S.stats).forEach(k => { if(typeof o.stats[k] === 'number' && isFinite(o.stats[k])) S.stats[k] = o.stats[k]; });
@@ -7292,7 +7320,7 @@ function towerBossCompLetter(){
     const g = marketItem(slot.id);
     if(!g){ log('这格货的数据缺失，已为你换新货。', 'bad'); rollMarket(); renderMarket(); return; }
     if(S.stone < slot.price){ const m='灵石不足，买【' + g.name + '】要 ' + fmt(slot.price) + ' 灵石（差 ' + fmt(slot.price - S.stone) + '）。'; log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){} return; }
-    if(g.kind === 'item' && S.bag.length >= bagCap()){
+    if(g.kind === 'item' && !bagCanAccept(g.item || g.id)){
       const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再买。';
       log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
       return;
@@ -7318,7 +7346,7 @@ function towerBossCompLetter(){
     const g = marketItem(slot.id);
     if(!g){ log('这格货的数据缺失，已为你换新货。', 'bad'); rollMarket(); renderMarket(); return; }
     if(S.stone < slot.price){ const m='灵石不足，买【' + g.name + '】要 ' + fmt(slot.price) + ' 灵石（差 ' + fmt(slot.price - S.stone) + '）。'; log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){} return; }
-    if(g.kind === 'item' && S.bag.length >= bagCap()){
+    if(g.kind === 'item' && !bagCanAccept(g.item || g.id)){
       const m = '背包已满（' + bagCap() + ' 格），先卖掉或扩个储物袋再买。';
       log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
       return;
@@ -7370,7 +7398,7 @@ function towerBossCompLetter(){
     if(!it){ log('这件东西已经不在背包里了，请重新打开背包再看。', 'bad'); return; }
     const p = sellPrice(it.t);
     if(!p){ log('坊市不收「' + it.n + '」（只收丹药和妖兽材料）。', 'bad'); return; }
-    S.bag.splice(idx, 1);
+    bagConsumeIdx(idx, 1);   /* 堆叠格卖 1 件，单价不变 */
     S.stone += p;
     S.stats.stoneEarned += p;
     S.market.sold++;
@@ -7383,11 +7411,15 @@ function towerBossCompLetter(){
     resetMarket();
     let n = 0, sum = 0;
     for(let i = S.bag.length - 1; i >= 0; i--){
-      if(S.market.sold >= BAL.marketSellMax * 2) break;
-      const p = sellPrice(S.bag[i].t);
+      const left = BAL.marketSellMax * 2 - S.market.sold;
+      if(left <= 0) break;
+      const it = S.bag[i];
+      const p = sellPrice(it.t);
       if(!p) continue;
-      S.bag.splice(i, 1);
-      sum += p; S.market.sold++; n++;
+      const q = bagQtyOf(it);
+      const take = Math.min(q, left);
+      if(take >= q) S.bag.splice(i, 1); else it.q = q - take;   /* 整叠卖，单价按件不变 */
+      sum += p * take; S.market.sold += take; n += take;
     }
     if(!n){ log('背包里没有坊市收的东西。', 'bad'); return; }
     S.stone += sum; S.stats.stoneEarned += sum;
@@ -7459,11 +7491,13 @@ function towerBossCompLetter(){
       let html = '';
       sellable.slice(0, 12).forEach(({ it, i, p }) => {
         const meta = ITEMS[it.t] || {};
+        const q = bagQtyOf(it);
         const ico = meta.img ? '<img src="' + meta.img + '" alt="">' : '<img class="mk-emo" src="ui/icons/ic_box.png" alt="">';
-        html += '<div class="mk-row">' + ico + '<div class="mk-main"><b>' + it.n + '</b></div>' +
+        html += '<div class="mk-row">' + ico + '<div class="mk-main"><b>' + it.n + (q > 1 ? ' ×' + q : '') + '</b></div>' +
           '<button class="mk-buy sell" data-sell="' + i + '">' + fmt(p) + '</button></div>';
       });
-      html += '<button class="mk-all"' + (sellable.length ? '' : ' disabled') + '>' + inkIco('💰') + '一键寄售全部（' + sellable.length + ' 件可卖）</button>';
+      const sellTotal = sellable.reduce((a, x) => a + bagQtyOf(x.it), 0);
+      html += '<button class="mk-all"' + (sellable.length ? '' : ' disabled') + '>' + inkIco('💰') + '一键寄售全部（' + sellTotal + ' 件可卖）</button>';
       html += '<p class="hint">上面只列出前 12 件；一键寄售会卖出背包里全部可卖材料（受今日寄售额度限制）· 点单件可单独卖 · 丹药也能卖，但吃了更划算</p>';
       if(sBox !== sellBox || html !== sellSig){
         sellBox = sBox; sellSig = html;
@@ -7672,15 +7706,15 @@ function towerBossCompLetter(){
   /* addItemEx：ok=进背包；mail=已暂存信匣；两者都算“奖励没有丢”。 */
   function addItemEx(t, n){
     n = n || (ITEMS[t] || {}).n || t;
-    if(S.bag.length >= bagCap()){
-      if(stashOverflow(t, 1)){
+    const r = bagAddQty(t, n, 1);
+    if(!r.ok){
+      if(r.mail){
         log('背包已满（' + bagCap() + ' 格），「' + n + '」已暂存信匣（打开背包可领）。', 'bad');
         return { ok: false, mail: true };
       }
       log('背包已满（' + bagCap() + ' 格），装不下「' + n + '」了。', 'bad');
       return { ok: false, mail: false };
     }
-    S.bag.push({ t: t, n: n });
     renderBag();
     return { ok: true, mail: false };
   }
@@ -7694,7 +7728,11 @@ function towerBossCompLetter(){
     const got = [], left = [], srows = [];
     list.forEach(function(e){
       let added = 0;
-      while(added < e.n && S.bag.length < bagCap()){ S.bag.push({ t: e.t, n: ovName(e.t) }); added++; }
+      while(added < e.n){
+        const one = bagAddQty(e.t, ovName(e.t), 1, true);   /* 领取不再往信匣回塞 */
+        if(!one.ok) break;
+        added++;
+      }
       if(added > 0){ got.push(ovName(e.t) + ' ×' + added); srows.push(settleLine('取回 · ' + ovName(e.t), '+' + added, 'good')); }
       if(added < e.n) left.push({ t: e.t, n: e.n - added });
     });
@@ -7776,14 +7814,14 @@ function towerBossCompLetter(){
     }
     const before = combatPower();
     const oldId = S.equipment[meta.slot];
-    S.bag.splice(idx, 1);                       /* 从背包取出 */
+    bagConsumeIdx(idx, 1);                      /* 从背包取出（装备单件，不并格） */
     S.equipment[meta.slot] = itemId;            /* 放入对应槽 */
     let returned = { ok: true, mail: false };
     if(oldId) returned = addItemEx(oldId, (ITEMS[oldId] || {}).n || oldId);   /* 换下来的退回背包/信匣 */
     if(!returned.ok && !returned.mail){
       /* 连信匣都写不进去：回滚，不让旧装备凭空消失 */
       S.equipment[meta.slot] = oldId || null;
-      S.bag.unshift({ t: itemId, n: meta.n });
+      S.bag.unshift({ t: itemId, n: meta.n, q: 1 });   /* 装备单件身份，不并格 */
       save(); render(); renderBag();
       log('换下的旧装备无处安放，本次换装已取消。', 'bad');
       return { ok: false, reason: 'stash-fail' };
@@ -8452,11 +8490,74 @@ function towerBossCompLetter(){
     const m = document.getElementById('power-modal');
     if(m) m.classList.add('hidden');
   }
-  /* 背包里某类物品的数量（炼丹材料配方用） */
-  function countItem(t){ return S.bag.filter(x => x.t === t).length; }
+  /* ===== 背包堆叠（batch7 跟进单）=====
+     一格一件 → 一格一叠：同 id + 全部变型属性（除数量 q 外）完全相同才并。
+     带个体身份的品类明确不并：装备/法宝（eg_/art_ 前缀或有装备槽的 ITEMS 条目）。
+     容量仍按格算（S.bag.length），一格叠多少件都只占一格；数量只体现在 q 上。 */
+  const BAG_STACK_NO_T = /^(eq_|art_)/;
+  function bagQtyOf(it){ const q = it && Number(it.q); return (isFinite(q) && q > 0) ? Math.floor(q) : 1; }
+  function bagStackKey(it){
+    if(!it || !it.t) return null;
+    if(BAG_STACK_NO_T.test(String(it.t))) return null;
+    const meta = ITEMS[it.t];
+    if(meta && (meta.slot || meta.type === 'equip')) return null;
+    /* 键 = id + 除数量 q 外的全部字段（排序后序列化）；n 也参与，名字不同宁可不并 */
+    const keys = Object.keys(it).filter(k => k !== 'q').sort();
+    return keys.map(k => k + '=' + String(it[k])).join('\u0001');
+  }
+  /* 往背包加 qty 件：能并先并；不能并且满格 → 信匣（与 addItemEx 同口径，不丢） */
+  function bagAddQty(t, n, qty, noMail){
+    qty = Math.max(1, Math.floor(Number(qty) || 1));
+    n = n || (ITEMS[t] || {}).n || t;
+    const key = bagStackKey({ t: t, n: n });
+    if(key){
+      for(let i = 0; i < S.bag.length; i++){
+        const it = S.bag[i];
+        if(bagStackKey(it) === key){ it.q = bagQtyOf(it) + qty; return { ok: true, mail: false, merged: true }; }
+      }
+    }
+    if(S.bag.length >= bagCap()){
+      if(!noMail && stashOverflow(t, qty)) return { ok: false, mail: true };
+      return { ok: false, mail: false };
+    }
+    const slot = { t: t, n: n, q: qty };
+    S.bag.push(slot);
+    return { ok: true, mail: false, merged: false };
+  }
+  /* 还能不能收下 1 件某物：已有同键叠格即使满格也能并；否则看剩余格数 */
+  function bagCanAccept(t, n){
+    n = n || (ITEMS[t] || {}).n || t;
+    const key = bagStackKey({ t: t, n: n });
+    if(key){
+      for(let i = 0; i < S.bag.length; i++) if(bagStackKey(S.bag[i]) === key) return true;
+    }
+    return S.bag.length < bagCap();
+  }
+  /* 从某一格扣 qty 件；扣空即删格。返回实际扣掉的件数。 */
+  function bagConsumeIdx(idx, qty){
+    const it = S.bag[idx];
+    if(!it) return 0;
+    const have = bagQtyOf(it);
+    const take = Math.min(have, Math.max(1, Math.floor(Number(qty) || 1)));
+    if(have <= take) S.bag.splice(idx, 1);
+    else it.q = have - take;
+    return take;
+  }
+  /* 背包里某类物品的总件数（按 q 累加，不是格数） */
+  function countItem(t){
+    let n = 0;
+    for(let i = 0; i < S.bag.length; i++){ const it = S.bag[i]; if(it && it.t === t) n += bagQtyOf(it); }
+    return n;
+  }
   function removeItems(t, n){
-    let removed = 0;
-    S.bag = S.bag.filter(x => { if(x.t === t && removed < n){ removed++; return false; } return true; });
+    n = Math.max(0, Math.floor(Number(n) || 0));
+    for(let i = S.bag.length - 1; i >= 0 && n > 0; i--){
+      const it = S.bag[i];
+      if(!it || it.t !== t) continue;
+      const q = bagQtyOf(it);
+      if(q <= n){ n -= q; S.bag.splice(i, 1); }
+      else { it.q = q - n; n = 0; }
+    }
   }
   /* 储物袋扩容：+5 格，最多 50 */
   function buyBag(fromEl){
@@ -8653,7 +8754,7 @@ function towerBossCompLetter(){
         log(matName(m.t) + '不足，炼【' + rec.name + '】要 ' + m.n + ' 个。', 'bad'); return;
       }
     }
-    if(rec.out !== 'weapon' && rec.out !== 'art' && S.bag.length >= bagCap()){
+    if(rec.out !== 'weapon' && rec.out !== 'art' && !bagCanAccept(rec.out)){
       const m = '背包已满（' + bagCap() + ' 格），先腾地方或扩个储物袋再炼。';
       log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
       return;
@@ -8875,7 +8976,7 @@ function towerBossCompLetter(){
         if(typeof confirm === 'function' && !confirm('确定丢弃「' + it.n + '」？丢弃后不可找回。')) return;
         log('🗑️ 丢掉了「' + it.n + '」。', '');
       }
-      S.bag.splice(idx, 1);
+      bagConsumeIdx(idx, 1);
       save(); render(); renderBag();
       return;
     }
@@ -8894,7 +8995,7 @@ function towerBossCompLetter(){
         log('🗑️ 丢掉了「' + it.n + '」。', '');
       }
     }
-    S.bag.splice(idx, 1);
+    bagConsumeIdx(idx, 1);
     save(); render(); renderBag();
   }
   /* ---------- 背包物品详情弹窗 ----------
@@ -8922,7 +9023,8 @@ function towerBossCompLetter(){
     const ico = document.getElementById('it-ico');
     if(ico) ico.innerHTML = '<img src="' + (meta.img || 'ui/icons/ic_box.png') + '" alt="' + it.n + '">';
     const nm = document.getElementById('it-name');
-    if(nm){ nm.textContent = it.n; nm.className = meta.cls || ''; }
+    const itQ = bagQtyOf(it);
+    if(nm){ nm.textContent = it.n + (itQ > 1 ? ' ×' + itQ : ''); nm.className = meta.cls || ''; }
     setTxt('it-desc',   meta.description || '此物来历不明，典籍未见记载。');
     setTxt('it-usage',  meta.usage       || '暂无用途记载');
     setTxt('it-source', meta.source      || '来历不明');
@@ -9185,14 +9287,16 @@ function towerBossCompLetter(){
       /* Boss 稀有材料优先掉落（每次击杀 1 个，稀有更有价值） */
       if(beast.boss && beast.bossDrop){
         const bmeta = ITEMS[beast.bossDrop];
-        for(let i = 0; i < killed && S.bag.length < bagCap(); i++){
-          S.bag.push({ t: beast.bossDrop, n: bmeta ? bmeta.n : beast.bossDrop });
+        for(let i = 0; i < killed; i++){
+          const r = bagAddQty(beast.bossDrop, bmeta ? bmeta.n : beast.bossDrop, 1, true);
+          if(!r.ok) break;
           bossCount++;
         }
       }
       /* 普通材料填剩余空间（每次击杀 1 个） */
-      for(let i = 0; i < killed && S.bag.length < bagCap(); i++){
-        S.bag.push({ t: beast.drop, n: meta ? meta.n : beast.drop });
+      for(let i = 0; i < killed; i++){
+        const r = bagAddQty(beast.drop, meta ? meta.n : beast.drop, 1, true);
+        if(!r.ok) break;
         added++;
       }
       /* 猎妖拾蛋（普通妖兽按品阶概率掉蛋；Boss 走首通必掉，不随机） */
@@ -9328,9 +9432,9 @@ function towerBossCompLetter(){
       stone = Math.round(needOf(S.rank) * TRACE.winStoneK);
       S.stone += stone; S.stats.stoneEarned += stone;
       mat = beast ? (beast.boss && beast.bossDrop ? beast.bossDrop : beast.drop) : null;
-      if(mat && S.bag.length < bagCap()){
-        S.bag.push({ t: mat, n: (ITEMS[mat] || {}).n || mat });
-        matN = 1;
+      if(mat){
+        const r = bagAddQty(mat, (ITEMS[mat] || {}).n || mat, 1, true);
+        if(r.ok) matN = 1;
       }
       if(beast && !beast.boss && S.eggs.length < BAL.petEggMax && Math.random() < TRACE.eggRate){
         S.eggs.push({ bid: beast.id });
@@ -11228,7 +11332,7 @@ function towerBossCompLetter(){
       list.push({ id: id, p: equipPowerOf(id) });
     };
     EQUIP_SLOTS.forEach(k => take(S.equipment && S.equipment[k]));
-    S.bag.forEach(it => take(it && it.t));
+    S.bag.forEach(it => { if(it && it.t){ const q = bagQtyOf(it); for(let i = 0; i < q; i++) take(it.t); } });
     list.sort((a, b) => b.p - a.p);
     return list.slice(0, 3).map(x => x.id);
   }
@@ -11278,7 +11382,7 @@ function towerBossCompLetter(){
        注意：遗物本身也在这批里（它若穿在身上就在这里；若本来在背包则原样留着），
        所以不需要再单独 push 一次 relic —— 那正是旧写法重复/丢失的根源。 */
     slotItems.forEach(id => {
-      S.bag.push({ t: id, n: (ITEMS[id] || {}).n || id });
+      S.bag.push({ t: id, n: (ITEMS[id] || {}).n || id, q: 1 });
     });
     if(slotItems.length){
       try{ log('🎒 前世的 ' + slotItems.length + ' 件装备已收回背包。', 'sys'); }catch(e){}
@@ -12622,7 +12726,7 @@ function towerBossCompLetter(){
     if(document.getElementById('xx-hub-mk-rate')){
       const m = S.market;
       seal('xx-hub-mk-rate', '×' + (m.buyRate || 1).toFixed(2));
-      seal('xx-hub-mk-sell', S.bag.filter(it => sellPrice(it.t) > 0).length + ' 件');
+      seal('xx-hub-mk-sell', S.bag.reduce((a, it) => a + (sellPrice(it.t) > 0 ? bagQtyOf(it) : 0), 0) + ' 件');
       seal('xx-hub-mk-goods', (m.goods || []).filter(g => !g.bought).length + ' 件');
       seal('xx-hub-tj', fmt(S.wisdom || 0) + ' 悟');
     }
@@ -12989,7 +13093,7 @@ function towerBossCompLetter(){
     if(!stoneOk) miss.push('灵石差 ' + fmt(recipeStoneCost(rec) - S.stone));
     rec.mats.forEach(m => { if(m.t !== 'stone' && !matHas(m.t, m.n)) miss.push(matName(m.t) + '差 ' + (m.n - Math.floor(matCount(m.t))) + matGoHtml(m.t)); });
     const missTxt = (!locked && miss.length) ? ' · 缺：' + miss.join('、') : '';
-    const bagOk = S.bag.length < bagCap();
+    const bagOk = bagCanAccept(rec.out);
     const canDo = !locked && stoneOk && matOk && bagOk;
     const rate = craftRate(rec);
     /* 面板上的成功率与失败返还都必须把洞天算进去，否则显示的数和实际结算对不上 */
@@ -14133,8 +14237,10 @@ function towerBossCompLetter(){
     S.stats.stoneEarned += stone;
     const meta = ITEMS['mat_bone'];
     let got = 0;
-    for(let i = 0; i < matCount && S.bag.length < bagCap(); i++){
-      S.bag.push({ t: 'mat_bone', n: meta ? meta.n : '兽骨' }); got++;
+    for(let i = 0; i < matCount; i++){
+      const r = bagAddQty('mat_bone', meta ? meta.n : '兽骨', 1, true);
+      if(!r.ok) break;
+      got++;
     }
     S.towerSwept = can;
     log('🏯 扫荡镇妖塔 ' + can + ' 层，灵石 +' + fmt(stone) + (got > 0 ? '，兽骨 ×' + got : '') + '。', 'good');
@@ -14931,8 +15037,9 @@ function towerBossCompLetter(){
       if(it){
         const meta = ITEMS[it.t] || {};
         const icoHtml = '<img src="' + (meta.img || 'ui/icons/ic_box.png') + '" alt="' + it.n + '">';
+        const q = bagQtyOf(it);
         html += '<div class="bag-cell" data-i="' + i + '">' +
-          '<span class="bag-ico">' + icoHtml + '</span>' +
+          '<span class="bag-ico">' + icoHtml + (q > 1 ? '<i class="bag-qty">×' + q + '</i>' : '') + '</span>' +
           '<span class="bag-name' + (meta.cls ? ' ' + meta.cls : '') + '">' + it.n + '</span></div>';
       }else{
         html += '<div class="bag-cell empty"></div>';
@@ -14947,9 +15054,12 @@ function towerBossCompLetter(){
     if(capEl){
       const bonus = Math.round(dtBagN());
       const over = Math.max(0, S.bag.length - cap);
+      let totalItems = 0;
+      for(let i = 0; i < S.bag.length; i++) totalItems += bagQtyOf(S.bag[i]);
       capEl.textContent = '已用 ' + S.bag.length + ' / 容量 ' + cap +
         (bonus > 0 ? '（洞天 +' + bonus + '）' : '') +
-        (over > 0 ? '（超 ' + over + ' 格）' : '');
+        (over > 0 ? '（超 ' + over + ' 格）' : '') +
+        ' · 共 ' + totalItems + ' 件';
       capEl.classList.toggle('over', over > 0);
     }
     const buyEl = document.getElementById('xx-bag-buy');
@@ -15045,7 +15155,7 @@ function towerBossCompLetter(){
         return Math.round(x);
       };
       /* R1：签名纳入数组“内容”信号，而非仅长度——背包总数量、信件未读数、灵兽等级+经验和 */
-      let bagQty = 0; for(let i = 0; i < S.bag.length; i++) bagQty += (S.bag[i] && S.bag[i].n) || 0;
+      let bagQty = 0; for(let i = 0; i < S.bag.length; i++) bagQty += bagQtyOf(S.bag[i]);
       let letterUnread = 0; if(S.letters) for(let i = 0; i < S.letters.length; i++) if(!S.letters[i].open) letterUnread++;
       let petSum = 0; for(let i = 0; i < S.pets.length; i++) petSum += (S.pets[i] ? sigNum(S.pets[i].lv) + sigNum(S.pets[i].exp) : 0);  /* R2 残留闭合：与 sigNum 统一归一，避免 |0 截断/溢出 */
       return [ S.rank, sigNum(S.exp), sigNum(S.stone), sigNum(S.cave), sigNum(S.dan), sigNum(S.forge),
@@ -16089,6 +16199,7 @@ function towerBossCompLetter(){
     _saveHealth: () => ({ failing: saveFailActive, failures: saveFailCount, firstAt: saveFailFirstAt, inited: inited, frozen: frozenForImport }),
     ranks: RANK_NAMES,
     _s: S, _need: needOf, _rate: expRate, _passiveRate: passiveRate, _latePassiveMult: latePassiveMult, _break: doBreakNow, _openBreakConfirm: openBreakConfirm, _confirmBreak: confirmBreakNow,
+    _bagMerge: () => lastBagMerge, _bagQty: bagQtyOf, _bagAdd: bagAddQty, _bagCanAccept: bagCanAccept, _countItem: countItem, _removeItems: removeItems,
     _closeBreakConfirm: closeBreakConfirm, _breakParts: breakChanceParts,
     _sign: act, _act: act,
     /* 成本曲线（纯函数）：等级曲线/经济体检的工具要用，导出以免工具自己抄一遍公式 */

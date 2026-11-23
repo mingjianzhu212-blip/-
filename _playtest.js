@@ -432,8 +432,9 @@ const SCENARIOS = [
         setTimeout(function(){
           var alt1 = document.querySelectorAll('#xx-alchemy .craft.alt').length;
           var codex1 = (document.querySelector('.recipe-codex') || {}).textContent || '';
-          var bagBefore = S.bag.filter(function(x){ return x.t === 'dan1'; }).length;
-          var coreBefore = S.bag.filter(function(x){ return x.t === 'mat_core'; }).length;
+          /* 堆叠后按「件数」对账，不按格数 */
+          var bagBefore = XX._countItem('dan1');
+          var coreBefore = XX._countItem('mat_core');
           var n1 = (S.recipeN || {}).dan1;
           var r2 = __click('#xx-alchemy .craft.alt button');
           setTimeout(function(){
@@ -442,8 +443,8 @@ const SCENARIOS = [
               alt0: alt0, codex0: codex0, r1: r1,
               alt1: alt1, codex1: codex1, n1: n1,
               bagBefore: bagBefore, coreBefore: coreBefore, r2: r2,
-              bagAfter: S.bag.filter(function(x){ return x.t === 'dan1'; }).length,
-              coreAfter: S.bag.filter(function(x){ return x.t === 'mat_core'; }).length,
+              bagAfter: XX._countItem('dan1'),
+              coreAfter: XX._countItem('mat_core'),
               n2: (S.recipeN || {}).dan1,
               expUp: S.mastery.alchemyExp > exp0,
               altName: (document.querySelector('#xx-alchemy .craft.alt b') || {}).textContent || ''
@@ -1639,8 +1640,8 @@ const SCENARIOS = [
           label: '未到境界的黄庭按钮禁用，并写明解锁层', detail: d.huangLock + ' / ' + d.huangNext },
         { ok: d.sum.indexOf('合计：') === 0 && d.sum.indexOf('炼丹成功率 +2%') >= 0 && d.sum.indexOf('战力 +6%') >= 0,
           label: '合计行把两座洞天的当前生效值汇总（不用玩家心算）', detail: d.sum },
-        { ok: d.bagCap === '已用 0 / 容量 80（洞天 +30）',
-          label: '背包标签写已用/容量：储物袋 50 + 玄冥洞天 30，并注明来源', detail: d.bagCap },
+        { ok: d.bagCap === '已用 0 / 容量 80（洞天 +30） · 共 0 件',
+          label: '背包标签写已用/容量/总件数：储物袋 50 + 玄冥洞天 30，并注明来源', detail: d.bagCap },
         { ok: d.bagCells === 80,
           label: '背包格子按有效容量铺满 80 格', detail: 'cells=' + d.bagCells }
       ];
