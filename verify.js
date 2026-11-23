@@ -4494,6 +4494,26 @@ const DIAG = `
   /* 外部评审 2026-11-23 第 1 项：妖兽白底融合 / 掉血飘字不压脸 */
   ok(/#bt-mavatar\{[^}]*mix-blend-mode:multiply/.test(chatCss), '妖兽立绘用水墨 multiply 融底');
   ok(/\.bt-dmg-float\{[^}]*top:60%/.test(chatCss), '掉血飘字落点下移，避开立绘脸');
+  /* 外部评审 2026-11-23 第 2/3/4/5 项：突破演出 / 遮挡安全区 / 寿元剩余 / 满溢提示（源码锁） */
+  ok(htmlSrc.indexOf('class="trib-rise"') >= 0 && htmlSrc.indexOf('trib-realm-seal') >= 0 &&
+     /#trib-modal\[data-phase="dawn"\] \.trib-realm-seal/.test(chatCss),
+     '突破成功层挂金色粒子与境界水墨印章（dawn 阶段显示）');
+  ok(/\.trib-realm-seal\{[^}]*width:206px/.test(chatCss), '境界印章加宽到 206px，五字一行不折行');
+  ok(/\.brk-fail-seal/.test(chatCss) && gameSrc.indexOf('道心淬炼') >= 0 && gameSrc.indexOf('info.failBonus') >= 0,
+     '破境失败补偿印章读真实 failBonus（X 不是写死的）');
+  ok(gameSrc.indexOf('const showFb = S.rank < TOP && fb > 0') >= 0,
+     '顶栏「下次 +X%」只要有失败加成即显示（不再等修为攒满）');
+  ok(gameSrc.indexOf("'余 ' + Math.floor(lifeLeft())") >= 0 &&
+     gameSrc.indexOf("'余 ' + Math.floor(lifeLeft()) + ' / ' + m + ' 年'") >= 0,
+     '顶栏 chip / 子页资源行 / 人物页寿元条统一剩余年数');
+  ok(gameSrc.indexOf('灵气已满溢，宜速突破') >= 0 && gameSrc.indexOf('继续修炼收益折半') < 0,
+     '修为满溢人话提示按事实写（不含假的「收益折半」）');
+  ok(chatCss.indexOf('env(safe-area-inset-bottom') >= 0 && chatCss.indexOf('env(safe-area-inset-top') >= 0,
+     '顶栏/底栏/子页底部接安全区 env(safe-area-inset-*)');
+  ok(/\.loot-toast\{ top:112px/.test(chatCss), '自动产出飘字从顶栏下方起，不遮资源栏');
+  ok(gameSrc.indexOf("t.done && !t.claimed ? ' anchor-ready'") >= 0 &&
+     /class="dcard' \+ \(t \? ' busy anchor-locked'/.test(gameSrc),
+     '任务可领取 / 宗门弟子可出师走同一套淡金+红点锚点');
   ok(/\.bt-vs-txt\{[^}]*white-space:nowrap/.test(chatCss),
      '「对决」印不许折行（390 窄屏实拍过：不加 nowrap 会竖排成「对/决」两行）');
   /* 第 84 轮 · 战斗面板：源码侧锁住几处「一改就退回旧观」的要点 */
