@@ -3712,6 +3712,18 @@ const DIAG = `
     if(ups5) ups5.click();
     L('upsNoJump', (document.querySelector('.panel-page').dataset.sec === sec0 && sec0 === 'xx-ups-sec') ? 'yes' : 'no');
     L('upsArrowGone', (document.querySelector('#xx-ups').textContent.indexOf('›') < 0) ? 'yes' : 'no');
+    /* 宗门 · 弟子：可出师 → 淡金边+红点；差事在身 → 置灰+小锁 */
+    S.rank = 12;
+    S.gate = { lv: 1, grad: 0, disciples: [
+      { id: 'g1', name: '甲', apt: 2, task: '', t0: 0, ret: 0, svc: 9, last: '', run: 0, bless: 0 },
+      { id: 'g2', name: '乙', apt: 2, task: 'herb', t0: Date.now(), ret: Date.now() + 600000, svc: 0, last: '', run: 0, bless: 0 }
+    ] };
+    window.switchTab('zong_gate');
+    XX._render();
+    const dcs = document.querySelectorAll('#sc-gate .dcard');
+    L('anchorGateReady', dcs[0] && dcs[0].classList.contains('anchor-ready') ? 'yes' : 'no');
+    L('anchorGateBusy', dcs[1] && dcs[1].classList.contains('anchor-locked') ? 'yes' : 'no');
+    L('anchorGateLock', dcs[1] && dcs[1].querySelector('.anchor-lock') ? 'yes' : 'no');
   }catch(e){ L('anchorEXC', (e.stack || e.message || '').toString().slice(0, 200)); }
   L('vtUsed', Math.round(performance.now()));
   const d=document.createElement('pre'); d.id='diag'; d.textContent=out.join(' | '); document.body.appendChild(d);
@@ -5264,6 +5276,8 @@ const DIAG = `
      '第7项：炼丹锁定行置灰+小锁、可炼行淡金边+红点（' + [F.anchorDanLocked, F.anchorDanReady].join('/') + '）');
   ok(F.upsNoBtn === '0' && F.upsState5 && F.upsState5 !== 'none' && F.upsNoJump === 'yes' && F.upsArrowGone === 'yes',
      '第8项：设施汇总纯数据——无按钮/无箭头、点击不跳页（按钮 ' + F.upsNoBtn + ' / 状态 ' + F.upsState5 + '）');
+  ok(F.anchorGateReady === 'yes' && F.anchorGateBusy === 'yes' && F.anchorGateLock === 'yes',
+     '第7项：宗门弟子可出师淡金边+红点、差事在身置灰+小锁（' + [F.anchorGateReady, F.anchorGateBusy, F.anchorGateLock].join('/') + '）');
   ok(F.lgEnh.indexOf('矿石 0/') >= 0 && F.lgEnh.indexOf('兽王精魄 0/1') >= 0 && F.lgEnh.indexOf('（不足）') >= 0,
      '强化消耗写矿石/Boss 材料缺口与灵石不足（' + F.lgEnh + '）');
   ok(F.lgDanOk === 'yes' && F.lgDanBtnOk === '炼制', '材料够了后不足标记消失、按钮回到「炼制」');
