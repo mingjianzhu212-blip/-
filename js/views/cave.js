@@ -79,7 +79,7 @@ HUBKIT.define({
         <h2>器炉</h2>
         <div class="craft-up"><span id="xx-forge-up"></span><button type="button" class="field-btn" id="xx-forge-upbtn">升级</button></div>
         <p class="farm-msg" id="xx-forge-upmsg" aria-live="polite"></p>
-        <button type="button" class="xlink codex-open" data-codex>法宝图鉴 · 看全 36 件 ›</button>
+        <!-- 外部评审 2026-11-23 第 8 项：法宝图鉴收敛为人物页唯一入口（自身养成归人物），此处不再重复 -->
         <div class="bp-box" id="xx-bp-box"></div>
         <div class="craft-list" id="xx-forge"></div>
         <p class="hint">灵器提修炼、战器加战力、破器助破境、财器添灵石——四族各占一个持有位，可以同时佩。炼成的法宝在背包与人物页。<button class="xlink" type="button" data-cross="bag">去背包看成品 ›</button></p>
@@ -111,12 +111,12 @@ HUBKIT.define({
         <p class="farm-msg" id="xx-array-msg" aria-live="polite"></p>
         <p class="hint">聚灵阵每级让洞府灵石产出 ×1.06，满级封顶；点一次升一级，费用随等级上浮。</p>
       </section>` },
-    { key: 'xx-ups-sec', view: 'dong_ups', name: '洞府设施', note: '汇总镜像 · 点行进页',
+    { key: 'xx-ups-sec', view: 'dong_ups', name: '洞府设施', note: '纯数据 · 只报等级',
       ico: 'ic_pagoda.png', sealId: 'xx-hub-ups', sealTxt: '汇总', also: ['xx-ups'],
       body: `      <section class="card wide" id="xx-ups-sec">
         <h2>洞府设施 · 汇总</h2>
         <div class="ups" id="xx-ups"></div>
-        <p class="hint">这里只报等级与下一级收益；升级动作已搬回各自页面，点「进页」去办。</p>
+        <p class="hint">这一页只报等级与状态，不可点击；升级请回各自页面（功法去藏经阁 · 功法，洞府与丹炉器炉去洞府对应页）。</p>
       </section>` }
   ]
 });

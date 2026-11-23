@@ -2180,15 +2180,20 @@
   /* 攻击突进：玩家在左向右冲，怪物向左冲（作用于立绘本体） */
   .bt-side.lunge .bt-fig{ animation:btLungeR .34s var(--ease-snap); }
   #bt-mside.lunge .bt-fig{ animation:btLungeL .34s var(--ease-snap); }
-  @keyframes btLungeR{ 0%{ transform:translateX(-9px) scale(.985); } 42%{ transform:translateX(64px) scale(1.03); } 100%{ transform:none; } }
-  @keyframes btLungeL{ 0%{ transform:translateX(9px) scale(.985); } 42%{ transform:translateX(-64px) scale(1.03); } 100%{ transform:none; } }
+  /* 外部评审：突进收到约 22px（原 64px 像瞬移），中途稍稍回坐再归位，出招带回弹 */
+  @keyframes btLungeR{ 0%{ transform:translateX(-4px) scale(.99); } 40%{ transform:translateX(22px) scale(1.022); } 68%{ transform:translateX(15px) scale(1.008); } 100%{ transform:none; } }
+  @keyframes btLungeL{ 0%{ transform:translateX(4px) scale(.99); } 40%{ transform:translateX(-22px) scale(1.022); } 68%{ transform:translateX(-15px) scale(1.008); } 100%{ transform:none; } }
   /* 受击：立绘红闪 + 侧移。基线投影在壳上，这里只写闪的那层，不用重抄 drop-shadow */
   .bt-side.hit .bt-fig{ animation:btHitGlow .46s ease-out; }
+  /* 外部评审：红闪之外补两记左右短抖，受击有「被打得一晃」的体感 */
   @keyframes btHitGlow{
     0%{ filter:drop-shadow(0 0 0 rgba(195,74,54,0)); transform:none; }
-    18%{ filter:drop-shadow(0 0 18px rgba(195,74,54,.8)) brightness(1.5) saturate(1.9) contrast(.92);
+    14%{ filter:drop-shadow(0 0 18px rgba(195,74,54,.82)) brightness(1.5) saturate(1.9) contrast(.92);
          transform:translateX(10px) scale(1.02); }
-    55%{ filter:drop-shadow(0 0 10px rgba(195,74,54,.4)) brightness(1.12); transform:translateX(-6px); }
+    34%{ filter:drop-shadow(0 0 14px rgba(195,74,54,.6)) brightness(1.28) saturate(1.5);
+         transform:translateX(-8px) scale(1.005); }
+    52%{ filter:drop-shadow(0 0 10px rgba(195,74,54,.42)) brightness(1.12); transform:translateX(5px); }
+    70%{ transform:translateX(-2px); }
     100%{ filter:none; transform:none; }
   }
   /* 残血：立绘压暗 + 一层灰，血条之外再多一条「快不行了」的体感 */
@@ -6234,3 +6239,127 @@ html,body{ background:var(--jx-paper); }
   font-size:16px; letter-spacing:2px; color:#5a4a2e; line-height:1.25; padding-right:22px;
 }
 .char-path-picks .char-pick:not(.active) .cp-name{ color:#6b6252; }
+
+/* ===== batch6 外部评审：战斗微演出 / 遮挡修正 / 安全区 ===== */
+/* 妖兽水墨白底融进战斗框；人物立绘保持透明底，不叠白 */
+#bt-mavatar{ mix-blend-mode:multiply; background:transparent; }
+#bt-pavatar{ mix-blend-mode:normal; background:transparent; }
+/* 突进/受击位移已在上方原 keyframes 处按评审口径改写（22px 带回弹 / 抖动+闪红） */
+/* 普通战斗中央「对决」方块字去掉；Boss 题签仍走 .bt-title/.bt-boss-tag */
+.bt-vs-txt{ display:none !important; }
+/* 掉血飘字落点下移，避开立绘脸（原 44% 正落在头部） */
+.bt-dmg-float{ top:60%; }
+/* 自动产出合并飘字：从顶栏下面起，不遮灵石/矿石/战力数字 */
+.loot-toast{ top:112px; }
+/* 城镇题签：让开第二排资源栏 */
+.town-title{ top:104px; }
+/* 城镇页右侧设置/功法圆钮：下移，让开藏经阁屋顶 */
+#page-scene.in-town .sys-rail{ top:206px; }
+/* 子页底部提示条留足底栏 + 安全区，不再被导航切一半 */
+.panel-page{ padding-bottom:calc(78px + env(safe-area-inset-bottom, 0px)) !important; }
+.panel-page .panel-body{ padding-bottom:30px; }
+/* 顶栏/底栏安全区内边距 */
+.topbar{
+  padding-top:calc(10px + env(safe-area-inset-top, 0px));
+  padding-left:calc(12px + env(safe-area-inset-left, 0px));
+  padding-right:calc(12px + env(safe-area-inset-right, 0px));
+}
+.app > .scene-tabs{
+  padding-left:env(safe-area-inset-left, 0px);
+  padding-right:env(safe-area-inset-right, 0px);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+}
+
+/* 破境成功：金色粒子升腾 + 境界水墨印章（都在现有 #trib-modal 内，不另起层） */
+.trib-rise{ position:absolute; inset:0; pointer-events:none; opacity:0; z-index:2; }
+#trib-modal[data-phase="dawn"] .trib-rise{ opacity:1; }
+.trib-rise i{
+  position:absolute; bottom:-12px; width:5px; height:5px; border-radius:50%;
+  background:radial-gradient(circle,#fff3c4 0%,#e7c884 45%,rgba(216,178,90,0) 75%);
+  filter:drop-shadow(0 0 6px rgba(231,200,132,.8)); opacity:0;
+  animation:tribRise 2.8s ease-out infinite;
+}
+.trib-rise i:nth-child(1){ left:12%; animation-delay:0s; }
+.trib-rise i:nth-child(2){ left:22%; animation-delay:.3s; }
+.trib-rise i:nth-child(3){ left:32%; animation-delay:.7s; }
+.trib-rise i:nth-child(4){ left:41%; animation-delay:.15s; }
+.trib-rise i:nth-child(5){ left:50%; animation-delay:.55s; }
+.trib-rise i:nth-child(6){ left:59%; animation-delay:.95s; }
+.trib-rise i:nth-child(7){ left:68%; animation-delay:.4s; }
+.trib-rise i:nth-child(8){ left:77%; animation-delay:.8s; }
+.trib-rise i:nth-child(9){ left:86%; animation-delay:.25s; }
+.trib-rise i:nth-child(10){ left:94%; animation-delay:.65s; }
+@keyframes tribRise{
+  0%{ opacity:0; transform:translateY(0) scale(.6); }
+  18%{ opacity:1; }
+  100%{ opacity:0; transform:translateY(-62vh) scale(1.4); }
+}
+.trib-realm-seal{
+  position:absolute; left:50%; top:44%; transform:translate(-50%,-50%) scale(.72) rotate(-4deg);
+  z-index:3; display:none; flex-direction:column; align-items:center; justify-content:center;
+  width:206px; height:158px; border-radius:18px; pointer-events:none;
+  border:3px solid rgba(231,200,132,.9);
+  box-shadow:0 0 34px rgba(231,200,132,.55), inset 0 0 24px rgba(216,178,90,.28);
+  background:radial-gradient(circle at 50% 40%, rgba(60,40,16,.72), rgba(20,18,14,.82));
+  font-family:'Ma Shan Zheng','ZCOOL XiaoWei',serif; color:#f6e3b5;
+}
+#trib-modal[data-phase="dawn"] .trib-realm-seal{ display:flex; animation:tribSeal .9s var(--ease-pop) both .15s; }
+.trib-realm-seal b{ font-size:30px; line-height:1.1; letter-spacing:3px; text-indent:3px; font-weight:400; white-space:nowrap; text-shadow:0 2px 12px rgba(231,200,132,.6); }
+.trib-realm-seal small{ margin-top:6px; font-size:13px; letter-spacing:8px; color:#d8b25a; }
+@keyframes tribSeal{
+  0%{ opacity:0; transform:translate(-50%,-50%) scale(.55) rotate(-8deg); }
+  60%{ opacity:1; transform:translate(-50%,-50%) scale(1.08) rotate(-2deg); }
+  100%{ opacity:1; transform:translate(-50%,-50%) scale(1) rotate(-4deg); }
+}
+/* 减少动效：不另起媒体查询逐条关动画，统一交给文件中部那条全局动效兜底
+   （* / *::before / *::after 的 animation-duration:.001ms !important 已覆盖新粒子与印章） */
+
+/* batch6 外部评审：破境失败补偿印章（X 读真实 failBonus） */
+#b-desc .brk-fail-seal{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  width:186px; min-height:88px; margin:2px auto 12px; padding:10px 12px;
+  border:2px solid rgba(216,178,90,.9); border-radius:14px;
+  background:radial-gradient(circle at 50% 30%, rgba(90,60,20,.20), rgba(255,250,238,.75));
+  box-shadow:0 0 22px rgba(216,178,90,.45), inset 0 0 16px rgba(231,200,132,.3);
+  color:#7a5a20; text-align:center; font-family:'Ma Shan Zheng','ZCOOL XiaoWei',serif;
+  animation:brkSealGlow 2.4s ease-in-out infinite;
+}
+#b-desc .brk-fail-seal span{ font-size:17px; letter-spacing:3px; }
+#b-desc .brk-fail-seal b{ display:block; margin-top:4px; font-size:13px; letter-spacing:1px; color:#a5302a; font-weight:600; }
+@keyframes brkSealGlow{
+  0%,100%{ box-shadow:0 0 16px rgba(216,178,90,.35), inset 0 0 12px rgba(231,200,132,.24); }
+  50%{ box-shadow:0 0 30px rgba(216,178,90,.62), inset 0 0 20px rgba(231,200,132,.4); }
+}
+/* 减少动效同由全局兜底统一处理（animation-duration:.001ms !important） */
+
+/* ===== batch6 外部评审：列表卡统一视觉锚点（第 7 项） ===== */
+.upg, .craft, .quest, .q-mile, .dcard{ position:relative; }
+/* 未解锁 / 不可点：置灰 + 小锁。淡出只压在正文上，锁标保持清晰 */
+.anchor-locked{ filter:grayscale(.55); padding-left:24px !important; }
+.anchor-locked > .t, .anchor-locked > .craft-main, .anchor-locked > .dtop{ opacity:.62; }
+.dcard.empty.anchor-locked{ padding-left:12px !important; }
+.anchor-lock{
+  position:absolute; left:7px; top:50%; transform:translateY(-50%); z-index:2; width:10px; height:9px;
+  border:1.5px solid #7a6440; border-radius:2px; background:rgba(247,243,233,.95);
+  pointer-events:none;
+}
+.anchor-lock::before{
+  content:''; position:absolute; left:50%; top:-6px; transform:translateX(-50%);
+  width:6px; height:6px; border:1.5px solid #7a6440; border-bottom:none; border-radius:6px 6px 0 0;
+}
+/* 可升级 / 可领取：淡金内框 + 右上朱砂红点（红点冒出行框，不压右侧按钮） */
+.anchor-ready{ box-shadow:inset 0 0 0 1px rgba(216,178,90,.55), 0 0 10px rgba(216,178,90,.14) !important; }
+.anchor-ready::after{
+  content:''; position:absolute; right:-3px; top:-3px; z-index:2; width:8px; height:8px;
+  border-radius:50%; background:#b23a2c; box-shadow:0 0 0 2px rgba(247,243,233,.95);
+  pointer-events:none;
+}
+/* ===== batch6 外部评审：设施汇总改纯数据（第 8 项） ===== */
+.upg-mirror{ cursor:default; }
+.upg-mirror:hover, .upg-mirror:active{ transform:none; }
+.upg-state{
+  flex:0 0 auto; padding:3px 9px; border-radius:10px; font-size:11px; letter-spacing:1px;
+  color:#6b6252; background:rgba(138,109,59,.08); white-space:nowrap;
+}
+.upg-mirror.anchor-ready .upg-state{ color:#8a5a16; background:rgba(216,178,90,.16); }
+.upg-mirror.anchor-locked .upg-state{ color:#8a7a5c; }

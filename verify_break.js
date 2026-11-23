@@ -107,6 +107,23 @@ const DIAG = `
     L('failBonus', Math.abs(S().failBonus-W.failStep)<1e-9 ? 'ok' : 'bad:'+S().failBonus);
     L('failLoseExp', S().exp===1e18-Math.floor(need15*t15.lose) ? 'ok' : 'bad:'+S().exp);
     L('failRankKeep', S().rank===15 ? 'ok' : 'bad');
+    /* ---- 外部评审 2026-11-23 第 6 项：炼气段失败免扣灵石 ----
+       炼气段失败只留修为反噬，灵石分文不动；筑基及以上保持现状（本单不改其数值，只锁行为防回加）。 */
+    S().rank=0; S().exp=1e18; S().stone=8888; S().wisdom=0; S().insight=0; S().failBonus=0;
+    S().guardMirror=0; S().guardArray=0; S().tianji=0; S().bag=[]; S().dao=0; S().pillUntil=0; S().pillBonus=0; S().rootIdx=1;
+    const need0=XX._need(0), t0=XX._breakTiers.find(t=>t.from<=0&&t.to>=0);
+    forceFail(); XX._attemptBreak({});
+    L('failStoneLianqi', S().stone===8888 ? 'ok' : 'bad:'+S().stone);
+    L('failExpLianqi', S().exp===1e18-Math.floor(need0*t0.lose) ? 'ok' : 'bad:'+S().exp);
+    L('failBonusLianqi', Math.abs(S().failBonus-W.failStep)<1e-9 ? 'ok' : 'bad:'+S().failBonus);
+    S().rank=9; S().exp=1e18; S().stone=8888; S().wisdom=0; S().insight=0; S().failBonus=0;
+    S().guardMirror=0; S().guardArray=0; S().tianji=0; S().bag=[]; S().dao=0; S().pillUntil=0; S().pillBonus=0; S().rootIdx=1;
+    const need9=XX._need(9), t9=XX._breakTiers.find(t=>t.from<=9&&t.to>=9);
+    forceFail(); XX._attemptBreak({});
+    L('failStoneZhuji', S().stone===8888 ? 'ok' : 'bad:'+S().stone);
+    L('failExpZhuji', S().exp===1e18-Math.floor(need9*t9.lose) ? 'ok' : 'bad:'+S().exp);
+    /* 恢复第四段后续断言依赖的基准态（rank15 / 满修为 / 灵根 1），不改任何断言 */
+    S().rank=15; S().exp=1e18; S().rootIdx=1;
     /* 失败加成封顶 +30%，顿悟进度封顶 100 */
     S().failBonus=0.28; forceFail(); XX._attemptBreak({});
     L('failBonusCap', Math.abs(S().failBonus-0.30)<1e-9 ? 'ok' : 'bad:'+S().failBonus);
@@ -483,6 +500,11 @@ const DIAG = `
     ['failBonus', '失败下次成功率 +5%'],
     ['failLoseExp', '失败按段表比例扣除修为'],
     ['failRankKeep', '失败境界不变'],
+    ['failStoneLianqi', '炼气段失败不扣灵石（外部评审第 6 项）'],
+    ['failExpLianqi', '炼气段失败仍扣修为反噬'],
+    ['failBonusLianqi', '炼气段失败仍累加下次成功率 +5%'],
+    ['failStoneZhuji', '筑基段失败不扣灵石（保持现状）'],
+    ['failExpZhuji', '筑基段失败仍扣修为反噬'],
     ['failBonusCap', '失败加成封顶 +30%'],
     ['insightCap', '顿悟进度封顶 100'],
     ['wisdomNoCap', '悟道值货币无上限累积（与顿悟解耦）'],

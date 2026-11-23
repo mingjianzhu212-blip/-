@@ -54,6 +54,8 @@
     var m = el();
     if(m){ m.classList.add('hidden'); m.setAttribute('data-phase', ''); }
     document.querySelectorAll('.trib-bolt').forEach(function(b){ b.classList.remove('on'); });
+    var rn = document.getElementById('trib-realm-name');
+    if(rn) rn.textContent = '';
   }
   function finish(){
     clearTimers();
@@ -90,6 +92,8 @@
     m.classList.remove('hidden');
     setPhase('cloud');   /* 阶段只走 data-phase 属性：绝不与 .trib-cloud 等元素类撞名 */
     caption(ok ? '天劫降临 · 冲击' + (opt.rank || '新境') : '天劫降临 · 道心蒙尘');
+    var rn = document.getElementById('trib-realm-name');
+    if(rn) rn.textContent = ok ? (opt.rank || '新境') : '';
     after(1200, function(){ strike(0); });
     after(1750, function(){ strike(1); });
     after(2300, function(){ strike(2); });

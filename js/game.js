@@ -3996,13 +3996,16 @@ const XX = (function(){
               '<small>留 ' + fmt(gateGradGain(d)) + ' 灵石</small></button>'
             : '<div class="dvoice"><span class="dv-t">' + gateVoice(d) + '</span>' +
               '<i class="dv-n">差事 ' + Math.min(gateSvc(d), BAL.gateGradSvc) + '/' + BAL.gateGradSvc + '</i></div>');
-      h += '<div class="dcard' + (t ? ' busy' : '') + '">' +
+      /* 外部评审 2026-11-23 第 7 项：差事在身的弟子卡不可派 → 置灰 + 小锁（原因即倒计时）；
+         可出师 → 淡金边 + 红点。 */
+      h += '<div class="dcard' + (t ? ' busy anchor-locked' : (ready ? ' anchor-ready' : '')) + '" data-sid="' + d.id + '">' +
+        (t ? '<i class="anchor-lock" aria-hidden="true"></i>' : '') +
         '<div class="dtop"><b>' + escHTML(d.name) + '</b>' + chip + '</div>' + body +
         '</div>';
     });
     /* 空位写成看得见的空名牒："还差几个"比"3/8"直观，也顺手把品阶的意义摆出来 */
     const empt = Math.max(0, gateCap() - list.length);
-    for(let i = 0; i < Math.min(empt, 8); i++) h += '<div class="dcard empty"><span>空位</span></div>';
+    for(let i = 0; i < Math.min(empt, 8); i++) h += '<div class="dcard empty anchor-locked"><i class="anchor-lock" aria-hidden="true"></i><span>空位</span></div>';
     h += '</div><p class="gate-note">点资质可点化（' + fmt(gateAptCost()) + ' 灵石一档）' +
       ' · 满 ' + BAL.gateGradSvc + ' 趟差事可送弟子出师，空出的位子再收新的' +
       ' · 差事到点自动回山并回到可派遣名册，离线也照算</p>' +
@@ -6624,12 +6627,15 @@ function towerBossCompLetter(){
     if(t) t.textContent = '💥 突破未成 · 道基未损';
     if(d){
       let rows = '';
+      const fbPct = Math.round((info.failBonus || 0) * 1000) / 10;
+      /* batch6：失败补偿印章，X 直读真实 failBonus；原大字安抚与拆账保留在下方 */
+      rows += '<div class="brk-fail-seal"><span>道心淬炼</span><b>下次渡劫成功率 +' + fbPct + '%</b></div>';
       /* P0.5：第一行大字先安抚——保底收益用本次实际 failBonus */
-      rows += '<span class="brk-boon">保底收益 · 下次成功率 +' + (Math.round((info.failBonus || 0) * 1000) / 10) + '%</span>';
+      rows += '<span class="brk-boon">保底收益 · 下次成功率 +' + fbPct + '%</span>';
       rows += '<span class="brk-row"><span>这一次成功率</span><b>' + (info.guarantee ? '成（必定成功）' : (Math.round(info.p * 1000) / 10) + '%') + '</b></span>';
       rows += '<span class="brk-row"><span>修为反噬</span><b>-' + fmt(info.lose - (info.back || 0)) + (info.back ? '（护心镜挡回 ' + fmt(info.back) + '）' : '') + '</b></span>';
       rows += '<span class="brk-row"><span>顿悟进度</span><b>' + info.insight + ' / ' + WISDOM.full + '</b></span>';
-      rows += '<span class="brk-row"><span>下次成功率加成</span><b>+' + (Math.round(info.failBonus * 1000) / 10) + '%</b></span>';
+      rows += '<span class="brk-row"><span>下次成功率加成</span><b>+' + fbPct + '%</b></span>';
       if(info.insight >= WISDOM.full) rows += '<span class="brk-unlock"><b>顿悟圆满</b><i>・下次突破必定成功</i></span>';
       else rows += '<span class="brk-unlock"><b>祝福进度</b><i>・再失败 ' + Math.max(1, Math.ceil((WISDOM.full - info.insight) / Math.max(1, WISDOM.perFail))) + ' 次即可顿悟圆满</i></span>';
       d.innerHTML = rows;
@@ -8304,7 +8310,7 @@ function towerBossCompLetter(){
         const m = lifeMax();
         if(!isFinite(m)){ lt.textContent = '无量'; if(lb) lb.style.width = '100%'; }
         else{
-          lt.textContent = lifeAge() + ' / ' + m;
+          lt.textContent = '余 ' + Math.floor(lifeLeft()) + ' / ' + m + ' 年';
           if(lb) lb.style.width = Math.max(0, Math.min(100, lifeLeft() / m * 100)).toFixed(1) + '%';
         }
       }
@@ -11441,7 +11447,7 @@ function towerBossCompLetter(){
     const full = S.exp >= need && secludeLeftMs() <= 0;
     const expTxt = full ? Math.round(S.exp / need * 100) + '%' : fmt(S.exp);
     const lifeTxt = isZuo() ? '坐化' : !lifeOn() ? '未开'
-      : (!isFinite(lifeMax()) ? '无量' : lifeAge() + '/' + lifeMax());
+      : (!isFinite(lifeMax()) ? '无量' : '余 ' + Math.floor(lifeLeft()));
     boxes.forEach(box => {
       const put = (k, v) => { const e = box.querySelector('[data-pr="' + k + '"]'); if(e) e.textContent = v; };
       put('stone', fmt(S.stone));
@@ -11472,7 +11478,8 @@ function towerBossCompLetter(){
       const pct = need > 0 ? Math.round(S.exp / need * 100) : 0;
       en.textContent = full ? pct + '%' : fmt(S.exp);
       en.classList.toggle('warn', full);
-      en.title = expReadout(S.exp, need).title;
+      en.title = (S.exp >= need ? '灵气已满溢，宜速突破；破境只耗本境所需，余下修为仍在。' : '') + expReadout(S.exp, need).title;
+      en.setAttribute('aria-label', '修为 ' + en.textContent + (S.exp >= need ? '，灵气已满溢，宜速突破' : ''));
     }
     /* 顶部突破按钮：修为满即可点（缺丹药时 attemptBreakthrough 会指路炼丹房） */
     const b = document.getElementById('sc-break');
@@ -11502,8 +11509,11 @@ function towerBossCompLetter(){
     const cdLeft = gateCdMs(S.rank) > 0 ? secludeLeftMs() : 0;
     const ready = S.rank < TOP && S.exp >= need && cdLeft <= 0;
     const fb = Math.min(WISDOM.failCap, S.failBonus || 0);
-    el.classList.toggle('hidden', !(ready && fb > 0));
-    if(ready && fb > 0) el.textContent = '下次 +' + (Math.round(fb * 1000) / 10) + '%';
+    /* 失败加成只要有，就在破境入口上露出来——不再等修为攒满才显示；
+       用户先看到「下次 +X%」，才知道这次失败留下了什么。 */
+    const showFb = S.rank < TOP && fb > 0;
+    el.classList.toggle('hidden', !showFb);
+    if(showFb) el.textContent = '下次 +' + (Math.round(fb * 1000) / 10) + '%';
     const b = document.getElementById('sc-break');
     if(b) b.title = expReadout(S.exp, need).title + (fb > 0 ? ' · 下次成功率 +' + (Math.round(fb * 1000) / 10) + '%' : '');
   }
@@ -11532,9 +11542,9 @@ function towerBossCompLetter(){
       c.title = '已飞升 · 寿元无量';
       return;
     }
-    if(v) v.textContent = lifeAge() + '/' + m;
+    if(v) v.textContent = '余 ' + Math.floor(lifeLeft());
     if(lifeLeft() / m < BAL.lifeLow) c.classList.add('low');
-    c.title = '寿元 ' + lifeAge() + ' / ' + m + ' 年（' + STAGE_NAMES[lifeStage()] + '）· 点开看这一世';
+    c.title = '寿元还剩 ' + Math.floor(lifeLeft()) + ' 年 / 上限 ' + m + ' 年（' + STAGE_NAMES[lifeStage()] + '）· 点开看这一世';
   }
   /* 寿元页（第 96 轮）：两页共用一个 render，元素不在场就自己跳过。
      十段寿元表每次重画——只有十格，不值得为它做增量 diff。 */
@@ -12296,6 +12306,12 @@ function towerBossCompLetter(){
       }
       tip.textContent = s;
     }
+    /* batch6：修为满溢的人话提示（只加提示，不改溢出百分比显示）。
+       注意：实测满溢后修为收益并不折半（折半的是「今日主动预算」），提示按事实写，
+       不用示例里的「收益折半」；最终文案待呆呆审。 */
+    if(tip && S.rank < TOP && S.exp >= needOf(S.rank) && tip.textContent.indexOf('灵气已满溢') < 0){
+      tip.textContent = '灵气已满溢，宜速突破。破境只扣本境所需修为，溢出部分仍在。' + tip.textContent;
+    }
     renderActs();
     renderUps();
     renderGongs();
@@ -12350,6 +12366,24 @@ function towerBossCompLetter(){
       btn.addEventListener('click', () => act(k));
       box.appendChild(btn);
     });
+  }
+  /* 外部评审 2026-11-23 第 7 项：列表卡统一视觉锚点。
+     locked：未解锁/不可点 —— 置灰 + 左侧小锁（原因小字仍由各行 sub 自带）；
+     ready ：可升级/可领取 —— 淡金内框 + 右上朱砂红点。
+     只切 class，不动各行既有文案与动作。 */
+  function anchorState(el, state){
+    if(!el) return;
+    el.classList.toggle('anchor-locked', state === 'locked');
+    el.classList.toggle('anchor-ready', state === 'ready');
+    const old = el.querySelector(':scope > .anchor-lock');
+    if(state === 'locked'){
+      if(!old){
+        const i = document.createElement('i');
+        i.className = 'anchor-lock';
+        i.setAttribute('aria-hidden', 'true');
+        el.appendChild(i);
+      }
+    }else if(old) old.remove();
   }
   function renderUps(){
     const box = document.getElementById('xx-ups');
@@ -12406,15 +12440,11 @@ function towerBossCompLetter(){
 
     if(!upsBuilt || !box.children.length){
       box.innerHTML = '';
-      rows.forEach(r => {
+      /* 外部评审 2026-11-23 第 8 项：设施汇总改纯数据面板——不再生成按钮，整行不可点。 */
+      rows.forEach(() => {
         const row = document.createElement('div');
-        row.className = 'upg';
-        row.innerHTML = '<div class="t"></div><button type="button"></button>';
-        const btn = row.querySelector('button');
-        btn.addEventListener('click', () => {
-          if(r.mirror){ if(r.target){ try{ ROUTER.open(r.target[0], r.target[1]); }catch(e){} } return; }
-          buy(r.k, btn);
-        });
+        row.className = 'upg upg-mirror';
+        row.innerHTML = '<div class="t"></div><span class="upg-state"></span>';
         box.appendChild(row);
       });
       upsBuilt = true;
@@ -12424,29 +12454,17 @@ function towerBossCompLetter(){
       if(!row) return;
       const t = row.querySelector('.t');
       if(t) t.innerHTML = '<b>' + r.name + '</b><small>' + r.sub + '</small>';
-      const btn = row.querySelector('button');
-      if(btn){
-        if(r.mirror){
-          /* 设施页全量降为镜像：只报等级与进页，不再放第二套升级动作 */
-          btn.textContent = '进页';
-          btn.disabled = false;
-        }
-        else if(!r.unlocked){ btn.textContent = '未解锁'; btn.disabled = true; }
-        else if(r.lv >= r.max){ btn.textContent = '已满级'; btn.disabled = true; }
-        else{
-          btn.textContent = matLedger([{ t: 'stone', n: r.cost }].concat(r.mats || []));
-          const matOk = !r.mats || r.mats.every(m => matHas(m.t, m.n));
-          btn.disabled = S.stone < r.cost || !matOk;
-          /* P1：不足时把「差什么、差多少」写在行内（只置灰无说明视为未修） */
-          if(btn.disabled){
-            const miss = [];
-            if(S.stone < r.cost) miss.push('灵石差 ' + fmt(r.cost - S.stone));
-            (r.mats || []).forEach(mm => { if(!matHas(mm.t, mm.n)) miss.push(matName(mm.t) + '差 ' + (mm.n - Math.floor(matCount(mm.t)))); });
-            const sm = t && t.querySelector('small');
-            if(sm && miss.length) sm.textContent += ' · 差：' + miss.join('、');
-          }
-        }
-      }
+      const st = row.querySelector('.upg-state');
+      /* 只显等级/状态；状态同时驱动第 7 项的锁定/可升级锚点。 */
+      const matOk = !r.mats || r.mats.every(m => matHas(m.t, m.n));
+      const stoneOk = S.stone >= r.cost;
+      let state = '', txt = '';
+      if(!r.unlocked){ state = 'locked'; txt = '未解锁'; }
+      else if(r.lv >= r.max){ txt = '已圆满'; }
+      else if(stoneOk && matOk){ state = 'ready'; txt = '可升级'; }
+      else { state = 'locked'; txt = !stoneOk ? '缺灵石' : '缺材料'; }
+      if(st) st.textContent = txt;
+      anchorState(row, state);
     });
   }
   /* ===== 第三批 B5：功法 / 聚灵阵升级动作搬回各自页 ===== */
@@ -12514,6 +12532,8 @@ function towerBossCompLetter(){
         btn.disabled = S.stone < cost;
         btn.onclick = () => gongUp(g.id, btn);
       }
+      /* 外部评审 2026-11-23 第 7 项：未解锁置灰加锁；灵石够且未满级 → 淡金边 + 红点 */
+      anchorState(row, !unlocked ? 'locked' : (full ? '' : (S.stone >= cost ? 'ready' : '')));
     });
   }
   /* 聚灵阵：升级动作落在洞府 · 聚灵阵页，设施页只留镜像 */
@@ -12971,6 +12991,8 @@ function towerBossCompLetter(){
     const btn = row.querySelector(':scope > button');
     btn.disabled = !canDo;
     if(!locked) btn.addEventListener('click', () => craftItem(rec.bld, rec.recipeId));
+    /* 外部评审 2026-11-23 第 7 项：可炼 → 淡金边 + 红点；未解锁/缺料/背包满 → 置灰 + 小锁 */
+    anchorState(row, canDo ? 'ready' : 'locked');
     row.dataset.recipe = rec.recipeId;
     return row;
   }
@@ -13231,6 +13253,8 @@ function towerBossCompLetter(){
     const btn = row.querySelector(':scope > button');
     btn.disabled = owned || locked || !stoneOk || !matOk;
     if(!locked && !owned) btn.addEventListener('click', () => craftItem('forge', rec.recipeId));
+    /* 外部评审 2026-11-23 第 7 项：与炼丹折叠单同一口径 */
+    anchorState(row, (!owned && !locked && stoneOk && matOk) ? 'ready' : 'locked');
     row.dataset.recipe = rec.recipeId;
     return row;
   }
@@ -14811,7 +14835,7 @@ function towerBossCompLetter(){
         const prog = questProgress(q);
         const pct = Math.max(0, Math.min(100, prog / q.goal.n * 100));
         const ql = questProgressLabel(q, prog, { rank: S.rank });
-        html += '<div class="quest' + (main ? ' quest-main' : ' quest-side') + '">' +
+        html += '<div class="quest' + (main ? ' quest-main' : ' quest-side') + (done ? ' anchor-ready' : '') + '">' +
           '<div class="q-head"><b>' + (main ? inkIco('📜') + '主线' : '🎋 支线') + ' · ' + q.title + '</b>' +
           '<span class="q-reward">' + q.rtxt + '</span></div>' +
           (q.story ? '<p class="q-story">' + q.story.replace(/\n/g, '<br>') + '</p>' : '') +
@@ -14829,7 +14853,7 @@ function towerBossCompLetter(){
         '已达成 ' + tasks.filter(t => t.done).length + ' / ' + tasks.length + ' 项 · 满进度算 1 项</span></div>';
       tasks.forEach(t => {
         const pct = Math.max(0, Math.min(100, t.prog / t.goal * 100));
-        html += '<div class="q-mile' + (t.claimed ? ' got' : '') + '">' +
+        html += '<div class="q-mile' + (t.claimed ? ' got' : '') + (t.done && !t.claimed ? ' anchor-ready' : '') + '">' +
           '<div class="q-mile-main"><b>' + t.icon + ' ' + t.name + '</b>' +
           '<div class="q-track"><i style="width:' + pct.toFixed(1) + '%"></i></div></div>' +
           (t.claimed ? '<span class="q-mile-p">已领</span>'

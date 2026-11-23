@@ -1508,7 +1508,8 @@ const DIAG = `
     L('lgForge', document.querySelector('#xx-forge .craft[data-recipe="wp4"]').querySelector('small').textContent);
     L('lgForgeBtn', document.querySelector('#xx-forge .craft[data-recipe="wp4"]').querySelector(':scope > button').textContent);
     window.switchTab('dong_ups');
-    L('lgUpg', document.querySelectorAll('#xx-ups .upg')[4].querySelector('button').textContent);
+    /* 外部评审 2026-11-23 第 8 项：设施汇总改纯数据（无「进页」按钮），这里改读状态徽标 */
+    L('lgUpg', document.querySelectorAll('#xx-ups .upg')[4].querySelector('.upg-state').textContent);
     window.switchTab('dong_enhance');
     L('lgEnh', document.querySelector('#xx-enhance .enh-cost').textContent);
     window.switchTab('dong_alchemy');
@@ -3684,6 +3685,34 @@ const DIAG = `
     L('s2HiddenStill', (bcM && bcM.classList.contains('hidden')) ? 'yes' : 'no');
     S.rank = 0; S.exp = 0;
   }catch(e){ L('s2HiddenEXC', (e.stack || e.message || '').toString().slice(0, 200)); }
+  /* 外部评审 2026-11-23 第 7/8 项：列表视觉锚点与镜像纯数据（放末尾，不污染前面用例的存档状态） */
+  try{
+    const S = XX._s;
+    S.rank = 10; S.stone = 1e9; S.gong1 = 1; S.gong2 = 0; S.gong3 = 0;
+    window.switchTab('xiu_gong');
+    XX._render();
+    const gRows = document.querySelectorAll('#xx-gong-list .upg');
+    L('anchorGongReady', gRows[0] && gRows[0].classList.contains('anchor-ready') ? 'yes' : 'no');
+    L('anchorGongLocked', gRows[2] && gRows[2].classList.contains('anchor-locked') ? 'yes' : 'no');
+    L('anchorGongLock', gRows[2] && gRows[2].querySelector('.anchor-lock') ? 'yes' : 'no');
+    S.dan = 5; S.mastery = { alchemyLv: 5, alchemyExp: 0, forgeLv: 3, forgeExp: 0 };
+    S.stone = 1e9; S.herb = 9999; S.ore = 9999; S.bag = [];
+    window.switchTab('dong_alchemy');
+    XX._render();
+    const danLock = document.querySelector('#xx-alchemy .craft[data-recipe="dan5"]');
+    L('anchorDanLocked', danLock && danLock.classList.contains('anchor-locked') ? 'yes' : 'no');
+    const danOk = document.querySelector('#xx-alchemy .craft[data-recipe="dan1"]');
+    L('anchorDanReady', danOk && danOk.classList.contains('anchor-ready') ? 'yes' : 'no');
+    window.switchTab('dong_ups');
+    XX._render();
+    L('upsNoBtn', document.querySelectorAll('#xx-ups .upg button').length);
+    const ups5 = document.querySelectorAll('#xx-ups .upg')[4];
+    L('upsState5', ups5 && ups5.querySelector('.upg-state') ? ups5.querySelector('.upg-state').textContent : 'none');
+    const sec0 = document.querySelector('.panel-page').dataset.sec;
+    if(ups5) ups5.click();
+    L('upsNoJump', (document.querySelector('.panel-page').dataset.sec === sec0 && sec0 === 'xx-ups-sec') ? 'yes' : 'no');
+    L('upsArrowGone', (document.querySelector('#xx-ups').textContent.indexOf('›') < 0) ? 'yes' : 'no');
+  }catch(e){ L('anchorEXC', (e.stack || e.message || '').toString().slice(0, 200)); }
   L('vtUsed', Math.round(performance.now()));
   const d=document.createElement('pre'); d.id='diag'; d.textContent=out.join(' | '); document.body.appendChild(d);
 })();
@@ -4440,6 +4469,19 @@ const DIAG = `
   ok(F.battleSlash === 'yes', '纯 CSS 半月剑光元素就位');
   ok(F.btArc === 'yes' && F.btVsTxt === '对决' && Number(F.btVsSealOp) >= 0.5,
      '中央剑气弧 + 「对决」朱砂印就位（印的不透明度 ' + F.btVsSealOp + '，旧版 VS 只有 .2 等于看不见）');
+  /* 外部评审 2026-11-23 第 1 项：普通战斗中央方块字去掉；Boss 题签（.bt-title/.bt-boss-tag）不动 */
+  ok(/\.bt-vs-txt\s*\{[^}]*display\s*:\s*none/.test(chatCss),
+     '普通战斗中央「对决」方块字已隐藏（display:none）');
+  ok(chatCss.indexOf('.bt-boss-tag{') >= 0, 'Boss 题签样式保留，不随方块字一起隐藏');
+  /* 外部评审 2026-11-23 第 1 项：突进约 22px 带回弹、受击红闪+抖动 */
+  ok(/@keyframes btLungeR\{[\s\S]*?translateX\(22px\)/.test(chatCss) &&
+     /@keyframes btLungeL\{[\s\S]*?translateX\(-22px\)/.test(chatCss),
+     '攻击方位移收到约 22px（原 64px）');
+  ok(/@keyframes btHitGlow\{[\s\S]*?translateX\(-8px\)[\s\S]*?translateX\(5px\)/.test(chatCss),
+     '受击方红闪之外补了左右短抖');
+  /* 外部评审 2026-11-23 第 1 项：妖兽白底融合 / 掉血飘字不压脸 */
+  ok(/#bt-mavatar\{[^}]*mix-blend-mode:multiply/.test(chatCss), '妖兽立绘用水墨 multiply 融底');
+  ok(/\.bt-dmg-float\{[^}]*top:60%/.test(chatCss), '掉血飘字落点下移，避开立绘脸');
   ok(/\.bt-vs-txt\{[^}]*white-space:nowrap/.test(chatCss),
      '「对决」印不许折行（390 窄屏实拍过：不加 nowrap 会竖排成「对/决」两行）');
   /* 第 84 轮 · 战斗面板：源码侧锁住几处「一改就退回旧观」的要点 */
@@ -4984,8 +5026,8 @@ const DIAG = `
   ok(F.svClosed2 === 'yes', '重新打开后仍可关闭');
 
   // ---- 第 96 轮 · 寿元倒计时 / 坐化 / 转世 骨架 ----
-  ok(F.lfChipNorm === '40/600/-', '顶栏寿元 chip 常态显示 年龄/上限（' + F.lfChipNorm + '）');
-  ok(F.lfChipLow === '570/600/low', '余命不足 15% → chip 挂 low（' + F.lfChipLow + '）');
+  ok(F.lfChipNorm === '余 560/-', '顶栏寿元 chip 常态显示剩余年数「余 560」（外部评审第 4 项）（' + F.lfChipNorm + '）');
+  ok(F.lfChipLow === '余 30/low', '余命不足 15% → 剩余数转朱砂 chip 挂 low（' + F.lfChipLow + '）');
   ok(F.lfChipZuo === '坐化/zuo', '坐化后 chip 改「坐化」+ zuo（' + F.lfChipZuo + '）');
   ok(F.lfChipOff === '未开/off', '未开寿元 → chip「未开」+ off（' + F.lfChipOff + '）');
   ok(F.lfChipInf === '无量/-', '飞升后寿元无量（' + F.lfChipInf + '）');
@@ -5213,8 +5255,15 @@ const DIAG = `
      '炼器行同口径：矿石持有/所需、灵石价格不足、按钮「缺料」（' + F.lgForge + '）');
   ok(F.lgForge.indexOf('失败返还 30% 材料（灵石不退）') >= 0,
      '炼器行同样把失败返还口径写在前面（' + F.lgForge + '）');
-  ok(F.lgUpRoom.indexOf('灵草 2/175') >= 0 && F.lgUpRoom.indexOf('灵石差') >= 0 && F.lgUpg === '进页',
-     '房间内升级块写材料持有/所需并标灵石差；设施页全量镜像「进页」（' + F.lgUpRoom + ' / ' + F.lgUpg + '）');
+  ok(F.lgUpRoom.indexOf('灵草 2/175') >= 0 && F.lgUpRoom.indexOf('灵石差') >= 0 && F.lgUpg === '缺灵石',
+     '房间内升级块写材料持有/所需并标灵石差；设施页纯数据只报状态「缺灵石」、不再有「进页」（' + F.lgUpRoom + ' / ' + F.lgUpg + '）');
+  /* 外部评审 2026-11-23 第 7/8 项 */
+  ok(F.anchorGongReady === 'yes' && F.anchorGongLocked === 'yes' && F.anchorGongLock === 'yes',
+     '第7项：功法可升级淡金边+红点、未解锁置灰+小锁（' + [F.anchorGongReady, F.anchorGongLocked, F.anchorGongLock].join('/') + '）');
+  ok(F.anchorDanLocked === 'yes' && F.anchorDanReady === 'yes',
+     '第7项：炼丹锁定行置灰+小锁、可炼行淡金边+红点（' + [F.anchorDanLocked, F.anchorDanReady].join('/') + '）');
+  ok(F.upsNoBtn === '0' && F.upsState5 && F.upsState5 !== 'none' && F.upsNoJump === 'yes' && F.upsArrowGone === 'yes',
+     '第8项：设施汇总纯数据——无按钮/无箭头、点击不跳页（按钮 ' + F.upsNoBtn + ' / 状态 ' + F.upsState5 + '）');
   ok(F.lgEnh.indexOf('矿石 0/') >= 0 && F.lgEnh.indexOf('兽王精魄 0/1') >= 0 && F.lgEnh.indexOf('（不足）') >= 0,
      '强化消耗写矿石/Boss 材料缺口与灵石不足（' + F.lgEnh + '）');
   ok(F.lgDanOk === 'yes' && F.lgDanBtnOk === '炼制', '材料够了后不足标记消失、按钮回到「炼制」');

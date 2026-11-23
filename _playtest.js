@@ -695,7 +695,9 @@ const SCENARIOS = [
         first.forgeBtn = (forge.querySelector(':scope > button') || {}).textContent || '';
         ROUTER.open('dong_ups');
         var upg = document.querySelectorAll('#xx-ups .upg')[4];
-        first.upg = (upg.querySelector(':scope > button') || {}).textContent || '';
+        /* 外部评审 2026-11-23 第 8 项：设施汇总改纯数据，读状态徽标（无按钮可点） */
+        first.upg = (upg.querySelector('.upg-state') || {}).textContent || '';
+        first.upgBtnN = upg.querySelectorAll('button').length;
         ROUTER.open('dong_enhance');
         var enh = document.querySelector('#xx-enhance .enh-cost');
         first.enh = (enh || {}).textContent || '';
@@ -732,8 +734,8 @@ const SCENARIOS = [
         { ok: (f.forge || '').indexOf('失败返还 30% 材料（灵石不退）') >= 0,
           label: '炼器行同样写明失败返还口径', detail: f.forge },
         { ok: f.forgeBtn === '缺料', label: '炼器缺料按钮也写「缺料」', detail: f.forgeBtn },
-        { ok: f.upg === '进页',
-          label: '设施页全量镜像（只留「进页」，升级动作在各自页内）', detail: f.upg },
+        { ok: f.upg === '缺灵石' && String(f.upgBtnN) === '0',
+          label: '设施页纯数据（状态报「缺灵石」、无按钮可点，升级动作在各自页内）', detail: f.upg + ' / 按钮 ' + f.upgBtnN },
         { ok: (f.enh || '').indexOf('矿石 0/') >= 0 && (f.enh || '').indexOf('兽王精魄 0/1') >= 0,
           label: '强化消耗写矿石与 Boss 材料缺口', detail: f.enh },
         { ok: d.okBtn === '炼制' && (d.okTxt || '').indexOf('（不足）') < 0,
@@ -1959,7 +1961,8 @@ const SCENARIOS = [
       const s = midSave();
       s.rank = 12; s.exp = 0;
       /* P1（阶段一，2026-11-14 已批）：lifeYearSec 300→4320，1 游戏年 = 72 分钟。
-         余命 3 真实秒 ⇒ 差 3/4320 = 0.000694 年；age 取 599.9993 后 floor 仍显示 599/600。 */
+         余命 3 真实秒 ⇒ 差 3/4320 = 0.000694 年；age 取 599.9993 后 lifeAge=floor=599，
+         剩余口径 lifeLeft=600-599=1 → chip 显示「余 1」（外部评审第 4 项）。 */
       s.life = { age: 599.9993, on: true, brk: 3 };   /* 余命 3 真实秒：首读还活着，两个心跳后自然坐化 */
       s.equipment = { weapon: null, armor: null, accessory: null };
       /* 第 97 轮：背包三件法宝 → 坐化结算卡给出三选一（赤霄 1800 > 玄龟甲 1500 > 聚灵珠 1200） */
@@ -2063,8 +2066,8 @@ const SCENARIOS = [
     `,
     checks(d) {
       return [
-        { ok: d.chipTag === 'BUTTON' && d.chip0 === '599/600' && d.low0 === true,
-          label: '顶栏寿元 chip 是按钮：余命告急显示 599/600 且挂 low',
+        { ok: d.chipTag === 'BUTTON' && d.chip0 === '余 1' && d.low0 === true,
+          label: '顶栏寿元 chip 是按钮：余命告急显示剩余「余 1」且挂 low',
           detail: [d.chipTag, d.chip0, d.low0].join('/') },
         { ok: String(d.cur1).indexOf('life') === 0 && d.cell === true && d.cur2 === 'life_now',
           label: 'chip 真点进寿元 hub，hub 格真点进寿元页',
@@ -2079,7 +2082,7 @@ const SCENARIOS = [
           label: '坐化结算卡：享年/止步境界/突破次数 + 三件遗物默认选中最强',
           detail: [d.sumTxt, d.pickN, d.pickOn0].join('/') },
         { ok: d.gens === 1 && Math.abs(d.mult - 1.1) < 1e-9 && d.age === 0 && d.rank === 0 &&
-              d.chip4 === '0/120' && d.relic === 'eq_xuangui' && d.pickSel === 'eq_xuangui',
+              d.chip4 === '余 120' && d.relic === 'eq_xuangui' && d.pickSel === 'eq_xuangui',
           label: '改选第二件后真点转世：带的是玄龟甲，不是默认最强的赤霄剑',
           detail: [d.gens, d.mult, d.age, d.rank, d.chip4, d.relic, d.pickSel].join('/') },
         { ok: d.cell2 === true && d.cur5 === 'life_legacy' && String(d.gensTxt).indexOf('第 1 世') >= 0 && d.rows === 4,
