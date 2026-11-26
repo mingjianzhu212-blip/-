@@ -6,7 +6,7 @@ window.VIEWS = window.VIEWS || {};
 HUBKIT.define({
   panel: 'role',
   title: '人物 · 装备',
-  sub: '道体 · 札记 · 道碑 · 悟道 · 断天门 · 识人',
+  sub: '道体 · 装备',
   crumb: '人物',
   secs: [
     { key: 'xx-role-equip', view: 'role_equip', name: '道体 · 法宝', note: '立绘 · 装备 · 四族法宝',
@@ -15,7 +15,7 @@ HUBKIT.define({
         <div class="cs-top">
           <div class="cs-portrait" id="xx-role-figure" aria-hidden="true"></div>
           <div class="cs-side">
-            <div class="cs-id"><b id="cs-name">无名散修</b><span id="cs-rank">炼气一层</span><em id="cs-path">道途 · 未定</em></div>
+            <div class="cs-id"><b id="cs-name">无名散修</b><span id="cs-rank">炼气一层</span></div>
             <div class="cs-slots">
               <div class="equip-wrap">
                 <div class="equip-slot" data-slot="weapon"><span class="es-body" id="es-weapon"></span></div>
@@ -38,19 +38,7 @@ HUBKIT.define({
           <div class="cs-bar"><span>修为</span><div class="bar"><i id="cs-expbar"></i></div><b id="cs-exptxt">0 / 0</b></div>
           <div class="cs-bar"><span>寿元</span><div class="bar"><i id="cs-lifebar"></i></div><b id="cs-lifetxt">—</b></div>
         </div>
-        <div class="role-grid">
-          <div class="role-stats" id="xx-role-stats"></div>
-        </div>
-        <button class="pw-link" id="xx-role-break" type="button">道行拆账 · 战力 / 修为 / 灵石是怎么算的 ›</button>
-        <div class="cs-links">
-          <button type="button" data-role-jump="xx-role-journal">修行札记</button>
-          <button type="button" data-role-jump="xx-role-miles">仙途道碑</button>
-          <button type="button" data-role-jump="xx-role-wu">悟道</button>
-          <button type="button" data-role-jump="xx-role-story">断天门</button>
-          <button type="button" data-role-jump="xx-role-npc">识人 · 沈碑</button>
-          <button type="button" data-codex>法宝图鉴</button>
-        </div>
-        <p class="hint">装备点圈即可穿/卸；四族法宝位点进去去炼制或强化。这里只报自己的账，功能入口不在此页。</p>
+        <p class="hint">装备点圈即可穿/卸；四族兽魂与旧法宝同族只取最高阶。法宝动作在洞府炼器坊，本页不设传送门。</p>
       </section>` },
     { key: 'xx-role-journal', view: 'role_journal', name: '修行札记', note: '这些年干过多少事',
       ico: 'ic_scroll.png', sealTxt: '历年',
@@ -110,3 +98,11 @@ HUBKIT.define({
       </section>` }
   ]
 });
+
+/* batch10：人物装备直开页删掉名实不符的右上「人物」按钮，只保留左上明确返回。
+   旧 role_equip 深链也同一处理；其余人物子页的面包屑仍回人物 hub。 */
+VIEWS.role_equip.html = VIEWS.role_equip.html.replace(/<button class="crumb" data-go-hub>人物<\/button>/, '');
+VIEWS.role = {
+  title:'人物 · 装备',
+  html:VIEWS.role_equip.html
+};

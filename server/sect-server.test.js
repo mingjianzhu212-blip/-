@@ -268,6 +268,9 @@ test('战力榜新鲜度：超过 7 天不上榜、不计入协力总和；旧�
   assert.equal(me.total, 2);                            /* 旧档 power 补 0，不上榜；过期上报仍留榜 */
   assert.equal(me.fresh, 1);
   assert.equal(me.sum, 7000);                           /* 只算近 7 天 */
+  assert.equal(me.list.find(x => x.nick === '新报').at, fresh.powerAt); /* 毫秒时间戳原样返回，不做 int32 截断 */
+  assert.equal(me.list.find(x => x.nick === '陈旧').at, stale.powerAt);
+  assert.equal(me.me.at, 0);                            /* 无时间戳由前端显示「—」 */
   assert.ok(POWER_FRESH_MS === 7 * 24 * 3600 * 1000);
   const reported = await call(base, 'power', { pid: 'poldold00', nick: '无字段' }, { snapshot: { ...SNAP_BASE, rank: 2 }, ver: 1 });
   assert.equal(reported.status, 200);

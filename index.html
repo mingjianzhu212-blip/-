@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1210">
 <title>九霄问道 · 放置挂机</title>
-<link rel="stylesheet" href="style.css?v=20261123rv3">
+<link rel="stylesheet" href="style.css?v=20261125rv4m7">
 <script src="js/img_fallback.js"></script>  <!-- A6：全站图片失败/超时文字兜底（NPC 立绘走 npc_art） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -83,7 +83,8 @@
       <!-- 修炼行动按钮：绝对定位在人物立绘正下方（不随人物容器缩放/移动） -->
       <div class="cave-acts" id="sc-acts">
         <button class="cave-act" data-k="sit" title="10 秒基础吐纳量与本层所需修为的 0.2% 取高，再乘今日主动效率（100%/50%/25%）"><b><img class="cave-ic" src="ui/icons/ic_sit2.png" alt="">打坐</b><small data-base="修为按当前境界结算">修为按当前境界结算</small></button>
-        <button class="cave-act" data-k="train"><b><img class="cave-ic" src="ui/icons/ic_blade.png" alt="">历练</b><small data-base="有风险">有风险</small></button>
+        <button class="cave-act" data-k="train"><b><img class="cave-ic" src="ui/icons/ic_blade.png" alt="">历练</b><small data-base="有风险">文字冒险</small></button>
+        <button class="cave-hunt-open" type="button" data-hunt-open title="打开猎妖行：查看旧掉落与妖兽专属料掉率"><b><img class="cave-ic" src="ui/icons/ic_blade.png" alt="">猎妖</b><small>自动战斗 · 专属料</small></button>
       </div>
       <!-- 道号铭牌：绝对定位在按钮排正下方，不与按钮/木牌争位 -->
       <div class="sc-plate" id="sc-plate"><span id="sc-char-name">无名散修</span><small id="sc-char-rank">炼气一层</small></div>
@@ -93,10 +94,10 @@
         <span class="nj-name">丹房</span>
         <span class="nj-tip">丹房 · 炼制破境丹，逆天改命</span>
       </button>
-      <button class="node-jade" data-bld="dong" data-scroll="xx-forge" style="--nx:75%;--ny:40%;--jd:-1.6s" aria-label="器室">
+      <button class="node-jade" data-bld="dong" data-scroll="xx-forge" style="--nx:75%;--ny:40%;--jd:-1.6s" aria-label="炼器坊">
         <i class="nj-ring"><b>器</b></i>
-        <span class="nj-name">器室</span>
-        <span class="nj-tip">器室 · 锻造法宝，符纹镶魂</span>
+        <span class="nj-name">炼器坊</span>
+        <span class="nj-tip">炼器坊 · 锻造法宝，符纹镶魂</span>
       </button>
       <button class="node-jade" id="sc-field" data-bld="dong" data-scroll="xx-field" style="--nx:25%;--ny:62%;--jd:-2.8s" aria-label="灵田">
         <i class="nj-ring"><b>田</b></i>
@@ -215,12 +216,12 @@
     </div>
 
     <div class="m-row">
-      <label>音乐音效（BGM + 按钮点击声）</label>
+      <label>音乐音效（背景音乐 + 按钮点击声）</label>
       <button class="btn-plain" id="fileaudio-toggle" style="width:100%"><img class="btn-ic" src="ui/icons/rail_sfx.png" alt="">音频：开（点击静音）</button>
     </div>
 
     <div class="m-row">
-      <label>宗门服务地址（留空 = 自动连接；高级玩家可手填）</label>
+      <label>宗门连接（留空 = 自动连接）</label>
       <input id="m-sect" type="text" placeholder="留空自动连接">
       <small id="m-sect-state">未连接</small>
     </div>
@@ -229,12 +230,12 @@
       <input id="m-nick" type="text" maxlength="12" placeholder="散修xxx">
     </div>
     <div class="m-btns">
-      <button class="btn-main" id="m-save">保存并重连</button>
+      <button class="btn-main" id="m-save">保存设置</button>
       <button class="btn-plain" id="m-cancel">取消</button>
     </div>
 
     <div class="m-row">
-      <label>存档备份（换设备 / 防清缓存）</label>
+      <label>存档备份（换设备 / 防止浏览器清除记录）</label>
       <button class="btn-plain" id="m-backup" style="width:100%">存档备份 · 导出 / 导入</button>
     </div>
 
@@ -255,7 +256,7 @@
   <div class="m-card">
     <h3>清空存档 <button class="m-close" id="wipe-cancel-x" type="button">×</button></h3>
     <p class="warn">这会<b>永久删除</b>当前角色的境界、修为、灵石、背包、法宝、洞府与全部 NPC 记忆。<br>删除后回到创角页，<b>无法撤销</b>。</p>
-    <p class="warn">若只是换设备或防清缓存，请先去「存档备份」导出一份。</p>
+    <p class="warn">若只是换设备或防止浏览器清除记录，请先去「存档备份」导出一份。</p>
     <div class="m-btns">
       <button class="btn-plain" id="wipe-cancel" type="button" style="flex:1">取消</button>
       <button class="btn-danger" id="wipe-ok" type="button" style="flex:1">清空并重开</button>
@@ -267,7 +268,7 @@
 <div class="modal hidden" id="save-modal">
   <div class="m-card sv-card">
     <h3>存档备份 <button class="m-close" id="sv-close" type="button">×</button></h3>
-    <p class="sv-lead">进度只存在这台设备的浏览器里。换设备、换浏览器、清缓存之前，先导出一份。</p>
+    <p class="sv-lead">进度只存在这台设备的浏览器里。换设备、换浏览器、清除浏览器记录之前，先导出一份。</p>
 
     <div class="sv-sec">
       <div class="sv-h">当前存档</div>
@@ -604,7 +605,7 @@
 <script src="js/multi-ledger.js"></script> <!-- 联机结算幂等账（123 轮）：必须先于 game.js；纯逻辑，不碰 DOM/存储 -->
 <script src="js/multi-local.js"></script>  <!-- 阶段四 C3（D4 A2-LOCAL）：本地陪练五层引擎；必须先于 game.js；纯逻辑，常量逐项抄自 server/server.mjs，server/ 零改动 -->
 <script src="js/npc_art.js"></script>           <!-- NPC 立绘公共缓存（B3）：预加载 / 3 秒超时重试 / 本地兜底 / 四呈现位共用；缺失时各视图退回「碑」字块 -->
-<script src="js/game.js?v=20261123rv3"></script>
+<script src="js/game.js?v=20261125rv4m7"></script>
 <script src="js/trib.js?v=20261123rv1"></script>
 <script src="js/npc_memory.js"></script>       <!-- NPC 记忆存储（独立键 jxwd_npc_memory_v1，不碰主存档；缺失时对话静默回退） -->
 <script src="js/npc_memory_voice.js"></script> <!-- NPC 称呼语气（按记忆分档；缺失/异常时静默回退） -->
@@ -616,28 +617,28 @@
 <script src="js/npc_rel.js"></script>          <!-- 记忆 NPC 框架第二步：关系事件化 / 可失去 / 状态机 / 托付（纯逻辑；缺失时按旧行为） -->
 <script src="js/views/kit.js"></script>
 <script src="js/views/scripture.js?v=20261121b3"></script>
-<script src="js/views/cave.js?v=20261123rv1"></script>
-<script src="js/views/sect.js"></script>
+<script src="js/views/cave.js?v=20261125rv4m7"></script>
+<script src="js/views/sect.js?v=20261125rv4m7"></script>
 <script src="js/views/chat.js"></script>
 <script src="js/views/bag.js?v=20261122b4b"></script>
-<script src="js/views/role.js?v=20261122b5"></script>
+<script src="js/views/role.js?v=20261125rv4m7"></script>
 <script src="js/views/today.js?v=20261122b6s2"></script>
-<script src="js/views/codex.js?v=20261122b5"></script>
-<script src="js/views/beast.js?v=20261122b5s3"></script>
+<script src="js/views/codex.js?v=20261125rv4m7"></script>
+<script src="js/views/beast.js?v=20261125rv4m7"></script>
 <script src="js/views/tower.js"></script>
-<script src="js/views/multi.js"></script>       <!-- 组队秘境 · 联机面板（115 轮）：三态空壳，内容 game.js 事件驱动现填 -->
+<script src="js/views/multi.js?v=20261125rv4m7"></script>       <!-- 组队秘境 · 联机面板（115 轮）：三态空壳，内容 game.js 事件驱动现填 -->
 <script src="js/views/event.js"></script>
 <script src="js/views/arena.js"></script>
 <script src="js/views/rank.js"></script>
 <script src="js/views/secret.js"></script>
-<script src="js/views/market.js"></script>
+<script src="js/views/market.js?v=20261125rv4m7"></script>
 <script src="js/views/life.js"></script>
 <script src="js/audio.js"></script>
 <!-- 太虚真人引导 V1（2026-11-11）：替换原 tutorial.js（其捕获点击监听是旧引导卡死根因）。
      须置于 router.js 之前：router.js 末尾同步触发 boot() → finishBoot() 内的 Guide.init()。
      guide_taixu.js 为自包含 IIFE，加载时不依赖 DOM，前移安全。 -->
-<script src="js/guide_taixu.js?v=20261122b6"></script>
-<script src="js/router.js?v=20261122b6"></script>
+<script src="js/guide_taixu.js?v=20261125rv4m7"></script>
+<script src="js/router.js?v=20261125rv4m7"></script>
 
 </body>
 </html>

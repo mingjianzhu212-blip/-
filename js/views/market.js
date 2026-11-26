@@ -32,12 +32,12 @@ HUBKIT.define({
       ico: 'bld_tianji.png', sealId: 'xx-hub-tj',
       body: `      <section class="card wide" id="xx-tianji">
         <h2>天机阁</h2>
-        <p class="hint">悟道值 <b id="tj-wisdom">0</b> · 此处与坊市<b>不在一个维度</b>：保底道具按
-          <b>当前总资产 35%~45% 的灵石 + 大额悟道值</b>双扣（悟道价随境界 ×<b id="tj-mul">1.00</b>）——囤多少灵石都一口榨走三到五成。
+        <p class="hint">悟道值 <b id="tj-wisdom">0</b> · 此处不与坊市共用物价：保底道具按
+          <b>当前总资产的 35%~45% 灵石 + 大额悟道值</b>同时扣除（悟道价随境界 ×<b id="tj-mul">1.00</b>）——囤多少灵石都会一口花掉三到五成。
           悟道值仅由<span class="tj-src">任务、签到、突破失败</span>获得。护心镜每周限购 2 次；护道阵法每周限购 1 次；天机令每大境界限 1 次。</p>
         <div class="mk-goods" id="tj-goods"></div>
         <h2 class="tj-bp-title">图纸 · 每周自选 <small id="tj-bp-state">本周 0/1</small></h2>
-        <p class="hint">每周可自选 1 张图纸，价格 = 当前一层需求 ×3 灵石 + 500 悟道值；图纸锻造只跳炼器坊等级与器师阶，材料与成功率照卡。</p>
+        <p class="hint">每周可自选 1 张图纸，价格 = 当前一层需求 ×3 灵石 + 500 悟道值；图纸锻造只看炼器坊等级与器师阶，材料仍按配方准备，成功率照常计算。</p>
         <div class="mk-goods" id="tj-bp"></div>
       </section>` }
   ]

@@ -313,19 +313,20 @@ function createSectServer(options = {}) {
        最多 50 名，按 power 降序、同战力最近上报者在前；sum/fresh 供宗门协力迁移用（近 7 天）。 */
     if (req.method === 'GET' && action === 'powerboard') {
       const stamp = now();
+      const atOf = x => Number.isFinite(x.powerAt) && x.powerAt > 0 ? x.powerAt : 0;
       p.seen = stamp;
       const all = Object.values(state.players).filter(x => (x.power | 0) > 0);
-      all.sort((a, b) => (b.power | 0) - (a.power | 0) || (b.powerAt | 0) - (a.powerAt | 0) ||
+      all.sort((a, b) => (b.power | 0) - (a.power | 0) || atOf(b) - atOf(a) ||
         String(a.nick).localeCompare(String(b.nick)));
       const list = all.slice(0, POWER_BOARD_CAP).map((x, i) => ({
-        no: i + 1, nick: x.nick, rank: x.rank | 0, power: x.power | 0, at: x.powerAt | 0, me: x === p
+        no: i + 1, nick: x.nick, rank: x.rank | 0, power: x.power | 0, at: atOf(x), me: x === p
       }));
-      const fresh = all.filter(x => stamp - (x.powerAt || 0) <= POWER_FRESH_MS);
+      const fresh = all.filter(x => stamp - atOf(x) <= POWER_FRESH_MS);
       const freshSum = fresh.reduce((s, x) => s + (x.power | 0), 0);
       const myIndex = all.indexOf(p);
       return response(res, 200, { ok: true, list, total: all.length, cap: POWER_BOARD_CAP,
         sum: freshSum, fresh: fresh.length,
-        me: { power: p.power | 0, at: p.powerAt | 0,
+        me: { power: p.power | 0, at: atOf(p),
           fresh: (p.power | 0) > 0 && stamp - (p.powerAt || 0) <= POWER_FRESH_MS,
           rank: myIndex >= 0 ? myIndex + 1 : 0 } });
     }

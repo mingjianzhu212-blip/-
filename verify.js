@@ -383,7 +383,9 @@ const DIAG = `
     L('candQuery', SECT._candidates({ search: '?sect=https://t.example/aa/', stored: 'http://old.example',
       protocol: 'https:', origin: 'https://game.example' }));
     L('candSame', SECT._candidates({ search: '', stored: '', protocol: 'https:', origin: 'https://game.example' }));
-    L('candDupe', SECT._candidates({ search: '?sect=http://localhost:8787', stored: 'http://localhost:8787/',
+    L('candDupe', SECT._candidates({ search: '?sect=https://same.example', stored: 'https://same.example/',
+      protocol: 'file:', origin: 'null' }));
+    L('candLoopback', SECT._candidates({ search: '?sect=http://localhost:8787', stored: 'http://127.0.0.1:8787/',
       protocol: 'file:', origin: 'null' }));
     L('aliveNone', await SECT._firstAlive(['http://127.0.0.1:1', 'http://127.0.0.1:2']));
     /* 设置里要看得见"连没连上、连的是谁"（换服务器/开隧道时不用开控制台猜） */
@@ -832,16 +834,16 @@ const DIAG = `
     L('equipReject', (bad.ok === false && bad.reason === 'not-equip') ? 'yes' : 'no');
     XX._s.equipment = { weapon:null, armor:null, accessory:null };   /* 复原，别污染后续用例 */
 
-    /* ---- 人物 · 装备面板：属性区 + 三槽 + 背包「装备」按钮联动 ---- */
-    /* 第 88 轮 B 拆页：hub 五格（道体法宝 / 札记 / 道碑 / 悟道 / 断天门），战力账落在法宝页页眉 */
+    /* ---- 人物 · 装备面板：rv4 定稿只留人物本体与装备，旧子页仅供既有剧情深链 ---- */
     window.switchTab('role');
-    L('roleHubCells', document.querySelectorAll('#page-role .hub-nav [data-jump]').length);   // 6（第 6 格：识人 · 沈碑）
-    L('roleHubCards', document.querySelectorAll('#page-role .panel-body > .card').length);    // 0
-    L('roleHubSealMiles', document.getElementById('xx-hub-role-miles').textContent);           // 0/N 碑
-    window.switchTab('role_equip');
+    L('roleHubCells', document.querySelectorAll('#page-role .hub-nav [data-jump]').length);
+    L('roleHubCards', document.querySelectorAll('#page-role .panel-body > .card').length);
+    L('roleNoPortals', document.querySelectorAll('#page-role [data-role-jump],#page-role [data-cross],#page-role [data-go-hub],#xx-role-break').length);
+    L('roleNoLegacyBlocks', document.querySelectorAll('#xx-role-stats,#cs-path,.cs-links').length);
     L('roleShown', document.getElementById('page-role') ? 'yes' : 'no');
-    L('roleStatsOk', (document.getElementById('xx-role-stats').textContent || '').indexOf('道号') >= 0 &&
-                     (document.getElementById('xx-role-stats').textContent || '').indexOf('修为产出') >= 0 ? 'yes' : 'no');
+    L('roleStatsOk', (document.getElementById('cs-name').textContent || '').indexOf('道号') < 0 &&
+                     document.getElementById('cs-name').textContent.length > 0 &&
+                     document.getElementById('cs-rank').textContent.length > 0 ? 'yes' : 'no');
     L('roleSlots', document.querySelectorAll('.equip-slot').length);
     L('roleAllEmpty', document.querySelectorAll('.equip-slot .es-empty').length);
     /* 第 95 轮 · 空槽不再只有一个「空」字：影子 + 一句状态 + 一行功效。
@@ -868,15 +870,14 @@ const DIAG = `
     L('slotItemName', (document.querySelector('#es-weapon .es-name') || {}).textContent || '');
     L('rolePowTxt', (document.getElementById('xx-role-pow') || {}).textContent || '');
     /* 第 95 轮 · 三个圈真的点得动：空槽 + 背包有货 → 点一下就穿上；再点一下卸下退回背包。
-       卸下那条问的是原生 confirm，headless 里它会挂死整页（第 95 轮就是这么撞上的），
-       所以点之前先把 confirm 定成「确定」、点完再还原。 */
+       batch10：卸下走共用游戏内确认层，测试接管确认回调，避免依赖原生弹窗。 */
     XX._s.bag = [{ t: 'eq_huxin', n: '照胆镜' }, { t: 'eq_yupei', n: '养元玉佩' }]; XX._render();
     window.switchTab('role_equip');
     const aSlot = document.querySelector('.equip-slot[data-slot="armor"]');
     L('slotCanUp', aSlot.classList.contains('can-up') ? 'yes' : 'no');
     L('slotCandTxt', (aSlot.querySelector('.es-empty') || {}).textContent + ' ' + (aSlot.querySelector('.es-tip') || {}).textContent);
     L('slotCandTitle', aSlot.title || '');
-    const cfOld = window.confirm; window.confirm = () => true;
+    XX._setConfirmHandler((cfg, cb) => cb(true));
     aSlot.click();
     const aSlot2 = document.querySelector('.equip-slot[data-slot="armor"]');
     L('slotTapFilled', aSlot2.classList.contains('filled') ? 'yes' : 'no');
@@ -885,14 +886,14 @@ const DIAG = `
     const aSlot3 = document.querySelector('.equip-slot[data-slot="armor"]');
     L('slotTapDown', aSlot3.classList.contains('filled') ? 'no' : 'yes');
     L('slotTapBack', String(XX._s.bag.filter(b => b.t === 'eq_huxin').length));
-    window.confirm = cfOld;
+    XX._setConfirmHandler(null);
     L('slotTapNoCand', (function(){ XX._s.bag = []; XX._render(); window.switchTab('role_equip');
       const s = document.querySelector('.equip-slot[data-slot="accessory"]'); s.click();
       const r = s.classList.contains('filled') ? 'filled' : 'still-empty';
       return r + '/' + ((document.querySelector('#es-accessory .es-empty') || {}).textContent || ''); })());
-    /* ---- 道行拆账（第 77 节）：人物面板入口 / 顶栏 chip → 弹窗；底×乘区+加区 = 面板值 ---- */
+    /* ---- 道行拆账：人物入口按 rv4 删除，顶栏 chip 与计算契约保留 ---- */
     L('pwBtn', !!document.getElementById('xx-role-break') ? 'yes' : 'no');
-    document.getElementById('xx-role-break').click();
+    XX._openPower();
     L('pwOpen', document.getElementById('power-modal').classList.contains('hidden') ? 'no' : 'yes');
     L('pwSecs', document.querySelectorAll('#pw-body .pw-sec').length);
     L('pwRowN', document.querySelectorAll('#pw-body .pw-row').length);
@@ -1033,8 +1034,13 @@ const DIAG = `
     L('mkRowFlash', document.querySelectorAll('#mk-goods .mk-row.flash').length);
     XX._render();
     L('mkRowPersist', document.querySelector('#mk-goods .mk-row') === mkRow0 ? 'yes' : 'no');
-    XX._s.bag = [{t:'mat_core',n:'妖丹'}]; XX._s.market.sold = 0; XX._render();
+    XX._s.bag = [{t:'mat_core',n:'妖丹'}]; XX._s.market.sold = 0; window.switchTab('market_sell'); XX._render();
     const st2 = XX._s.stone, pNormal = XX._sellPrice('mat_core');
+    L('mkSellPriceBtn', (document.querySelector('#mk-sell [data-sell="0"]') || {}).textContent.trim() === pNormal + ' 灵石' ? 'yes' : 'no');
+    XX._setConfirmHandler((cfg, cb) => cb(false));
+    XX._sellMarket(0);
+    L('mkSellCancelKeeps', XX._s.stone === st2 && XX._s.bag.length === 1 && XX._s.market.sold === 0 ? 'yes' : 'no');
+    XX._setConfirmHandler((cfg, cb) => cb(true));
     XX._sellMarket(0);
     L('mkSoldGain', XX._s.stone > st2 ? 'yes' : 'no');
     L('mkSoldCount', XX._s.market.sold);                          // 1
@@ -1043,8 +1049,15 @@ const DIAG = `
     L('mkOverPrice', XX._sellPrice('mat_core') < pNormal ? 'yes' : 'no');   // 超额压价
     XX._s.market.sold = 0;
     XX._s.bag = [{t:'mat_core',n:'妖丹'},{t:'mat_bone',n:'兽骨'}]; XX._render();
-    const st3 = XX._s.stone; XX._sellAll();
+    const st3 = XX._s.stone, allPlan = XX._sellAllPlan();
+    XX._setConfirmHandler((cfg, cb) => cb(false));
+    XX._sellAll();
+    L('mkSellAllCancelKeeps', XX._s.stone === st3 && XX._s.bag.length === 2 ? 'yes' : 'no');
+    XX._setConfirmHandler((cfg, cb) => cb(true));
+    XX._sellAll();
     L('mkSellAll', XX._s.stone > st3 && XX._s.bag.length === 0 ? 'yes' : 'no');
+    L('mkSellAllSum', XX._s.stone - st3 === allPlan.sum ? 'yes' : 'no:' + (XX._s.stone - st3) + '/' + allPlan.sum);
+    XX._setConfirmHandler(null);
 
     // ---- 天机阁（资产比例 + 大额悟道值双扣；与坊市定价脱钩） ----
     /* 场景木牌「天机阁」带的还是老锚点 xx-tianji —— 深链要落到那一页，且 ← 先回坊市 hub */
@@ -1317,10 +1330,27 @@ const DIAG = `
     L('danHeadTxt', [].map.call(document.querySelectorAll('#xx-alchemy .dan-fam b'), b => b.textContent).join(','));
     L('danHeadArt', [].map.call(document.querySelectorAll('#xx-alchemy .dan-fam img'),
       i => (i.getAttribute('src') || '').replace('ui/icons/', '')).join(','));
-    L('danRowsAll', document.querySelectorAll('#xx-alchemy .craft.dan').length);
+    const danRows = [].slice.call(document.querySelectorAll('#xx-alchemy .craft.dan'));
+    const danLegacyRows = danRows.filter(r => !XX._dan.rv4.all[r.dataset.recipe]);
+    const danRv4Rows = danRows.filter(r => !!XX._dan.rv4.all[r.dataset.recipe]);
+    L('danRowsAll', danRows.length);
+    L('danLegacyRowsAll', danLegacyRows.length);
+    L('danRv4Rows', danRv4Rows.length);
     L('danSegTags', document.querySelectorAll('#xx-alchemy .dan-seg').length);
+    L('danLegacySegTags', danLegacyRows.filter(r => r.querySelector('.dan-seg')).length);
+    L('danRv4SegTags', danRv4Rows.filter(r => r.querySelector('.dan-seg')).length);
     L('danEffTags', document.querySelectorAll('#xx-alchemy .craft-eff').length);
-    L('danBand', ['t1', 't2', 't3', 't4', 't5'].map(c => document.querySelectorAll('#xx-alchemy .craft.dan.' + c).length).join(','));
+    L('danLegacyEffTags', danLegacyRows.filter(r => r.querySelector('.craft-eff')).length);
+    L('danRv4EffTags', danRv4Rows.filter(r => r.querySelector('.craft-eff')).length);
+    L('danBand', ['t1', 't2', 't3', 't4', 't5'].map(c => danRows.filter(r => r.classList.contains(c)).length).join(','));
+    L('danLegacyBand', ['t1', 't2', 't3', 't4', 't5'].map(c => danLegacyRows.filter(r => r.classList.contains(c)).length).join(','));
+    L('danRv4Band', ['t1', 't2', 't3', 't4', 't5'].map(c => danRv4Rows.filter(r => r.classList.contains(c)).length).join(','));
+    L('danRv4Strict', XX._dan.rv4.list.length===12 && XX._dan.rv4.list.every(function (d) {
+      const std = XX._dan.all[XX._dan.ids[d.fam][d.seg - 1]];
+      return !!std && ['tier','seg','rate','reqLv','reqM','buff','exp','mult','pct','brk'].every(k => d[k] === std[k]) &&
+        d.mats.length===3 && d.mats.slice(0,2).every(m => m.t.indexOf('matb_')===0) && d.mats[2].t==='stone';
+    }) ? 'yes' : 'no');
+    L('danRv4Meta', XX._dan.rv4.list.filter(d => XX._items[d.id] && XX._items[d.id].usage && XX._items[d.id].source && XX._items[d.id].description===d.desc).length);
     L('danBagMeta', XX._dan.list.filter(d => !d.legacy && XX._items[d.id] && XX._items[d.id].usage && XX._items[d.id].source).length);
     L('danOldNames', ['dan1', 'dan2', 'dan3', 'dan4', 'dan5'].map(id => XX._items[id].n).join(','));
     L('danOldImgs', ['dan1', 'dan2', 'dan3', 'dan4', 'dan5'].map(id => XX._items[id].img).join(','));
@@ -1417,8 +1447,9 @@ const DIAG = `
     L('artHeadArt', [].map.call(document.querySelectorAll('#xx-forge .dan-fam img'),
       i => (i.getAttribute('src') || '').replace('ui/icons/', '')).join(','));
     L('artRowsAll', document.querySelectorAll('#xx-forge .craft.art').length);
-    L('artSegTags', document.querySelectorAll('#xx-forge .dan-seg').length);
-    L('artEffTags', document.querySelectorAll('#xx-forge .craft-eff').length);
+    /* rv4 兽魂/装备也复用 dan-seg/craft-eff；旧 36 行子集只在自己行内计数。 */
+    L('artSegTags', document.querySelectorAll('#xx-forge .craft.art .dan-seg').length);
+    L('artEffTags', document.querySelectorAll('#xx-forge .craft.art .craft-eff').length);
     L('artBand', ['f-lq', 'f-bg', 'f-brk', 'f-cai'].map(c => document.querySelectorAll('#xx-forge .craft.art.' + c).length).join(','));
     L('artSegTagTxt', (document.querySelector('#xx-forge .craft[data-recipe="wp1"] .dan-seg') || {}).textContent || '');
     L('artEffTxt', [].map.call(document.querySelectorAll('#xx-forge .craft[data-recipe="bg1"] .craft-eff, #xx-forge .craft[data-recipe="brk1"] .craft-eff, #xx-forge .craft[data-recipe="cai1"] .craft-eff'), e => e.textContent).join(' / '));
@@ -1864,6 +1895,7 @@ const DIAG = `
       const pcInfo = document.querySelector('#char-path-picks .cp-info');
       XX._showPathInfo('sword');
       L('pathCardTxt', (pcTag ? pcTag.textContent : 'none') + '/' + (pcInfo ? 'info' : 'no'));
+      L('pathHintsOk', Array.isArray(XX._pathOpts) && XX._pathOpts.every(p => !/资源产出|功法领悟|修行速度/.test(p.hint)));
       L('pathDetail', (document.getElementById('cs-title') || {}).textContent + '/' +
         document.querySelectorAll('#craft-settle #cs-rows .cs-row').length);
       document.getElementById('cs-close').click();
@@ -1953,7 +1985,7 @@ const DIAG = `
     L('guideSitTxt', gtxt().indexOf('盘腿') >= 0 ? 'ok' : gtxt().slice(0, 20));
     L('guideLocks1', gLockN());                                                     // 5：已教到 sit，那一格去灰
     { const e1 = document.querySelector('#sc-acts .cave-act[data-k="sit"]');
-      const e2 = document.querySelector('.scene-tab[data-tab="role"]');
+      const e2 = document.querySelector('.npc-banner[data-scroll="xx-role-npc"]');
       L('guideLockNow', [e1 ? (e1.classList.contains('guide-locked') ? 'greyed' : 'clear') : 'noEl',
                          e2 ? (e2.classList.contains('guide-locked') ? 'greyed' : 'clear') : 'noEl'].join('/')); }
     /* POLL 路径：只改权威业务状态（打过坐），引导自己认出来——不是猜点了哪一下 */
@@ -2585,7 +2617,7 @@ const DIAG = `
     L('storyLogSub', (document.getElementById('xx-role-story-sub') || {}).textContent || '');
     L('storyLogNow', document.querySelectorAll('#xx-role-story .sto-now').length);
     L('storyLogHint', document.querySelectorAll('#xx-role-story .sto-hint').length > 0 ? 'yes' : 'no');
-    /* 弹窗「去看这一段」的走法：面板名 + 履历锚点 → 直达独立页，底下仍压 hub 一层 */
+    /* rv4 人物定稿：剧情锚点仍直达独立页，但人物相关页只压一层，返回直接回场景。 */
     window.ROUTER.open('role', 'xx-role-story');
     L('storyDeep', window.ROUTER.current());
     L('storyDeepDepth', window.ROUTER.depth());
@@ -4151,10 +4183,10 @@ const DIAG = `
      F.guideDanCount === '1' && F.guideDanClaim === 'ok' && F.guideDanSaved === 'ok',
      'W3·S1 / 阶段二 N12-3：引导毕业一份丹药——现行改赠下品破境丹（丹号 dan1 / 丹名 / 唯一凭证号三条字面量都在），' +
      '运行时也真发到背包恰好 ' + F.guideDanCount + ' 枚、凭证只落一次并随档存下（' + F.guideDanClaim + '/' + F.guideDanSaved + '）');
-  ok(taixuSrc.indexOf("target: '.scene-tab[data-tab=\"role\"]'") >= 0 &&
+  ok(taixuSrc.indexOf("target: '.npc-banner[data-scroll=\"xx-role-npc\"]'") >= 0 &&
      taixuSrc.indexOf('后山那位，记得替我问好') >= 0 &&
      F.guideToHandoff === 'ok' && F.guideFinishLog === 'ok',
-     'W3·S1：引导收尾把玩家交到具体去处——最后一步指着底部【人物】签（旧玉印已收，指向随拍板改挂五签），' +
+     'W3·S1：引导收尾把玩家交到具体去处——最后一步指着主场景沈碑横幅（人物页已无传送门），' +
      '运行时收尾那句旁白也真落进日志（' + F.guideToHandoff + '/' + F.guideFinishLog + '）');
   ok(chatCss.indexOf('.sc-trail') >= 0 && chatCss.indexOf('.st-seal') >= 0 &&
      chatCss.indexOf('trailRing') >= 0 && chatCss.indexOf('.sc-trail[hidden]') >= 0,
@@ -4353,27 +4385,25 @@ const DIAG = `
      srvSrc.indexOf('pushEvent') >= 0, '服务端 stats 接口 + 在场判定 + 事件流在位');
   /* 宗门服务地址解析（2026-10-26）：以前默认只连本机 localhost:8787，等于人人各玩各的 */
   ok(F.candApi === 'true', 'SECT 暴露 _candidates / _firstAlive 两个测试口');
-  /* 2026-11-06 B-35 裁定：无配置的 file:// 双击运行**不发起宗门探活**（返回空候选），
-     以免每次开页都向 localhost:8787 打一条 ERR_CONNECTION_REFUSED。
-     本断言原写于 B-35 之前（期望 http://localhost:8787），B-35 落地后未同步 → 长期假红。
-     现已对齐裁定：空候选 = 不探活。file:// 下「已配置地址仍探活」由 candDupe 继续守护；
-     完整五场景对照见 tools/b34b35-candidates-test.mjs 与 B34B35_VERIFICATION.md。 */
+  /* 2026-11-25 UI 修正：本机地址不再作为候选；file:// 无配置仍不探活，
+     远程地址重复项仍只保留一个，旧本机配置由 safeHost 清空。 */
   ok(F.candFile === '',
      'B-35：file:// 打开且没存过地址 → 不探活（空候选）', F.candFile);
-  ok(F.candQuery === 'https://t.example/aa,http://old.example,https://game.example,http://localhost:8787',
-     '候选优先级 ?sect= → 手填 → 官方 → 同源 → 本机，尾斜杠削掉', F.candQuery);
-  ok(F.candSame === 'https://game.example,http://localhost:8787',
-     '发到公网上会去试同域服务（以前只在 localhost 才试 → 永远「山门未开」）', F.candSame);
-  ok(F.candDupe === 'http://localhost:8787', '同一地址重复出现只留一个，不会把死地址探两遍', F.candDupe);
+  ok(F.candQuery === 'https://t.example/aa,http://old.example,https://game.example',
+     '候选优先级 ?sect= → 手填 → 同源，不追加本机地址，尾斜杠削掉', F.candQuery);
+  ok(F.candSame === 'https://game.example',
+     'HTTPS 页面默认探活本站同源服务', F.candSame);
+  ok(F.candDupe === 'https://same.example', '同一远程地址重复出现只留一个', F.candDupe);
+  ok(F.candLoopback === '', '旧 localhost / 127.0.0.1 配置不再进入候选', F.candLoopback);
   ok(F.aliveNone === '', '并发探活全灭时返回空、不抛不挂', JSON.stringify(F.aliveNone));
   ok(F.sectTimer === 'true',
      '探活全灭也把轮询挂上（服务后起来时页面自己会连，不用玩家手点重连）', F.sectTimer);
   ok(F.sectOff.indexOf('山门未开') >= 0 && F.sectOff.indexOf('每 25 秒会自己再试一次') >= 0 &&
      F.sectOff.indexOf('sect-server.js') < 0,
      '连不上时的文案面向玩家：不再教人跑 node 命令，并说清会自动重试', F.sectOff);
-  ok((F.sectStateTxt || '').indexOf('未连接') === 0 && (F.sectLabel || '').indexOf('宗门服务地址') === 0 &&
-     (F.sectLabel || '').indexOf('默认本机') < 0,
-     '设置里写明连接状态与自动挑选顺序', F.sectStateTxt + ' / ' + F.sectLabel);
+  ok((F.sectStateTxt || '').indexOf('未连接') === 0 && (F.sectLabel || '').indexOf('宗门连接') === 0 &&
+     (F.sectLabel || '').indexOf('localhost') < 0 && (F.sectLabel || '').indexOf('高级玩家') < 0,
+     '设置里写明连接状态与留空自动连接，不出现本机地址或研发术语', F.sectStateTxt + ' / ' + F.sectLabel);
   /* 天机阁双扣也要有花费浮字（2026-10-25 补） */
   ok(gameSrc.indexOf("spendFloat('-' + fmt(ps) + ' 灵石'") >= 0 &&
      gameSrc.indexOf("spendFloat('-' + fmt(pw) + ' 悟道'") >= 0 &&
@@ -4956,10 +4986,11 @@ const DIAG = `
      '卸下成功：槽位清空 + 退回背包');
   ok(F.equipReject === 'yes', '丹药等非装备物品拒绝装备');
   ok(F.roleShown === 'yes', '「人物 · 装备」面板可打开');
-  ok(F.roleHubCells === '6' && F.roleHubCards === '0',
-     '人物拆页：hub 六格（法宝 / 札记 / 道碑 / 悟道 / 断天门 / 识人）（格 ' + F.roleHubCells + ' · 卡 ' + F.roleHubCards + '）');
-  ok(String(F.roleHubSealMiles).indexOf('碑') >= 0, '道碑格朱砂印报立碑数（' + F.roleHubSealMiles + '）');
-  ok(F.roleStatsOk === 'yes', '属性区显示道号/境界/战力/修为产出');
+  ok(F.roleShown === 'yes' && F.roleHubCells === '0' && F.roleHubCards === '1',
+     '人物入口直出本体装备页，不经 hub（hub 格 ' + F.roleHubCells + ' · 本体卡 ' + F.roleHubCards + '）');
+  ok(F.roleNoPortals === '0' && F.roleNoLegacyBlocks === '0',
+     '人物页无道途/四维/拆账/传送门（入口 ' + F.roleNoPortals + ' · 旧区块 ' + F.roleNoLegacyBlocks + '）');
+  ok(F.roleStatsOk === 'yes', '人物本体显示道号与境界，不再显示修为产出四维区');
   ok(F.roleSlots === '3', '三个圆形装备槽位');
   ok(F.roleAllEmpty === '3', '三个槽位各自带一段空槽文案（' + F.roleAllEmpty + ' 个）');
   /* ---- 第 95 轮 · 角色面板三个空圈补内容 ---- */
@@ -4992,7 +5023,7 @@ const DIAG = `
   ok(F.slotItemName === '青锋剑', '槽内显示装备名（' + F.slotItemName + '）');
   ok(F.roleUnequipOk === 'yes' && F.slotEmptyAfter === 'yes', '卸下后槽位回到暗灰空态');
   /* 道行拆账（第 77 节）：底 × 乘区 + 加区 必须与结算函数一致，且三块都不许出 NaN */
-  ok(F.pwBtn === 'yes', '人物面板挂上「道行拆账」入口');
+  ok(F.pwBtn === 'no', '人物页不再挂道行拆账入口（rv4 定稿）');
   ok(F.pwOpen === 'yes' && F.pwSecs === '3', '拆账弹窗三块：战力 / 修为 / 灵石（' + F.pwSecs + '）');
   ok(Number(F.pwRowN) >= 5, '拆账逐行列底/乘区/加区（' + F.pwRowN + ' 行）');
   ok(F.pwNoBad === 'yes', '拆账文本无 NaN / undefined / Infinity');
@@ -5223,10 +5254,17 @@ const DIAG = `
      F.danHeadTxt === '破境族 · 九阶,聚灵族 · 九阶,淬体族 · 九阶,丰产族 · 九阶' &&
      F.danHeadArt === 'dan1.png,dan_jl.png,dan_ct.png,dan_fc.png',
      '炼丹房一页四段族签全展开，族头各带本族母图（' + F.danHeadArt + '）');
-  ok(F.danRowsAll === '37' && F.danSegTags === '37' && F.danEffTags === '37',
-     '族内 36 行正方 + 1 行旧妖丹方，每行都带阶签与功效文案（' + F.danRowsAll + ' 行）');
-  ok(F.danBand === '4,9,8,8,8',
-     '品阶色带按阶分布 1/2/2/3/3/4/4/5/5 阶 → 四 / 九 / 八 / 八 / 八 行（' + F.danBand + '）');
+  ok(F.danLegacyRowsAll === '37' && F.danLegacySegTags === '37' && F.danLegacyEffTags === '37',
+     '旧内容子集不回归：36 行正方 + 1 行旧妖丹方，阶签与功效齐全（' + F.danLegacyRowsAll + ' 行）');
+  ok(F.danLegacyBand === '4,9,8,8,8',
+     '旧内容子集品阶色带不回归：1/2/2/3/3/4/4/5/5 阶 → 四 / 九 / 八 / 八 / 八 行（' + F.danLegacyBand + '）');
+  ok(F.danRv4Rows === '12' && F.danRv4SegTags === '12' && F.danRv4EffTags === '12' &&
+     F.danRv4Strict === 'yes' && F.danRv4Meta === '12' && F.danRv4Band === '2,4,4,1,1',
+     'rv4 专属丹 12 味独立成行，门槛/成功率/效果严格同段，专属主料+灵石与背包文案齐全（色带 ' + F.danRv4Band + '）');
+  ok(F.danRowsAll === '49' && F.danSegTags === '49' && F.danEffTags === '49',
+     '炼丹总行数 = 旧 37 + 专属 12 = 49，每行都带阶签与功效文案（' + F.danRowsAll + ' 行）');
+  ok(F.danBand === '6,13,12,9,9',
+     'rv4 并入后品阶色带按 49 行统计为 6/13/12/9/9（' + F.danBand + '）');
   ok(F.danGate === '110',
      '阶 = 大境界段：金丹期认第 3 阶九转金丹与第 2 阶正本，第 1 阶下品丹不再顶用');
   ok(F.danHerb0 === '3' && F.danBuffs === '0.3,0.24,0.9' &&
@@ -5341,8 +5379,8 @@ const DIAG = `
      '炼器行同口径：矿石持有/所需、灵石价格不足、按钮「缺料」（' + F.lgForge + '）');
   ok(F.lgForge.indexOf('失败返还 30% 材料（灵石不退）') >= 0,
      '炼器行同样把失败返还口径写在前面（' + F.lgForge + '）');
-  ok(F.lgUpRoom.indexOf('灵草 2/175') >= 0 && F.lgUpRoom.indexOf('灵石差') >= 0 && F.lgUpg === '缺灵石',
-     '房间内升级块写材料持有/所需并标灵石差；设施页纯数据只报状态「缺灵石」、不再有「进页」（' + F.lgUpRoom + ' / ' + F.lgUpg + '）');
+  ok(F.lgUpRoom.indexOf('灵草 2/175') >= 0 && F.lgUpRoom.indexOf('灵石差') >= 0 && F.lgUpg === 'Lv.5 / 10',
+     '房间内升级块写材料持有/所需并标灵石差；设施页只报当前等级，不再显示缺料或升级胶囊（' + F.lgUpRoom + ' / ' + F.lgUpg + '）');
   /* 外部评审 2026-11-23 第 7/8 项 */
   ok(F.anchorGongReady === 'yes' && F.anchorGongLocked === 'yes' && F.anchorGongLock === 'yes',
      '第7项：功法可升级淡金边+红点、未解锁置灰+小锁（' + [F.anchorGongReady, F.anchorGongLocked, F.anchorGongLock].join('/') + '）');
@@ -5437,8 +5475,9 @@ const DIAG = `
   ok(F.pathDrift === 'ok', 'N11 道途九段矩阵漂移断言通过（' + F.pathDrift + '）');
   ok(Number(F.pathSpread) <= 8.0001, 'N11 每段四道途极差 ≤8pp（实测 ' + F.pathSpread + 'pp）');
   ok(F.pathCur === '1.08/1.00#1.08', 'N11 当前段取值：炼气剑 1.08 / 丹 1.00、元婴体 1.08（' + F.pathCur + '）');
-  ok(F.pathCardTxt === '极致爆发 · 越级杀伐/info' && F.pathDetail === '剑修 · 道途详情/9',
-     'N11 创角道途卡只显定位与「?」；详情弹层 9 段直读 PATH_BONUS（' + F.pathCardTxt + ' / ' + F.pathDetail + '）');
+  ok(F.pathCardTxt === '前中段凌厉 · 后段平稳/info' && F.pathDetail === '剑修 · 道途详情/9' &&
+     String(F.pathHintsOk) === 'true',
+     'N11 创角道途卡只显战斗定位与「?」；hint 不承诺资源或修行收益，详情 9 段直读 PATH_BONUS（' + F.pathCardTxt + ' / ' + F.pathDetail + '）');
   ok(F.n13Usage === '11111', 'N13 五枚破境丹 usage 均无「握持」且均写「服食」（' + F.n13Usage + '）');
   ok(F.n13DeadPill === 'ok', 'N13 死丹 dan_juqi 文案不再宣称可服食');
   /* 阶段三 S1/S2/S3 回归 */
@@ -5487,7 +5526,7 @@ const DIAG = `
   ok(F.guideSkipBtn === 'ok', '气泡带「先别唠叨」跳过钮');
   ok(F.guideLocks0 === '6' && F.guideLocks1 === '5',
      '渐进解锁只做视觉：入场步 6 个目标变灰，教到打坐后那一格去灰、余 5（' + F.guideLocks0 + '→' + F.guideLocks1 + '）');
-  ok(F.guideLockNow === 'clear/greyed', '已教的去灰、未教的仍灰（打坐格/守碑钮：' + F.guideLockNow + '）');
+  ok(F.guideLockNow === 'clear/greyed', '已教的去灰、未教的仍灰（打坐格/沈碑横幅：' + F.guideLockNow + '）');
   ok(F.guideToSit === 'ok' && F.guideSitTxt === 'ok',
      'enter 是脚本化演出（auto 2600ms）→ 自动进「打坐」步（' + F.guideToSit + ' / ' + F.guideSitTxt + '）');
   ok(F.guidePollSit === 'ok', 'POLL 路径认权威状态：打坐计数 +1 后引导自己推进到突破步（不是猜点击）');
@@ -5603,8 +5642,8 @@ const DIAG = `
   ok(Number(F.storyLogItems) >= 6, '人物面板有履历：' + F.storyLogItems + ' 段已发生');
   ok(String(F.storyLogSub).indexOf('已走过') >= 0, '履历抬头写清走过几段（' + F.storyLogSub + '）');
   ok(F.storyLogNow === '1' && F.storyLogHint === 'yes', '履历末尾是当前这一段 + 下一步指路');
-  ok(F.storyDeep === 'role_story' && F.storyDeepDepth === '2',
-     '断天门锚点深链直达「断天门」独立页（' + F.storyDeep + ' · 栈深 ' + F.storyDeepDepth + '）');
+  ok(F.storyDeep === 'role_story' && F.storyDeepDepth === '1',
+     '断天门锚点单层直达独立页，返回直接回场景（' + F.storyDeep + ' · 栈深 ' + F.storyDeepDepth + '）');
   ok(F.storyKeep === 'done' && F.storyDirty === '-', '二次 init 幂等，脏 id 被丢');
 
   /* ===== 悟道树（2026-10-25 第 59 节）===== */
@@ -5716,7 +5755,7 @@ const DIAG = `
      而且创角那一下没点道途 —— confirmChar 在 game.js:11579 直接 return，弹窗不关、boot 不下去，
      #sc-break 根本没机会出现，于是 rank 永远 0（旧驱动插桩实测见 probe_old_onboard.out，逐 tick 记录）。
      现行口径：创角 = 选道途 + 取名 + 确认；收工 = S.guide.done（并核对真落盘）；
-     七步按 window.Guide 的 step 索引逐条真点（打坐 / 突破 / 灵田开垦播种 / 顶栏【人物】→ 识人格子）。 */
+     七步按 window.Guide 的 step 索引逐条真点（打坐 / 突破 / 灵田开垦播种 / 主场景沈碑横幅 → 识人页）。 */
   const onbInj = `<script>
 var O={},t=0,idle=0,seen={};
 function sh(id){var e=document.getElementById(id);if(!e||e.classList.contains("hidden"))return false;return getComputedStyle(e).display!=="none";}
@@ -5803,10 +5842,9 @@ setInterval(function(){
     var pl=q("#xx-plots .plot.empty");
     if(pl){pl.click();O.planted=1;}
     return;}
-  if(id==="handoff"){                                     /* 真点底部【人物】签，再点人物页里的「识人 · 沈碑」 */
+  if(id==="handoff"){                                     /* rv4：人物页已无传送门，改点主场景常驻沈碑横幅 */
     if(!document.getElementById("npc-topics")){
-      if(!O.roleHub){clk('.scene-tab[data-tab="role"]',"roleBtn");O.roleHub=1;return;}
-      clk('#panel-host [data-role-jump="xx-role-npc"]',"npcCell");return;}
+      clk('.npc-banner[data-scroll="xx-role-npc"]',"npcBanner");return;}
     return;}
   idle++;if(idle>=8){idle=0;O.stuckAt=(O.stuckAt||0)+1;}
 },200);
@@ -6046,7 +6084,7 @@ setTimeout(function(){done("timeout");},25000);</scr` + `ipt>`;
      '留的是最早那份（哨兵串仍在位）—— 反复读档不许把旧档原串刷成迁移后的新串（bk=' + ONCE.bk + '）',
      JSON.stringify(ONCE));
   const DWIPE = readBoot(DAY_NEW,
-    '(function(){var err=null;window.confirm=function(){return true;};' +
+    '(function(){var err=null;XX._setConfirmHandler(function(cfg,cb){cb(true);});' +
     'try{XX.reset();}catch(e){err=String(e).slice(0,60);}' +
     'var s=XX._s;var bk=localStorage.getItem("xiuxian_save_pre_stage1");' +
     'return JSON.stringify({err:err,dayK:Object.keys(s.day).join(","),day:s.day,seclude:s.secludeUntil,' +
@@ -6258,7 +6296,7 @@ setTimeout(function(){done("timeout");},25000);</scr` + `ipt>`;
   /* --- 6) 新档 / 转世清零：resetAll 与 坐化转世（resetForNewLife 那条共用清单） --- */
   const L3R = readBoot({ name: '清零档', sex: 'm', gender: 'male', rank: 8, exp: 500, stone: 1000,
     secludeUntil: L3_FUT, day: { key: L3_TODAY, expGain: 420, sweepExp: 77 }, last: Date.now() },
-    '(function(){var err=null;window.confirm=function(){return true;};' +
+    '(function(){var err=null;XX._setConfirmHandler(function(cfg,cb){cb(true);});' +
     'try{XX.reset();}catch(e){err=String(e).slice(0,60);}' +
     'var s=XX._s;return JSON.stringify({err:err,su:s.secludeUntil,rank:s.rank,day:s.day,name:s.name});})()',
     'l3reset');
@@ -6370,7 +6408,7 @@ setTimeout(function(){done("timeout");},25000);</scr` + `ipt>`;
     })) + ');localStorage.setItem("hasFinishedTutorial","1");';
     PAGE.writePage(f, html
       .replace('</head>', '<script>try{' + seedJs + '}catch(e){}</scr' + 'ipt>\n</head>')
-      .replace('</body>', `<script>setTimeout(function(){try{window.confirm=function(){return true;};XX.reset();}
+      .replace('</body>', `<script>setTimeout(function(){try{XX._setConfirmHandler(function(cfg,cb){cb(true);});XX.reset();}
 catch(e){document.title=JSON.stringify({err:String(e).slice(0,60)});return;}
 var raw=localStorage.getItem("xiuxian_save");
 var j=null;try{j=raw===null?"NULL":JSON.parse(raw);}catch(e){j="ERR:"+String(e).slice(0,30);}

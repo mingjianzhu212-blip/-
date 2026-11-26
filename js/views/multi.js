@@ -16,9 +16,9 @@ VIEWS.multi = {
     <!-- 大厅态：连服务器 → 建房/进房 -->
     <section class="card wide" id="xx-multi-hall" hidden>
       <h2>大厅 <span class="npc-h-sub" id="xx-multi-who"></span></h2>
-      <p class="hint" id="xx-multi-srvline">联机要有一个真人开服务：本机跑 <code>node server/server.mjs</code>，同 WiFi 的道友在各自浏览器里填同一个地址。</p>
+      <p class="hint" id="xx-multi-srvline">联机需要房主提供入口，道友们从同一个入口相聚，再一起闯秘境。</p>
       <div class="ch-input" id="xx-multi-connrow">
-        <input id="xx-multi-srv" type="text" placeholder="服务地址，例如 http://192.168.1.5:7730" autocomplete="off">
+        <input id="xx-multi-srv" type="text" placeholder="填写房主提供的联机入口" autocomplete="off">
         <button type="button" id="xx-multi-go">进入</button>
       </div>
       <div class="ch-input" id="xx-multi-namerow" hidden>
@@ -66,7 +66,7 @@ VIEWS.multi = {
     <section class="card wide" id="xx-multi-offline">
       <h2>组队秘境 · 联机</h2>
       <div class="npc-greet">镇妖塔后头有一道封着的山门，门后是更凶的妖物，一个人走不深。</div>
-      <p class="hint">这是真人联机玩法：需要一位道友起服务（<code>node server/server.mjs</code>），大家填同一个地址进来，2～4 人组队闯秘境。</p>
+      <p class="hint">这是真人联机玩法：由房主提供入口，大家从同一个入口相聚，2～4 人组队闯秘境。</p>
     </section>
     </div>
   </section>`

@@ -336,8 +336,7 @@ const SCENARIOS = [
         }
         if(id === 'handoff'){
           if(!document.getElementById('npc-topics')){
-            if(!O.roleHub){ __click('.scene-tab[data-tab="role"]', 'body'); O.roleHub = 1; return; }
-            __click('[data-role-jump="xx-role-npc"]', '#panel-host');
+            __click('.npc-banner[data-scroll="xx-role-npc"]', 'body');
           }
           return;
         }
@@ -495,6 +494,18 @@ const SCENARIOS = [
         var rows = pg ? pg.querySelectorAll('.craft').length : 0;
         var segs = pg ? pg.querySelectorAll('.dan-seg').length : 0;
         var effs = pg ? pg.querySelectorAll('.craft-eff').length : 0;
+        /* rv4 专属 12 丹追加在旧四族之后；旧 37 行子集仍单独保护，不能拿总数覆盖旧契约。 */
+        var legacyRows = pg ? [].filter.call(pg.querySelectorAll('.craft'), function(c){
+          return c.dataset.recipe && !XX._dan.rv4.all[c.dataset.recipe];
+        }) : [];
+        var rv4Rows = pg ? [].filter.call(pg.querySelectorAll('.craft'), function(c){
+          return !!(c.dataset.recipe && XX._dan.rv4.all[c.dataset.recipe]);
+        }).length : 0;
+        var legacySegs = 0, legacyEffs = 0;
+        legacyRows.forEach(function(c){
+          if(c.querySelector('.dan-seg')) legacySegs++;
+          if(c.querySelector('.craft-eff')) legacyEffs++;
+        });
         /* 真人路径：侧栏背包 → 点格子开详情 → 详情框点服食。名字一律从丹表取，测试里不写死 */
         var bagBtn = __click('.scene-tab[data-tab="bag"]', 'body');
         setTimeout(function(){
@@ -525,6 +536,7 @@ const SCENARIOS = [
                 };
                 __ptDone({
                   heads: heads, headTxt: headTxt, rows: rows, segs: segs, effs: effs,
+                  legacyRows: legacyRows.length, legacySegs: legacySegs, legacyEffs: legacyEffs, rv4Rows: rv4Rows,
                   bagBtn: bagBtn, gridShown: gridShown, names: names,
                   e1: e1, e2: e2, e3: e3, b1: b1, b2: b2, b3: b3,
                   jlRow: rowOf(bd.exp.mults, '聚灵'), ctRow: rowOf(bd.power.mults, '淬体'),
@@ -545,8 +557,12 @@ const SCENARIOS = [
       return [
         { ok: d.heads === 4 && d.headTxt === '破境族 · 九阶 / 聚灵族 · 九阶 / 淬体族 · 九阶 / 丰产族 · 九阶',
           label: '炼丹房一页四族，族头按「族 · 九阶」各带一枚母图', detail: d.heads + ' ' + d.headTxt },
-        { ok: d.rows === 37 && d.segs === 37 && d.effs === 37,
-          label: '36 枚正方 + 1 行旧妖丹方，行行带阶签与功效', detail: d.rows + '/' + d.segs + '/' + d.effs },
+        { ok: d.legacyRows === 37 && d.legacySegs === 37 && d.legacyEffs === 37,
+          label: '旧内容子集不回归：36 枚正方 + 1 行旧妖丹方，行行带阶签与功效',
+          detail: d.legacyRows + '/' + d.legacySegs + '/' + d.legacyEffs },
+        { ok: d.rows === 49 && d.segs === 49 && d.effs === 49 && d.rv4Rows === 12,
+          label: 'rv4 在旧 37 行后追加 12 味专属丹，每行同样带阶签与功效',
+          detail: '总行' + d.rows + '/' + d.segs + '/' + d.effs + ' · 专属' + d.rv4Rows },
         { ok: d.bagBtn === 'ok' && d.gridShown === 'shown' && d.e1.c === 'ok' && hasEat(d.e1.acts),
           label: '侧栏背包真点得开，点格子先出详情框、框里给「服食」', detail: d.bagBtn + ' ' + d.gridShown + ' ' + d.e1.c + ' ' + d.e1.acts },
         { ok: d.e1.nm === nm[0] && d.e1.eat === 'ok' && d.b1.exp > 0 && d.jlRow > 1 && d.rateNow > d.rate0,
@@ -587,8 +603,9 @@ const SCENARIOS = [
         var headArt = pg ? [].map.call(pg.querySelectorAll('.dan-fam img'),
           function (i) { return (i.getAttribute('src') || '').replace('ui/icons/', ''); }).join(',') : '';
         var rows = pg ? pg.querySelectorAll('.craft.art').length : 0;
-        var segs = pg ? pg.querySelectorAll('.dan-seg').length : 0;
-        var effs = pg ? pg.querySelectorAll('.craft-eff').length : 0;
+        /* rv4 兽魂与装备也复用 dan-seg/craft-eff；旧 36 行口径只在自己行内计数。 */
+        var segs = pg ? pg.querySelectorAll('.craft.art .dan-seg').length : 0;
+        var effs = pg ? pg.querySelectorAll('.craft.art .craft-eff').length : 0;
         /* craft-eff 新口径（21:59 代）：锁定行不输出 .craft-eff，改在 small 里写「需炼器坊 N 级 / 需器师 N 阶」。
            这里按「原因行前缀」认锁定行（与 _craft_fold_check.js:668 isLockRow 同一口径），不认按钮文案——
            炼器行按钮是 owned 优先（「已装备」），拿按钮当锁行身份会误判。 */
@@ -735,8 +752,8 @@ const SCENARIOS = [
         { ok: (f.forge || '').indexOf('失败返还 30% 材料（灵石不退）') >= 0,
           label: '炼器行同样写明失败返还口径', detail: f.forge },
         { ok: f.forgeBtn === '缺料', label: '炼器缺料按钮也写「缺料」', detail: f.forgeBtn },
-        { ok: f.upg === '缺灵石' && String(f.upgBtnN) === '0',
-          label: '设施页纯数据（状态报「缺灵石」、无按钮可点，升级动作在各自页内）', detail: f.upg + ' / 按钮 ' + f.upgBtnN },
+        { ok: f.upg === 'Lv.5 / 10' && String(f.upgBtnN) === '0',
+          label: '设施页只报当前等级（无缺料胶囊、无按钮可点，升级动作在各自页内）', detail: f.upg + ' / 按钮 ' + f.upgBtnN },
         { ok: (f.enh || '').indexOf('矿石 0/') >= 0 && (f.enh || '').indexOf('兽王精魄 0/1') >= 0,
           label: '强化消耗写矿石与 Boss 材料缺口', detail: f.enh },
         { ok: d.okBtn === '炼制' && (d.okTxt || '').indexOf('（不足）') < 0,
@@ -1740,15 +1757,11 @@ const SCENARIOS = [
     }
   },
 
-  /* ⑮ 城镇七面板「一格一页」（第 88 轮 B）：制作人反复提的老毛病——
-     不同功能点进去全挤在同一页，只是上下关系。这里真点每一格（共 33 格），
-     验三件事：格子数对得上、点进去是一个独立页（页眉就是那格的名字、
-     页里没有 hub 的入口格、← 只回 hub）、hub 上每格图标真加载且有现状印。
-     站 hub 上量图标要先让出一拍（enter() 刚换上的 <img> 还没 decode，立刻量得到假裂图）；
-     逐格真点则同步读数即可。enter() 会整段换掉 innerHTML，所以每轮都按 key 重新取元素，
-     攥着旧节点再 click 就打不出委托监听了。 */
+  /* ⑮ 城镇一格一页：六个 hub 共 27 格逐格真点；人物按 rv4 定稿改为直出人物本体装备页。
+     旧七 hub 的 33 格契约保留为子集检查：27 格仍逐格验独立页、返回栈、题签与现状印；
+     人物直出另验「三槽本体卡 + 无 hub / 无传送门 + ← 直接回场景」，不放宽其余六块。 */
   {
-    id: 'townhub', name: '城镇七面板一格一页（真点 33 格）', budget: 12000, size: '900,1200',
+    id: 'townhub', name: '城镇六 hub 27 格 + 人物直出本体页（真点）', budget: 12000, size: '900,1200',
     save() {
       const s = midSave();
       s.rank = 12; s.exp = 0; s.stone = 200000;
@@ -1756,11 +1769,11 @@ const SCENARIOS = [
     },
     body: `
       setInterval(__clearPopups, 400);
-      var WANT = { xiu:6, role:6, zong:6, market:4, secret:4, arena:3, event:4 };
-      var LIST = ['xiu','role','zong','market','secret','arena','event'];
+      var WANT = { xiu:6, zong:6, market:4, secret:4, arena:3, event:4 };
+      var LIST = ['xiu','zong','market','secret','arena','event'];
       var O = { rows: [], cells: 0, viewN: 0, dup: 0, depthBad: 0, titleOk: 0,
                 noHub: 0, backOk: 0, icMiss: '', sealBad: '', hubCards: 0,
-                cardLo: 99, cardHi: 0 };
+                cardLo: 99, cardHi: 0, role: {} };
       var V = {};
       /* 入口格的水墨题签分两处验：
          · 素材本身是不是真 PNG —— 由 Node 直接读字节（HUB_ART）。headless 里
@@ -1838,7 +1851,26 @@ const SCENARIOS = [
           }).map(function(r){ return r.p + ':' + r.lead; }).join(' ');
           O.counts = O.rows.map(function(r){ return r.p + ':' + r.cells + '/' + WANT[r.p]; }).join(' ');
           O.allCells = O.rows.every(function(r){ return r.cells === WANT[r.p] && r.sec === 'hub'; });
-          __ptDone(O);
+          ROUTER.open('role');
+          setTimeout(function(){
+            var p = document.querySelector('#page-role');
+            var h = p ? p.querySelector('.panel-head h2') : null;
+            O.role = {
+              page: !!p, sec: p ? p.dataset.sec : 'none', title: h ? h.textContent.trim() : '',
+              cards: p ? p.querySelectorAll('.panel-body > .card').length : 0,
+              nav: p ? p.querySelectorAll('.hub-nav').length : 0,
+              portals: p ? p.querySelectorAll('[data-jump],[data-role-jump],[data-cross],[data-go-hub],#xx-role-break').length : -1,
+              slots: p ? p.querySelectorAll('.equip-slot').length : 0,
+              bars: p ? p.querySelectorAll('.cs-bar').length : 0,
+              figure: p ? p.querySelectorAll('#xx-role-figure').length : 0,
+              depth: ROUTER.depth(), current: ROUTER.current()
+            };
+            var back = p ? p.querySelector('.panel-back') : null;
+            if(back) back.click();
+            O.role.backCurrent = ROUTER.current();
+            O.role.backDepth = ROUTER.depth();
+            __ptDone(O);
+          }, 260);
         }
         nextPanel();
       }
@@ -1847,37 +1879,47 @@ const SCENARIOS = [
     `,
     checks(d) {
       return [
-        { ok: d.rows && d.rows.length === 7 && d.allCells === true,
-          label: '七个面板 hub 都在，入口格数一个不差（藏经阁6 人物6 宗门6 坊市4 秘境4 论剑3 活动4）',
+        { ok: d.rows && d.rows.length === 6 && d.allCells === true,
+          label: '六个 hub 入口格数一个不差（藏经阁6 宗门6 坊市4 秘境4 论剑3 活动4）',
           detail: d.counts },
-        { ok: d.cells === 33 && d.viewN === 33 && d.dup === 0 && !(d.rows || []).some(r => r.onPanel),
-          label: '33 格点进去是 33 个不同页面（不是同一页上下滚）',
+        { ok: d.cells === 27 && d.viewN === 27 && d.dup === 0 && !(d.rows || []).some(r => r.onPanel),
+          label: '27 格点进去是 27 个不同页面（不是同一页上下滚）',
           detail: '格子' + d.cells + ' · 独立页' + d.viewN + ' · 重页' + d.dup },
         { ok: d.badLead === '' && d.hubCards === 1,
-          label: 'hub 上只剩入口格：秘境留一张卷首概览，其余六块 0 张卡',
+          label: '六个 hub 上只剩入口格：秘境留一张卷首概览，其余五块 0 张卡',
           detail: d.badLead || '卡合计' + d.hubCards },
-        { ok: d.titleOk === 33,
-          label: '每格进的那一页，页眉写的就是那一格的功能名', detail: d.titleOk + '/33' },
-        { ok: d.noHub === 33 && d.depthBad === 0 && d.backOk === 33,
-          label: '独立页里没有第二格入口；栈深恒 2；← 先回 hub 不退主场景',
+        { ok: d.titleOk === 27,
+          label: '27 格进的那一页，页眉写的就是那一格的功能名', detail: d.titleOk + '/27' },
+        { ok: d.noHub === 27 && d.depthBad === 0 && d.backOk === 27,
+          label: '六个 hub 的独立页无第二格入口；栈深恒 2；← 先回 hub 不退主场景',
           detail: ['无入口' + d.noHub, '栈深错' + d.depthBad, '回hub' + d.backOk].join(' / ') },
         { ok: d.icMiss === '',
-          label: '33 格各挂 HUBKIT 里写定的那枚题签（挂错/漏挂都算红）',
-          detail: d.icMiss ? ('错位:' + d.icMiss) : '33/33 对得上' },
+          label: '27 格各挂 HUBKIT 里写定的那枚题签（挂错/漏挂都算红）',
+          detail: d.icMiss ? ('错位:' + d.icMiss) : '27/27 对得上' },
         { ok: HUB_ART === '',
-          label: '八块面板用到的每一枚题签素材都是真 PNG（Node 读字节判，不中虚拟时间的假红）',
+          label: '面板题签素材都是真 PNG（Node 读字节判，不中虚拟时间的假红）',
           detail: HUB_ART || HUB_ART_N + ' 枚全部有效' },
         { ok: d.sealBad === '',
-          label: '32 格个个有朱砂印写现状，没有一格还停在占位符「—」',
+          label: '27 格个个有朱砂印写现状，没有一格还停在占位符「—」',
           detail: d.sealBad || '全部有印' },
         { ok: d.cardLo >= 1 && d.cardHi <= 2,
           label: '每张独立页只装自己那一两张卡，不再堆成一串',
-          detail: '最少' + d.cardLo + ' 最多' + d.cardHi }
+          detail: '最少' + d.cardLo + ' 最多' + d.cardHi },
+        { ok: d.role.page && d.role.title.indexOf('道体') >= 0 && d.role.cards === 1 &&
+              d.role.nav === 0 && d.role.portals === 0 && d.role.slots === 3 &&
+              d.role.bars === 2 && d.role.figure === 1,
+          label: '人物入口直出本体装备页：一张立绘卡、三槽两道条，无 hub 与任何传送门',
+          detail: JSON.stringify(d.role) },
+        { ok: d.role.current === 'role' && d.role.depth === 1 &&
+              d.role.backCurrent === 'scene' && d.role.backDepth === 0,
+          label: '人物直出只压一层，← 直接回主场景，不经过已取消的人物 hub',
+          detail: d.role.current + ':' + d.role.depth + ' → ' + d.role.backCurrent + ':' + d.role.backDepth }
       ];
     }
   },
 
-  /* ⑬ 道行拆账 + 下一级预览（第 77 节）：点顶栏 chip / 人物面板入口，读三块拆账与升级箭头 */
+  /* ⑬ 道行拆账 + 下一级预览（第 77 节）：顶栏 chip 真点读三块拆账；人物页只验入口已移除。
+     关闭仍走两条真实路径：×，以及顶栏重开后点遮罩。 */
   {
     id: 'pwbreak', name: '道行拆账 + 升级预览（真点击·真账目）', budget: 9000, size: '900,1200',
     save() {
@@ -1908,12 +1950,15 @@ const SCENARIOS = [
         O.stoneOk = Math.abs(bd.stone.base * prod(bd.stone.mults) - bd.stone.total) < 1e-6;
         document.getElementById('pw-close').click();
         O.closedBtn = !__vis('power-modal');
-        ROUTER.open('role_equip');
+        ROUTER.open('role');
         setTimeout(function(){
           var link = document.getElementById('xx-role-break');
           O.link = !!link;
-          if(link) link.click();
-          O.open2 = __vis('power-modal');
+          O.rolePortals = document.querySelectorAll('#page-role [data-role-jump],#page-role [data-cross],#page-role [data-go-hub],#xx-role-break').length;
+          O.open2 = link ? __vis('power-modal') : false;
+          /* 人物页按 rv4 定稿不得有拆账入口；遮罩关闭改由顶栏重新打开同一弹窗验证。 */
+          if(!link) chip.click();
+          O.maskOpen = __vis('power-modal');
           document.getElementById('power-modal').click();   /* 点遮罩关闭 */
           O.closedMask = !__vis('power-modal');
           ROUTER.open('dong_ups');
@@ -1942,9 +1987,10 @@ const SCENARIOS = [
         { ok: Number(d.powCalc) === Number(d.powNow) && d.expOk === true && d.stoneOk === true,
           label: '底 × 乘区 + 加区 = 顶部/人物面板的结算值',
           detail: ['pow=' + d.powCalc + '/' + d.powNow, 'exp=' + d.expOk, 'stone=' + d.stoneOk].join(' ') },
-        { ok: d.closedBtn === true && d.link === true && d.open2 === true && d.closedMask === true,
-          label: '× 能关；人物面板入口能开；点遮罩也能关',
-          detail: [d.closedBtn, d.link, d.open2, d.closedMask].join('/') },
+        { ok: d.closedBtn === true && d.link === false && d.open2 === false &&
+              d.rolePortals === 0 && d.maskOpen === true && d.closedMask === true,
+          label: '× 能关；人物页无拆账入口；顶栏重开点遮罩也能关',
+          detail: [d.closedBtn, d.link, d.open2, d.rolePortals, d.maskOpen, d.closedMask].join('/') },
         { ok: d.arrowN >= 4 && (d.caveTxt || '').indexOf('→ ×') >= 0,
           label: '升级行写清「当前 → 下一级」（洞府阵带箭头）',
           detail: 'arrows=' + d.arrowN + ' ' + d.caveTxt },
@@ -3062,10 +3108,10 @@ const SCENARIOS = [
                 setTimeout(function(){
                   O.npcParas = document.querySelectorAll('#npc-world-echo p').length;
                   O.npcTxt = tt('npc-world-echo');
-                  /* 4) 彻底重开：终态、这块碑一起归零（confirm 在无头里会挂死 → 接管再还原） */
-                  var sv = window.confirm; window.confirm = function(){ return true; };
+                  /* 4) 彻底重开：终态、这块碑一起归零（batch10 共用游戏内确认层，测试接管回调） */
+                  XX._setConfirmHandler(function(cfg, cb){ cb(true); });
                   try{ XX._resetAll(); }catch(e){}
-                  window.confirm = sv;
+                  XX._setConfirmHandler(null);
                   setTimeout(function(){
                     var b3 = snap();
                     O.resetFoot = b3.foot;

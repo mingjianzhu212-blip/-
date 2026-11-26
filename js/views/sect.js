@@ -35,29 +35,29 @@ HUBKIT.define({
       body: `      <section class="card wide" id="sc-weather">
         <div class="sect-head">
           <h2>全服同门</h2>
-          <span class="sc-quota off" id="sc-wq">未连接</span>
+          <span class="sc-quota" id="sc-wq">连接中…</span>
         </div>
         <div class="sc-stats" id="sc-stats"></div>
         <div class="sc-roster" id="sc-roster"></div>
         <div class="sc-events" id="sc-events"></div>
       </section>` },
     /* batch5：战力榜（服务端按养成快照重算，前 50） */
-    { key: 'xx-power', view: 'zong_power', name: '战力榜', note: '同门前 50 · 服务端重算',
+    { key: 'xx-power', view: 'zong_power', name: '战力榜', note: '同门前 50 · 按养成核验',
       ico: 'ic_bolt.png', sealId: 'xx-hub-power', sealTxt: '战力',
       body: `      <section class="card wide" id="sc-power">
         <div class="sect-head">
           <h2>宗门战力榜</h2>
-          <span class="sc-quota off" id="sc-pw-state">未连接</span>
+          <span class="sc-quota" id="sc-pw-state">连接中…</span>
         </div>
         <div class="sc-pw-list" id="sc-pw-list"></div>
-        <p class="hint">只列服务端认可的战力（客户端上报养成快照、服务端重算），最多 50 名；不显示玩家标识。进入页面自动上报一次，之后每 60 秒心跳。</p>
+        <p class="hint">只列经山门核验的战力，最多 50 名；不显示玩家标识。进入页面自动同步一次，之后每 60 秒更新。</p>
       </section>` },
     /* 探索：花灵石进秘境采材料 */
     { key: 'xx-treasure', view: 'zong_seek', name: '探索秘境', note: '采灵草 · 挖矿石',
       ico: 'bld_secret.png', sealTxt: '采集',
       body: `      <section class="card wide">
         <button class="treasure-btn" id="xx-treasure">🗺️ 探索秘境</button>
-        <p class="hint">按钮上标的是本次探索所需灵石（随境界递增，与实扣同源）；可采得灵草与矿石各 5~20 份（炼丹、炼器材料），机缘好时另有百年／万年灵草。</p>
+        <p class="hint">按钮上标的是本次探索所需灵石，与实际扣除一致；可采得灵草与矿石各 5~20 份（炼丹、炼器材料），机缘好时另有百年／万年灵草。</p>
       </section>` },
     /* 宗门互助：发求助、替同门护法 */
     { key: 'xx-help', view: 'zong_help', name: '宗门互助', note: '求助 · 护法 · 领赏',
@@ -65,7 +65,7 @@ HUBKIT.define({
       body: `      <section class="card wide" id="sc-box">
         <div class="sect-head">
           <h2>同门之事</h2>
-          <span class="sc-quota off" id="sc-quota">未连接</span>
+          <span class="sc-quota" id="sc-quota">连接中…</span>
         </div>
         <div class="sc-mine" id="sc-mine"></div>
         <div class="sc-list" id="sc-list"></div>

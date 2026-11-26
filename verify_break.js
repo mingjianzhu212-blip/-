@@ -263,7 +263,9 @@ const DIAG = `
     S().mastery={alchemyLv:1,alchemyExp:0,forgeLv:1,forgeExp:0};      /* 阶位从一阶起步（公式纯度） */
     /* --- 建筑状态总览（数据结构字段） --- */
     L('bldMax', B().alchemy.maxLevel===10 && B().forge.maxLevel===10 ? 'ok' : 'bad');
-    L('bldUnlockedAll', B().alchemy.unlockedRecipes.length===37 && B().forge.unlockedRecipes.length===36 ? 'ok' : 'bad:'+B().alchemy.unlockedRecipes.length+'/'+B().forge.unlockedRecipes.length);
+    L('bldUnlockedAll', B().alchemy.unlockedRecipes.length===49 && B().forge.unlockedRecipes.length===52 ? 'ok' : 'bad:'+B().alchemy.unlockedRecipes.length+'/'+B().forge.unlockedRecipes.length);
+    L('bldLegacyUnlockedAll', Object.keys(R()).filter(id => R()[id].bld==='alchemy' && !R()[id].rv4 && B().alchemy.unlockedRecipes.indexOf(id)>=0).length===37 &&
+       Object.keys(R()).filter(id => R()[id].bld==='forge' && !R()[id].rv4 && B().forge.unlockedRecipes.indexOf(id)>=0).length===36 ? 'ok' : 'bad');
     L('bldCostShape', B().alchemy.upgradeCost.stone>0 && B().alchemy.upgradeCost.mats.length===1 ? 'ok' : 'bad');
     /* --- 成功率公式：基础 + 建筑等级 × 2% + 匠道(阶-1)×1%（一阶时 0），硬上限 95% --- */
     L('rateFormula', Math.abs(XX._craftRate(R().dan5)-0.45)<1e-9 ? 'ok' : 'bad:'+XX._craftRate(R().dan5));   // 0.25 + 10×0.02
@@ -580,7 +582,8 @@ const DIAG = `
     ['tianjiNewTier', '突破到大境界新段后解锁兑换'],
     ['shopList', '天机阁商品列表 3 项'],
     ['bldMax', '炼丹房/炼器坊上限 10 级'],
-    ['bldUnlockedAll', '满级建筑解锁全部配方（37 丹方 / 36 法器）'],
+    ['bldUnlockedAll', '满级建筑解锁全部配方（旧 37 + rv4 专属 12 = 49 丹方 / 旧 36 + 兽魂 10 + 装备 6 = 52 炼器行）'],
+    ['bldLegacyUnlockedAll', '旧内容子集不回归：满级仍解锁原 37 丹方 / 36 法器'],
     ['bldCostShape', '建筑升级消耗 = 灵石 + 基础材料'],
     ['rateFormula', '成功率 = 基础 + 等级×2%（大乘丹 0.25+0.20=0.45）'],
     ['rateCap', '成功率硬上限 95%'],

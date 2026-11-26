@@ -61,7 +61,7 @@
     { id: 'flash.b', text: '不像炼气期？听课不专心——罚你去见个人。',
       target: '.bld[data-bld="tower"]', click: true },
     { id: 'handoff', text: '后山有块碑，守碑老头记性好，记三百年；名号别报，报了不理你。',
-      target: '.scene-tab[data-tab="role"]' }
+      target: '.npc-banner[data-scroll="xx-role-npc"]' }
   ];
 
   /* 完成判定：读权威业务状态（window.S）。不是点击猜测，是“业务成功后的状态验证”。 */

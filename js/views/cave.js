@@ -73,16 +73,19 @@ HUBKIT.define({
         <div class="craft-list" id="xx-alchemy"></div>
         <p class="hint">用灵草 + 灵石炼制丹药，吃了加修为、提升突破成功率。炼成的丹药与装备在背包。<button class="xlink" type="button" data-cross="bag">去背包看成品 ›</button></p>
       </section>` },
-    { key: 'xx-forge-sec', view: 'dong_forge', name: '炼器房', note: '四族法器 · 各九阶',
+    { key: 'xx-forge-sec', view: 'dong_forge', name: '炼器坊', note: '四族法器 · 各九阶',
       ico: 'cave_tag_forge.png', sealId: 'xx-hub-forge', sealTxt: 'Lv.0', also: ['xx-forge'],
       body: `      <section class="card wide" id="xx-forge-sec">
-        <h2>器炉</h2>
+        <h2>炼器坊</h2>
         <div class="craft-up"><span id="xx-forge-up"></span><button type="button" class="field-btn" id="xx-forge-upbtn">升级</button></div>
         <p class="farm-msg" id="xx-forge-upmsg" aria-live="polite"></p>
-        <!-- 外部评审 2026-11-23 第 8 项：法宝图鉴收敛为人物页唯一入口（自身养成归人物），此处不再重复 -->
+        <div class="forge-entries">
+          <button type="button" class="xlink" data-forge-codex>法宝图鉴 · 四族与兽魂 ›</button>
+          <button type="button" class="xlink" data-forge-bestiary>万兽谱 · 专属料收录与段奖 ›</button>
+        </div>
         <div class="bp-box" id="xx-bp-box"></div>
         <div class="craft-list" id="xx-forge"></div>
-        <p class="hint">灵器提修炼、战器加战力、破器助破境、财器添灵石——四族各占一个持有位，可以同时佩。炼成的法宝在背包与人物页。<button class="xlink" type="button" data-cross="bag">去背包看成品 ›</button></p>
+        <p class="hint">灵器提修炼、战器加战力、破器助破境、财器添灵石。旧法宝与同族兽魂共同比阶，只生效一个最高值，不叠加。装备可重复炼制、穿戴与寄售。<button class="xlink" type="button" data-cross="bag">去背包看成品 ›</button></p>
       </section>` },
     { key: 'xx-enhance-sec', view: 'dong_enhance', name: '法宝强化', note: '强化 · 洗练词条',
       ico: 'ic_blade.png', sealId: 'xx-hub-enhance', sealTxt: '无',
@@ -111,12 +114,31 @@ HUBKIT.define({
         <p class="farm-msg" id="xx-array-msg" aria-live="polite"></p>
         <p class="hint">聚灵阵每级让洞府灵石产出 ×1.06，满级封顶；点一次升一级，费用随等级上浮。</p>
       </section>` },
-    { key: 'xx-ups-sec', view: 'dong_ups', name: '洞府设施', note: '纯数据 · 只报等级',
+    { key: 'xx-ups-sec', view: 'dong_ups', name: '洞府设施', note: '等级一览 · 只报状态',
       ico: 'ic_pagoda.png', sealId: 'xx-hub-ups', sealTxt: '汇总', also: ['xx-ups'],
       body: `      <section class="card wide" id="xx-ups-sec">
         <h2>洞府设施 · 汇总</h2>
         <div class="ups" id="xx-ups"></div>
-        <p class="hint">这一页只报等级与状态，不可点击；升级请回各自页面（功法去藏经阁 · 功法，洞府与丹炉器炉去洞府对应页）。</p>
+        <p class="hint">这一页只报等级与状态，不可点击；升级请回各自页面（功法去藏经阁 · 功法，洞府与丹炉炼器坊去洞府对应页）。</p>
       </section>` }
   ]
 });
+
+/* rv4：恢复独立猎妖行，专属料与旧通用料在同一行明示。
+   主场景「历练」仍走原文字冒险；「猎妖」按钮只打开自动战斗页，不改旧历练数值。 */
+VIEWS.hunt = {
+  title:'猎妖',
+  html:`  <section class="panel-page ink-page" id="page-hunt">
+    <header class="panel-head">
+      <button class="panel-back" data-back>←</button>
+      <h2>猎妖</h2>
+      <span class="panel-sub">自动战斗 · 专属料</span>
+    </header>
+    <div class="panel-body">
+      <section class="card wide">
+        <div class="hunt-list" id="xx-hunt"></div>
+        <p class="hint">每行同时显示原有材料与各类妖兽专属材料的掉落机会。专属材料满包时暂存信匣，不会因专属材料满格而停猎。</p>
+      </section>
+    </div>
+  </section>`
+};

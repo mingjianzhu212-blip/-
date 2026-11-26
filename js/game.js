@@ -164,6 +164,9 @@ const XX = (function(){
     weaponBless: 0,                                     /* 强化祝福值（连败累积，满则必成） */
     affix: [],                                          /* 法宝洗练词条 [{id, q}]，条数 = 法宝品质 */
     art: { bg: 0, brk: 0, cai: 0 },                     /* 法器另三族持有阶位（0无 1~9 阶）；灵器族仍走上面的 S.weapon */
+    /* rv4 唯一扩展容器：souls 本世兽魂；found 曾取得专属料；claimed 万兽谱已领段。
+       转世只清 souls，found/claimed 跨世；重开整组清零。 */
+    rv4: { v: 1, souls: [], found: [], claimed: [] },
     swordAura: 0,                                       /* 剑意流派：0 青莲剑意 / 1 紫霄神雷 / 2 赤炎流光 */
     bagSize: 20,                                        /* 背包容量（储物袋可扩到 50） */
     huntBeast: null,                                    /* 当前历练的妖兽 id（null=未历练） */
@@ -216,7 +219,7 @@ const XX = (function(){
     arena: { day: '', left: 0, foes: [], tier: 0, win: 0, lose: 0, rep: 0, proxyDay: '' },
     /* 限时活动：七日签到（断签重置）+ 仙盟争霸（7 天赛季，战功换强化材料） */
     sign: { days: 0, last: '' },
-    /* 每日任务奖励的「已入账凭据」（D-006 J-1）：形如 'sit@2026-11-08'。
+    /* 每日任务奖励的「已入账登录状态」（D-006 J-1）：形如 'sit@2026-11-08'。
        作用：把「发了多少奖」和「这笔奖发过没有」写在**同一次主存档写入**里，
        这样"标记已落盘、奖励还没入账就崩了"能被下次启动识别并补发，且补发不会重复
        （详见 js/daily.js 的 pending / recoverPending）。只留最近 40 条，够跨很久的补发窗口。 */
@@ -984,11 +987,53 @@ const XX = (function(){
     }
     DAN_IDS[fam] = ids;
   });
+  /* rv4 十二味专属丹：独立表，不改旧 36 枚的 id、顺序、材料与效果。
+     每味从同 (fam,seg) 标准丹复制全部门槛、成功率、时效与效果字段，只替换两味主料。 */
+  const RV4_DAN_ROWS = [
+    { id:'dan_chansu', name:'蟾酥丹', fam:'jl', seg:1, mats:[['matb_ox',1],['matb_croc',1]],
+      desc:'丹名取蟾酥，丹成却带一股苦气。服后心神先定，气脉后顺。' },
+    { id:'dan_bodan', name:'豹胆丹', fam:'ct', seg:1, mats:[['matb_wolf',1],['matb_leopard',1]],
+      desc:'一味豹胆入炉，苦到极处便是回甘。武夫服之，敢挨妖兽一爪。' },
+    { id:'dan_lurong', name:'鹿茸丹', fam:'po', seg:2, mats:[['matb_lion',1],['matb_tiger',1]],
+      desc:'丹色温润，如嫩角未骨化时。服后精血先温，行功不至发寒。' },
+    { id:'dan_jungu', name:'骏骨丹', fam:'fc', seg:2, mats:[['matb_eagle',1],['matb_bear',1]],
+      desc:'丹气轻清，像一节轻骨里自有去路。古人千金买骏骨，买的也是这份认路。' },
+    { id:'dan_hurong', name:'狐绒丹', fam:'jl', seg:3, mats:[['matb_monkey',2],['matb_rabbit',2]],
+      desc:'丹名取狐绒，服之幻中生真。此丹要久坐方得，多用于闭关守神。' },
+    { id:'dan_nilin', name:'逆鳞丹', fam:'ct', seg:3, mats:[['matb_deer',2],['matb_moth',2]],
+      desc:'丹性最烈，如逆鳞连着魂，入喉先要镇住它的怒。服后皮骨如锻。' },
+    { id:'dan_xiewei', name:'蝎尾丹', fam:'fc', seg:4, mats:[['matb_jiao',4],['matb_horse',4]],
+      desc:'以毒攻毒，药性如蝎尾针之烈，可祛三尸风；炼成一炉，丹房三日有腥。' },
+    { id:'dan_linxie', name:'麟竭丹', fam:'po', seg:4, mats:[['matb_qilin',3],['matb_tortoise',3]],
+      desc:'仁兽之血凝成的赤块，续骨接脉。破境前后各服一丸，道基不至裂处。' },
+    { id:'dan_baize', name:'白泽通玄丹', fam:'jl', seg:5, mats:[['matb_phoenix',8],['matb_crane',8]],
+      desc:'白泽毛端那一字，一味可抵半卷谱。此丹不增力气，只增清明。' },
+    { id:'dan_jinwu', name:'金乌丹', fam:'ct', seg:5, mats:[['matb_python',6],['matb_bonejiao',6]],
+      desc:'翎影中另有一日，一炉要添三炉炭。合体期服它，如吞一粒小太阳。' },
+    { id:'dan_heding', name:'鹤顶丹', fam:'fc', seg:6, mats:[['matb_nethpython',15],['matb_fox',15]],
+      desc:'丹色如鹤顶朝日。此丹不为战阵，只为浮阳得降、关隘可叩；所获灵石随同段旧例。' },
+    { id:'dan_kunpeng', name:'鲲鹏丹', fam:'po', seg:8, mats:[['matb_yinglong',39],['matb_moqilin',39]],
+      desc:'一羽压舟，非风不能举；此丹亦非大风关不可服。渡劫期闭关，多半就为等它。' }
+  ];
+  const RV4_DAN_LIST = [], RV4_DAN_BY_ID = {};
+  RV4_DAN_ROWS.forEach(row => {
+    const std = DAN_BY_ID[DAN_IDS[row.fam][row.seg - 1]];
+    const mats = row.mats.map(m => ({ t:m[0], n:m[1] }));
+    mats.push({ t:'stone', n:DAN_STONE[row.seg - 1] });
+    const d = { id:row.id, fam:row.fam, seg:row.seg, tier:std.tier, name:row.name,
+      img:std.img, cls:std.cls, desc:row.desc, mats, rate:std.rate, reqLv:std.reqLv,
+      reqM:std.reqM, buff:std.buff, exp:std.exp, mult:std.mult, pct:std.pct, brk:std.brk,
+      legacy:false, rv4:true };
+    RECIPES[d.id] = { recipeId:d.id, bld:'alchemy', fam:d.fam, seg:d.seg, tier:d.tier,
+      name:d.name, reqLv:d.reqLv, reqM:d.reqM, rate:d.rate, out:d.id, img:d.img,
+      cls:d.cls, mats:d.mats, note:d.desc, rv4:true };
+    RV4_DAN_LIST.push(d); RV4_DAN_BY_ID[d.id] = d;
+  });
   /* 寄售口径照旧：丹药按品阶定价，四阶以上不收（与老档 dan4/dan5 无寄售价一致）。
      真正的写入要等 ITEMS / SELL_K 两张表定义完——它们在更远处，就地写会撞 const 的 TDZ。 */
   const DAN_SELL_TIER = { 1: 0.20, 2: 0.50, 3: 1.20, 4: 0, 5: 0 };
   function danFillBagMeta(){
-    DAN_LIST.forEach(d => {
+    DAN_LIST.concat(RV4_DAN_LIST).forEach(d => {
       if(d.legacy) return;
       ITEMS[d.id] = { n: d.name, img: d.img, cls: d.cls,
         usage: DAN_FAM[d.fam].name + '族第 ' + d.seg + ' 阶丹：' + danEffectText(d),
@@ -1162,6 +1207,97 @@ const XX = (function(){
     if(fam === 'bg') return '战力 +' + danPct(ART_FX.bg[seg]);
     if(fam === 'brk') return '突破成功率 +' + danPct(ART_FX.brk[seg]);
     return '灵石产出 ×' + (1 + ART_FX.cai[seg]).toFixed(2);
+  }
+
+  /* ---- rv4 兽魂：独立旁挂 10 件，全部被动；不占佩戴位、不累加。
+     每族有效阶位由旧四族法宝与本族最高兽魂共同取最大，效果仍只走原四族通道。 ---- */
+  const RV4_SOUL_ROWS = [
+    { id:'soul_wolf',   name:'狼毫哨', fam:'bg',  seg:1, reqLv:1,  reqM:1, rate:0.90, ore:10,  stone:40,   boss:null,
+      mats:[['matb_rat',1],['matb_crow',1],['mat_bone',3]], desc:'狼毫凝哨，兽魂镇于战器族，只取本族最高阶。' },
+    { id:'soul_toad',   name:'蟾骨笛', fam:'lq',  seg:1, reqLv:1,  reqM:1, rate:0.90, ore:10,  stone:40,   boss:null,
+      mats:[['matb_toad',1],['matb_boar',1],['mat_eye',1]], desc:'蟾骨作笛，兽魂镇于灵器族，修炼只取本族最高阶。' },
+    { id:'soul_horse',  name:'骏影鞭', fam:'brk', seg:3, reqLv:3,  reqM:2, rate:0.60, ore:80,  stone:300,  boss:null,
+      mats:[['matb_horse',1],['matb_hound',1],['mat_core',8]], desc:'骏影入鞭，破境只取本族最高阶。' },
+    { id:'soul_qilin',  name:'麟趾印', fam:'cai', seg:4, reqLv:5,  reqM:3, rate:0.35, ore:200, stone:700,  boss:null,
+      mats:[['matb_crane',1],['matb_dragon',1],['mat_feather',5]], desc:'麟趾落印，灵石产出只取本族最高阶。' },
+    { id:'soul_scorpion',name:'蝎尾铃',fam:'bg',  seg:5, reqLv:6,  reqM:3, rate:0.30, ore:320, stone:1500, boss:null,
+      mats:[['matb_bat',2],['matb_snake',2],['mat_bone',36]], desc:'尾铃镇魂，与旧战器共同比阶，不叠加。' },
+    { id:'soul_bat',    name:'蝠影冕', fam:'lq',  seg:5, reqLv:6,  reqM:3, rate:0.30, ore:320, stone:1500, boss:null,
+      mats:[['matb_spider',1],['matb_scorpion',1],['mat_eye',8]], desc:'蝠影藏冕，与旧灵器共同比阶，不叠加。' },
+    { id:'soul_crane',  name:'鹤翎冠', fam:'brk', seg:6, reqLv:7,  reqM:4, rate:0.27, ore:480, stone:3200, boss:null,
+      mats:[['matb_rakshasa',2],['matb_ghoul',2],['mat_core',40]], desc:'鹤翎护顶，与旧破器共同比阶，不叠加。' },
+    { id:'soul_crow',   name:'乌羽灯', fam:'bg',  seg:7, reqLv:8,  reqM:5, rate:0.24, ore:700, stone:6000, boss:'boss_core',
+      mats:[['matb_goldencrow',4],['matb_baize',4],['mat_bone',72],['boss_core',1]], desc:'乌羽照夜，七阶兽魂只替代同族较低效果。' },
+    { id:'soul_jiao',   name:'蛟脊索', fam:'cai', seg:8, reqLv:9,  reqM:6, rate:0.21, ore:1000,stone:12000,boss:'boss_feather',
+      mats:[['matb_xiezhi',1],['matb_taotie',1],['mat_feather',22],['boss_feather',1]], desc:'蛟脊为索，八阶财魂只替代同族较低效果。' },
+    { id:'soul_kunpeng',name:'鲲鹏翼', fam:'lq',  seg:9, reqLv:10, reqM:7, rate:0.18, ore:1500,stone:24000,boss:'boss_heart',
+      mats:[['matb_zhulong',2],['matb_kunpeng',2],['mat_eye',30],['boss_heart',2]], desc:'鲲鹏展翼，九阶灵魂只替代同族较低效果。' }
+  ];
+  const RV4_SOUL_BY_ID = {};
+  RV4_SOUL_ROWS.forEach(s => {
+    const tier = s.seg <= 2 ? 1 : s.seg <= 4 ? 2 : s.seg <= 6 ? 3 : 4;
+    s.tier = tier;
+    s.img = ART_FAM[s.fam].img;
+    s.cls = artCls(tier);
+    s.mats = [{ t:'ore', n:s.ore }].concat(s.mats.map(m => ({ t:m[0], n:m[1] })), [{ t:'stone', n:s.stone }]);
+    s.recipeId = s.id;
+    RV4_SOUL_BY_ID[s.id] = s;
+    RECIPES[s.id] = { recipeId:s.id, bld:'forge', fam:s.fam, famOf:s.fam, seg:s.seg, tier,
+      name:s.name, reqLv:s.reqLv, reqM:s.reqM, rate:s.rate, out:s.id, outLv:s.seg,
+      img:s.img, cls:s.cls, mats:s.mats, note:s.desc, rv4:true, soul:true };
+  });
+  const RV4_BESTIARY_TIERS = [
+    { id:'t1', name:'妖兽卷', K:3 }, { id:'t2', name:'灵兽卷', K:5 },
+    { id:'t3', name:'仙兽卷', K:8 }, { id:'t4', name:'魔兽卷', K:12 },
+    { id:'t5', name:'神兽卷', K:20 }
+  ];
+  const RV4_BESTIARY_K = {};
+  RV4_BESTIARY_TIERS.forEach(t => { RV4_BESTIARY_K[t.id] = t.K; });
+  const emptyRv4 = () => ({ v:1, souls:[], found:[], claimed:[] });
+  const rv4Ids = (v, byId) => {
+    const out = [], seen = {};
+    if(Array.isArray(v)) v.forEach(id => {
+      if(typeof id !== 'string' || !byId[id] || seen[id]) return;
+      seen[id] = 1; out.push(id);
+    });
+    return out;
+  };
+  function ensureRv4(){
+    if(!S.rv4 || typeof S.rv4 !== 'object' || Array.isArray(S.rv4)) S.rv4 = emptyRv4();
+    if(!Array.isArray(S.rv4.souls)) S.rv4.souls = [];
+    if(!Array.isArray(S.rv4.found)) S.rv4.found = [];
+    if(!Array.isArray(S.rv4.claimed)) S.rv4.claimed = [];
+    S.rv4.v = 1;
+    return S.rv4;
+  }
+  const rv4HasSoul = id => ensureRv4().souls.indexOf(id) >= 0;
+  const rv4SoulMax = fam => RV4_SOUL_ROWS.reduce((m, s) =>
+    s.fam === fam && rv4HasSoul(s.id) ? Math.max(m, s.seg) : m, 0);
+  const rv4SoulAt = fam => RV4_SOUL_ROWS.filter(s => s.fam === fam && rv4HasSoul(s.id))
+    .sort((a, b) => b.seg - a.seg)[0] || null;
+  function rv4Found(id){
+    const r = ensureRv4();
+    if(!RV4_MAT_BY_ID[id] || r.found.indexOf(id) >= 0) return false;
+    r.found.push(id); return true;
+  }
+  function bestiaryProgress(tier){
+    return RV4_MATS.filter(m => m.tier === tier && ensureRv4().found.indexOf(m.id) >= 0).length;
+  }
+  function claimBestiary(tier){
+    const row = RV4_BESTIARY_TIERS.find(t => t.id === tier);
+    if(!row){ log('万兽谱卷次有误。', 'bad'); return { ok:false, reason:'bad-tier' }; }
+    const r = ensureRv4();
+    if(r.claimed.indexOf(tier) >= 0){ log('这一卷的灵石已经领过了。', 'bad'); return { ok:false, reason:'claimed' }; }
+    const need = RV4_MATS.filter(m => m.tier === RV4_BESTIARY_TIERS.indexOf(row) + 1).length;
+    if(bestiaryProgress(RV4_BESTIARY_TIERS.indexOf(row) + 1) < need){
+      log('这一卷尚未集齐，卖掉的旧料不会从谱上抹去，也不会补记。', 'bad'); return { ok:false, reason:'incomplete' };
+    }
+    const reward = needOf(S.rank) * row.K;
+    r.claimed.push(tier);
+    S.stone += reward; S.stats.stoneEarned = (S.stats.stoneEarned || 0) + reward;
+    log('📖 万兽谱·' + row.name + '已收录，灵石 +' + fmt(reward) + '。', 'gold');
+    sfx.win(); save(); render(); renderBestiary();
+    return { ok:true, tier:tier, reward:reward };
   }
 
   /* ============================================================
@@ -1742,7 +1878,7 @@ const XX = (function(){
     if(S.weaponBless >= BAL.enhanceBlessMax) return 1;
     return Math.min(1, Math.max(BAL.enhanceMinChance, 1 - S.weaponLv * BAL.enhanceFailPer) + dtEnhPct() / 100);
   }
-  /* P1：强化/洗练资源不足的可见回执（不只日志区） */
+  /* P1：强化/洗练资源不足的可见结果（不只日志区） */
   function enhSay(text, bad){
     const el = document.getElementById('xx-enh-msg');
     if(!el) return;
@@ -1752,7 +1888,7 @@ const XX = (function(){
     if(text) el._t = setTimeout(function(){ el.textContent = ''; el.className = 'farm-msg'; }, 3600);
   }
   function enhanceWeapon(){
-    if(S.weapon <= 0){ log('还没有法宝，先去炼器房炼一件。', 'bad'); enhSay('尚无法宝，先去炼器房炼一件。', true); return; }
+    if(S.weapon <= 0){ log('还没有法宝，先去炼器坊炼一件。', 'bad'); enhSay('尚无法宝，先去炼器坊炼一件。', true); return; }
     if(S.weaponLv >= BAL.enhanceMax){ log('法宝已强化到 +' + BAL.enhanceMax + '，炉火纯青。', 'gold'); enhSay('已满级 +' + BAL.enhanceMax + '。', false); return; }
     const c = enhanceCost();
     if(S.ore < c.ore){ log('矿石不足，强化 +' + (S.weaponLv + 1) + ' 要 ' + c.ore + ' 块（矿脉产）。', 'bad'); enhSay('矿石差 ' + (c.ore - S.ore) + '（要 ' + c.ore + '）。', true); return; }
@@ -1805,8 +1941,8 @@ const XX = (function(){
     if(S.weapon <= 0){
       box.innerHTML = '<div class="enh-empty">' +
         '<img src="ui/icons/weapon1.png" alt="" style="width:48px;height:48px;opacity:.35">' +
-        '<b>尚无法宝</b><p>先去炼器房炼一件，再回来强化与洗练。</p>' +
-        '<button type="button" class="enh-btn" id="xx-enh-go">去炼器房</button></div>';
+        '<b>尚无法宝</b><p>先去炼器坊炼一件，再回来强化与洗练。</p>' +
+        '<button type="button" class="enh-btn" id="xx-enh-go">去炼器坊</button></div>';
       const go = document.getElementById('xx-enh-go');
       if(go) go.onclick = () => { try{ ROUTER.open('dong', 'xx-forge-sec'); }catch(e){} };
       return;
@@ -1936,7 +2072,7 @@ const XX = (function(){
   function openReroll(){
     const modal = document.getElementById('reroll-modal');
     if(!modal) return;
-    if(S.weapon <= 0){ log('还没有法宝，先去炼器房炼一件。', 'bad'); return; }
+    if(S.weapon <= 0){ log('还没有法宝，先去炼器坊炼一件。', 'bad'); return; }
     if(rrSpinning) return;
     const card = modal.querySelector('.rr-card');
     if(card) card.classList.remove('rr-jackpot');
@@ -2224,7 +2360,7 @@ const XX = (function(){
           const b = ev.target.closest('[data-daily]');
           if (!b) return;
           ev.stopPropagation();
-          /* Daily.claim 现在返回 Promise：它要在跨标签页互斥锁内完成「读盘→检查→发奖→写盘」，
+          /* Daily.claim 现在返回 Promise：它要在跨标签页互斥锁内完成「读盘→检查→发奖→保存」，
              Web Locks 只有异步 API。这里按住按钮防连点，结果回来再放行。
              （不支持 Web Locks 的环境走 localStorage 租约锁，同样返回 Promise，调用方式一致。） */
           if (b.disabled) return;
@@ -2415,6 +2551,21 @@ const XX = (function(){
     stanceCb = null;
   }
 
+  /* batch10：所有不可逆/交易动作共用一张游戏内确认卡。
+     UI 层复用既有起手式弹层；测试可通过 _setConfirmHandler 自动作答，不触碰原生 confirm。 */
+  let confirmHandler = null;
+  function confirmAction(cfg, cb){
+    if(confirmHandler) return confirmHandler(cfg || {}, cb);
+    pickStance({
+      icon: cfg.icon || '❔', title: cfg.title || '请确认',
+      text: cfg.text || '', foot: cfg.foot || '取消不会改变任何资源或物品。',
+      opts: [
+        { k:'cancel', n:'取消', d:'保留现状' },
+        { k:'ok', n:cfg.okText || '确认', d:cfg.okDesc || '' }
+      ]
+    }, k => cb(k === 'ok'));
+  }
+
   function challengeArena(i, stance){
     resetArenaDay();
     if(S.arena.left <= 0){ log('今日论剑次数用尽了，明日再来。', 'bad'); return; }
@@ -2540,7 +2691,7 @@ const XX = (function(){
     if(!f || f.beat) return false;
     if(S.stone < cost){ log('灵石不足，雇人代打要 ' + fmt(cost) + ' 灵石。', 'bad'); return false; }
     S.stone -= cost;
-    S.arena.proxyDay = todayKey();          /* 日键与 08:00 日界同口径；写盘由 challengeArena 的 save 一并落 */
+    S.arena.proxyDay = todayKey();          /* 日键与 08:00 日界同口径；保存由 challengeArena 的 save 一并落 */
     log('💸 花 ' + fmt(cost) + ' 灵石雇人代打【' + f.name + '】。', 'note');
     challengeArena(i, 'plain');
     return true;
@@ -3118,9 +3269,10 @@ const XX = (function(){
   const gongLvOf = g => Math.min(S[g.id], g.max);
   const gongMult = () => GONGS.reduce((a, g) => a * Math.pow(g.rate, gongLvOf(g)), 1);
   const gongUnlocked = g => S.rank >= g.unlock;
-  const weaponMult = () => BAL.weaponMult[S.weapon] || 1;
-  /* 法器另三族（第 90 节）：灵器族就是上面的 weaponMult，这三条各走一路独立乘/加区 */
-  const artSeg = fam => (fam === 'lq' ? S.weapon : ((S.art && S.art[fam]) || 0));
+  const weaponMult = () => BAL.weaponMult[artSeg('lq')] || 1;
+  /* 旧法宝阶位与有效阶位分开：炼制/图鉴 owned 只认旧法宝，效果统一认两系共同最高。 */
+  const oldArtSeg = fam => (fam === 'lq' ? S.weapon : ((S.art && S.art[fam]) || 0));
+  const artSeg = fam => Math.max(oldArtSeg(fam), rv4SoulMax(fam));
   const artFx = (fam, seg) => { const tbl = ART_FX[fam]; return (tbl && tbl[seg]) || 0; };
   /* A4b 乙案（2026-11-20 制作人批、呆呆复算通过）：强化档四族共用 S.weaponLv，
      战/破/财按 30% 系数受益；只在该族已获得时生效（seg>0），不白送。 */
@@ -3810,9 +3962,9 @@ const XX = (function(){
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   }
   function coopMembers(){ return 1 + ((S.gate && S.gate.disciples) ? S.gate.disciples.length : 0); }
-  /* batch5 第 4 项迁移：下个周键起，总血量优先用服务端认可的战力（近 7 天上报）。
-     服务端 sum 已含本地掌门（若本地有新鲜上报）；弟子无独立战力，仍按掌门同战力补人数。
-     没连服务、没上报或缓存过期 → 回退旧口径（本地掌门/弟子同战力），不把血量算成 1。 */
+  /* batch5 第 4 项迁移：下个周键起，总血量优先用服务端认可的战力（近 7 天同步）。
+     服务端 sum 已含本地掌门（若本地有新鲜同步）；弟子无独立战力，仍按掌门同战力补人数。
+     没连服务、没同步或缓存过期 → 回退旧口径（本地掌门/弟子同战力），不把血量算成 1。 */
   function coopServerPower(){
     try{
       if(typeof SECT === 'undefined' || !SECT.powerBoard) return null;
@@ -3888,7 +4040,7 @@ const XX = (function(){
         '<small>' + (done ? '已领' : (can ? '领取' : fmt(need))) + '</small></button>';
     });
     h += '</div><p class="hint">总血量 = 宗门成员战力总和 × ' + COOP_HP_MULT + '（' +
-      (coopServerPower() ? '取自宗门服务近 7 天上报的真实战力' : '未连宗门服务，暂按本地掌门与弟子同战力计') +
+      (coopServerPower() ? '取自宗门服务近 7 天同步的真实战力' : '未连宗门服务，暂按本地掌门与弟子同战力计') +
       '；弟子暂无独立战力，按掌门同战力计人数）。</p></div>';
     return h;
   }
@@ -4331,6 +4483,10 @@ const XX = (function(){
     return (n / 1e8).toFixed(2) + '亿';
   }
   function fmt1(n){ return n < 10000 ? (Math.round(n * 10) / 10).toFixed(1) : fmt(n); }
+  /* 修为展示统一向下取整；缺口按两个显示整数相减，避免「还差 0」却还不能突破。 */
+  function expInt(n){ return Math.floor(Math.max(0, Number(n) || 0)); }
+  function expGapInt(exp, need){ return Math.max(0, expInt(need) - expInt(exp)); }
+  function pct1(v){ return (Math.round((Number(v) || 0) * 1000) / 10).toFixed(1); }
   /* 钱数取整一律走这里，不许用 | 0：位运算把值折进 int32，越过 2^31 就翻成负数。
      层 23 起一层灵石收入已经 30 亿量级（见 _curve.js），| 0 是必然踩到的。 */
   function moneyInt(n){ return Math.floor(n || 0); }
@@ -4393,7 +4549,10 @@ const XX = (function(){
           if(el.querySelector('.e-dot')) return;
           const d = document.createElement('i');
           d.className = 'e-dot';
-          el.appendChild(d);
+          /* 城镇建筑把红点挂到立绘本体；侧栏等普通入口仍挂按钮自身。 */
+          const shape = el.classList && el.classList.contains('bld') && el.classList.contains('art')
+            ? el.querySelector('.art-shape') : null;
+          (shape || el).appendChild(d);
         });
       });
     }catch(e){}
@@ -4439,7 +4598,7 @@ const XX = (function(){
 
   /* ---------- M-2：存档写入失败统一反馈 ----------
      save() 返回布尔；全文本匹配约 106 处、真实调用点 104 处，仅 2 处显式检查。
-     tickLoop 每 3 秒自动保存，写盘失败原先玩家全程无提示。
+     tickLoop 每 3 秒自动保存，保存失败原先玩家全程无提示。
      做法：save() 内部统一兜底，不改任何调用点、不改业务返回值与推进顺序。
      !inited / frozenForImport 属「未到写入时机」，不告警；同一故障周期只提示一次，
      恢复后再失败才重新提示（避免 3 秒一次刷屏）。不新增定时器、不新增 window 全局。
@@ -4458,7 +4617,7 @@ const XX = (function(){
     return v;
   }
   /* 存档损坏保护闸门：load() 读到过原始数据但迁移失败时置真。
-     作用：禁止一切写盘，避免 boot 弹创角后 confirmChar() 的 save()
+     作用：禁止一切保存，避免 boot 弹创角后 confirmChar() 的 save()
      把玩家唯一那份（只是读不出来的）存档覆盖成新档。
      解除路径只有两条：玩家在设置页成功「取回备份」，或玩家主动重开。 */
   let saveBlocked = false;
@@ -4470,7 +4629,7 @@ const XX = (function(){
     if(saveFailActive) return;
     saveFailActive = true;
     saveFailFirstAt = Date.now();
-    try{ log('⚠️ 存档写入失败：当前进度只暂存在内存，关闭页面可能丢失。请到「设置 → 存档备份」导出一份存档。', 'bad'); }catch(e){}
+    try{ log('⚠️ 存档保存失败：当前进度尚未保存，关闭页面可能丢失。请到「设置 → 存档备份」导出一份存档。', 'bad'); }catch(e){}
     try{ if(typeof window.showToast === 'function') window.showToast('⚠️ 存档写入失败，请导出存档备份'); }catch(e){}
     try{ console.warn('[save] localStorage.setItem failed'); }catch(e){}
   }
@@ -4616,8 +4775,8 @@ const XX = (function(){
   /* 议程1 P0-1 顶栏修为语义（纯呈现，不改数值/存档）：突破按钮与修为条口径统一 */
   function breakButtonLabel(s){
     const rank = s.rank, exp = Number(s.exp) || 0, need = Number(s.need) || 0, top = s.top;
-    const nextRankName = s.nextRankName || '', chancePct = s.chancePct || 0;
-    const left = Math.max(0, need - exp);
+    const nextRankName = s.nextRankName || '', chancePct = Number(s.chancePct) || 0;
+    const left = Math.max(0, need - exp), leftShown = expGapInt(exp, need);
     if (rank >= top) return { text: '♻️ 转世', disabled: false, action: 'reincarnate', title: '已至最高境界 · 点此转世重修', left: 0 };
     /* 路 3 第四态：闸门期优先于「修为一满就显示突破」。可点（点了由 attemptBreakthrough 说明三值），
        否则玩家只能悬停看 title，等于静默失败。 */
@@ -4625,16 +4784,16 @@ const XX = (function(){
     if (cdLeft > 0) return { text: '⏳ 闭关中 · 余 ' + fmtCd(cdLeft), disabled: true, action: null,
       title: gateLockNote() + ' · 解禁 ' + fmtWhen(Date.now() + cdLeft) + ' · 可做：' + gateGoals().join('、'),
       left: left, cd: cdLeft };
-    if (left <= 0) return { text: '⚡ 突破 ' + nextRankName + ' ' + chancePct + '%', disabled: false, action: 'doBreak', title: '当前修为 ' + fmt(exp) + ' / 本层需求 ' + fmt(need) + ' · 可突破 · 溢出 ' + fmt(exp - need), left: 0 };
-    return { text: '距突破还差 ' + fmt(left), disabled: true, action: null, title: '当前修为 ' + fmt(exp) + ' / 本层需求 ' + fmt(need) + ' · 还差 ' + fmt(left), left };
+    if (left <= 0) return { text: '⚡ 突破 ' + nextRankName + ' ' + Number(chancePct).toFixed(1) + '%', disabled: false, action: 'doBreak', title: '当前修为 ' + fmt(expInt(exp)) + ' / 本层需求 ' + fmt(expInt(need)) + ' · 可突破 · 溢出 ' + fmt(Math.max(0, expInt(exp) - expInt(need))), left: 0 };
+    return { text: '距突破还差 ' + fmt(leftShown), disabled: true, action: null, title: '当前修为 ' + fmt(expInt(exp)) + ' / 本层需求 ' + fmt(expInt(need)) + ' · 还差 ' + fmt(leftShown), left };
   }
   function expReadout(exp, need){
     const e = Number(exp) || 0, n = Number(need) || 1;
     /* A2：闭关锁定期内，修为条口径改「闭关中」，不再提示可突破 */
     if (secludeLeftMs() > 0) return { barPct: '100.0%', roleText: '闭关中 · 余 ' + fmtCd(secludeLeftMs()), title: gateLockNote() + ' · 可做：' + gateGoals().join('、') };
     /* 第 9 条补落（2026-11-20）：溢出时不再只报「已满」，明示可突破与溢出数（只改显示） */
-    if (e >= n) return { barPct: '100.0%', roleText: '可突破 · 溢出 ' + fmt(e - n), title: '当前修为 ' + fmt(e) + ' / 本层需求 ' + fmt(n) + ' · 可突破 · 溢出 ' + fmt(e - n) };
-    return { barPct: Math.max(0, Math.min(100, e / n * 100)).toFixed(1) + '%', roleText: fmt(e) + ' / ' + fmt(n), title: '当前修为 ' + fmt(e) + ' / 本层需求 ' + fmt(n) };
+    if (e >= n) return { barPct: '100.0%', roleText: '可突破 · 溢出 ' + fmt(Math.max(0, expInt(e) - expInt(n))), title: '当前修为 ' + fmt(expInt(e)) + ' / 本层需求 ' + fmt(expInt(n)) + ' · 可突破 · 溢出 ' + fmt(Math.max(0, expInt(e) - expInt(n))) };
+    return { barPct: Math.max(0, Math.min(100, e / n * 100)).toFixed(1) + '%', roleText: fmt(expInt(e)) + ' / ' + fmt(expInt(n)), title: '当前修为 ' + fmt(expInt(e)) + ' / 本层需求 ' + fmt(expInt(n)) };
   }
   /* 议程1 P0-2 凝神指引（纯呈现）：功法任务补「解锁门槛/去处」提示，不改 goal.n/cost */
   const GONG_NAME = { gong1: '引气诀', gong2: '凝神诀', gong3: '化神诀' };
@@ -4677,15 +4836,15 @@ const XX = (function(){
 
   function save(){
     if(!inited) return false;
-    /* 存档损坏保护：读到过原始数据但迁移失败时，一次都不许写盘。
+    /* 存档损坏保护：读到过原始数据但迁移失败时，一次都不许保存。
        否则创角存档会覆盖掉玩家那份只是"读不出来"的真实存档。 */
     if(saveBlocked) return false;
-    /* 导入冻结期不写盘是既有设计（避免把内存里旧进度写回刚导入的新档），
+    /* 导入冻结期不保存是既有设计（避免把内存里旧进度写回刚导入的新档），
        但不能静默——否则玩家不重载继续玩几小时，进度全丢且毫不知情。
        走一次性提示通道，明确告知"现在不保存、请尽快重载"。 */
     if(frozenForImport){ reportFrozenNoSave(); return false; }
     /* 2026-11-19：创角弹窗在场时，空名档不许落盘。
-       清档后 Guide.reset 等模块会顺手 save，一次空名写盘就会在刷新后变成「无名散修」
+       清档后 Guide.reset 等模块会顺手 save，一次空名保存就会在刷新后变成「无名散修」
        （或盖掉刚建的号）。创角确认时名字已写入，这条不会拦正常保存。 */
     try{
       if(!S.name){
@@ -4776,7 +4935,7 @@ const XX = (function(){
       raw = localStorage.getItem(SAVE_KEY);
     }catch(e){
       saveBlocked = true;
-      try{ console.error('[load] localStorage 读取被拒绝，进入存档保护状态（禁止写盘）：', e); }catch(_){}
+      try{ console.error('[load] localStorage 读取被拒绝，进入存档保护状态（禁止保存）：', e); }catch(_){}
       return false;
     }
     try{
@@ -4862,8 +5021,8 @@ const XX = (function(){
          否则"读档清洗"与"运行期认领"会漂移。缺模块时退回空表（最坏结果是旧局重投补一次）。 */
       S.multiCreditedRuns = Array.isArray(o.multiCreditedRuns) ? o.multiCreditedRuns.slice() : [];
       try{ if(window.MultiLedger) window.MultiLedger.hist(S); else S.multiCreditedRuns = []; }catch(e){ S.multiCreditedRuns = []; }
-      /* 每日任务「已入账凭据」（D-006 J-1）：只收 'id@YYYY-M-D' 形式的短串，去重，最多 40 条。
-         它是"这笔奖发过没有"的唯一凭据 —— 崩在"标记已落盘、奖励未入账"之间时，
+      /* 每日任务「已入账登录状态」（D-006 J-1）：只收 'id@YYYY-M-D' 形式的短串，去重，最多 40 条。
+         它是"这笔奖发过没有"的唯一登录状态 —— 崩在"标记已落盘、奖励未入账"之间时，
          下次启动靠它判断该不该补发（见 js/daily.js 的 recoverPending）。 */
       S.dailyApplied = [];
       if(Array.isArray(o.dailyApplied)){
@@ -5197,6 +5356,14 @@ const XX = (function(){
           if(typeof n === 'number' && isFinite(n)) S.art[fam] = Math.max(0, Math.min(9, n | 0));
         });
       }
+      /* rv4 唯一容器迁移：旧档补空，未知 id 忽略并去重；found 不从背包现货反推。 */
+      const rv4Raw = (o.rv4 && typeof o.rv4 === 'object' && !Array.isArray(o.rv4)) ? o.rv4 : {};
+      S.rv4 = {
+        v: 1,
+        souls: rv4Ids(rv4Raw.souls, RV4_SOUL_BY_ID),
+        found: rv4Ids(rv4Raw.found, RV4_MAT_BY_ID),
+        claimed: rv4Ids(rv4Raw.claimed, RV4_BESTIARY_K)
+      };
       /* 限时活动：七日签到 / 仙盟争霸 */
       if(o.sign && typeof o.sign === 'object'){
         S.sign.days = (typeof o.sign.days === 'number' && isFinite(o.sign.days)) ? Math.max(0, o.sign.days | 0) : 0;
@@ -5456,7 +5623,7 @@ const XX = (function(){
       S.last = safeTs(o.last, Date.now());
       if(Array.isArray(o.log)) S.log = o.log.slice(0, 40);
       /* F1 修复（2026-11-11）：断点续走——此前 load() 未恢复 o.guide，
-         导致刷新后引导进度整档丢失（S.guide 随主存档同事务写盘、却没读回来）。
+         导致刷新后引导进度整档丢失（S.guide 随主存档同事务保存、却没读回来）。
          引导状态挂在 S.guide，逐字段白名单校验合并，缺字段用默认值兜底，避免脏档注入任意对象。
          Guide.init() 据此判断 alreadyStarted，从而正确续走而非误判老玩家跳过引导。 */
       if(o.guide && typeof o.guide === 'object' && !Array.isArray(o.guide)){
@@ -5500,7 +5667,7 @@ const XX = (function(){
          ⚠️ 保护模式：只要主键里**确实读到过内容**（raw 非空），就说明玩家有存档。
          此时绝不能把"读档失败"当成"没有存档"——否则 boot 会弹创角，
          confirmChar() 的 save() 会把唯一一份存档覆盖掉，一次 bug = 永久毁档。
-         所以这里挂一个 saveBlocked 闸门，禁止任何写盘，直到玩家手动选择重开。 */
+         所以这里挂一个 saveBlocked 闸门，禁止任何保存，直到玩家手动选择重开。 */
       let backedUp = false;
       try{
         if(raw && typeof raw === 'string'){
@@ -5509,7 +5676,7 @@ const XX = (function(){
         }
       }catch(_){}
       if(raw){
-        saveBlocked = true;      /* 关键：有原始数据 → 禁止写盘，防止被新档覆盖 */
+        saveBlocked = true;      /* 关键：有原始数据 → 禁止保存，防止被新档覆盖 */
         /* 备份键写不进去（存储满/被禁写）时，原文仍留在内存里：
            设置页可以把它导出成文件/文本，玩家不至于只能开开发者工具捞。
            注意这是"尽力而为"——页面一旦刷新内存就没了，所以同时明确提示。 */
@@ -5519,35 +5686,42 @@ const XX = (function(){
       clearTutorialMark(); return false;
     }
   }
-  /* 从旧游戏厅搬存档（只搬一次，玩家确认后） */
-  function tryImport(){
+  /* 从旧游戏厅搬存档（只搬一次，玩家在游戏内确认后才执行） */
+  function readArcadeImport(){
     try{
       const raw = localStorage.getItem('arcade_xx_save');
-      if(!raw) return false;
+      if(!raw) return null;
       const o = JSON.parse(raw);
-      if(!o || typeof o !== 'object' || typeof o.rank !== 'number') return false;
-      if(!confirm('检测到你在「游戏厅」里的修仙存档（' + (RANK_NAMES[o.rank] || '?') + '），要把它搬过来吗？')) return false;
-      ['rank','exp','stone','cave','dan','dao','rootIdx'].forEach(k => {
-        if(typeof o[k] === 'number' && isFinite(o[k])) S[k] = o[k];
-      });
-      if(typeof o.gong === 'number') S.gong1 = Math.max(0, o.gong | 0);
-      S.rank = Math.max(0, Math.min(TOP, S.rank | 0));
-      S.rootIdx = Math.max(0, Math.min(ROOTS.length - 1, S.rootIdx | 0));
-      S.cave = Math.max(0, Math.min(BAL.caveMax, S.cave | 0));
-      S.dan = Math.max(0, Math.min(BUILDINGS.alchemy.maxLevel, S.dan | 0));
-      S.forge = Math.max(0, Math.min(BUILDINGS.forge.maxLevel, S.forge | 0));
-      S.field = Math.max(0, Math.min(BAL.fieldMax, S.field | 0));
-      GONGS.forEach(g => { S[g.id] = Math.max(0, Math.min(g.max, S[g.id] | 0)); });
-      ensureActs();
-      S.last = safeTs(o.last, Date.now());
-      if(Array.isArray(o.log)) S.log = o.log.slice(0, 40);
-      /* 搬完就删源键：不删的话，玩家只要没主动清掉它，
-         以后每次"没有主存档"的开局（清空重开、换浏览器…）都会再弹一次这个确认框。
-         搬移只该发生一次。删失败不算错（权限/配额），下次最多再问一遍。 */
-      try{ localStorage.removeItem('arcade_xx_save'); }catch(e){}
-      log('📦 已从游戏厅搬来你的修行进度（境界与资源；背包/灵田等旧格式数据不迁移）。', 'sys');
-      return true;
-    }catch(e){ return false; }
+      if(!o || typeof o !== 'object' || typeof o.rank !== 'number') return null;
+      return o;
+    }catch(e){ return null; }
+  }
+  function applyArcadeImport(o){
+    ['rank','exp','stone','cave','dan','dao','rootIdx'].forEach(k => {
+      if(typeof o[k] === 'number' && isFinite(o[k])) S[k] = o[k];
+    });
+    if(typeof o.gong === 'number') S.gong1 = Math.max(0, o.gong | 0);
+    S.rank = Math.max(0, Math.min(TOP, S.rank | 0));
+    S.rootIdx = Math.max(0, Math.min(ROOTS.length - 1, S.rootIdx | 0));
+    S.cave = Math.max(0, Math.min(BAL.caveMax, S.cave | 0));
+    S.dan = Math.max(0, Math.min(BUILDINGS.alchemy.maxLevel, S.dan | 0));
+    S.forge = Math.max(0, Math.min(BUILDINGS.forge.maxLevel, S.forge | 0));
+    S.field = Math.max(0, Math.min(BAL.fieldMax, S.field | 0));
+    GONGS.forEach(g => { S[g.id] = Math.max(0, Math.min(g.max, S[g.id] | 0)); });
+    ensureActs();
+    S.last = safeTs(o.last, Date.now());
+    if(Array.isArray(o.log)) S.log = o.log.slice(0, 40);
+    /* 搬完就删源键：取消则不删，下次仍可再选。 */
+    try{ localStorage.removeItem('arcade_xx_save'); }catch(e){}
+    log('📦 已从游戏厅搬来你的修行进度（境界与资源；背包/灵田等旧格式数据不迁移）。', 'sys');
+    return true;
+  }
+  function askArcadeImport(o, done){
+    confirmAction({
+      icon:'📦', title:'发现旧修行存档', okText:'确认搬入',
+      text:'检测到你在「游戏厅」里的修仙存档（<b>' + escHTML(RANK_NAMES[o.rank] || '?') + '</b>）。<br>要把它搬过来吗？',
+      foot:'只迁移旧版支持的数据；取消不会删除旧存档。'
+    }, ok => done(!!ok && applyArcadeImport(o)));
   }
 
   /* 收益 */
@@ -5690,7 +5864,7 @@ const XX = (function(){
     const dispatch = (S.log || []).slice(0, Math.max(0, (S.log || []).length - logN0))
       .map(x => x.t).filter(t => /弟子|差事|议事|回山|出师|山门/.test(t)).slice(0, 5);
     lastOfflineInfo = { used: used, dt: dt, cap: cap, gExp: gExp, gStone: gStone, gOre: gOre, gHunt: gHunt, dispatch: dispatch };
-    /* 回执底层数字：按出关时速率核算（期间若破境，expRate 随 rank 变，故不写成「速率×时长」。 */
+    /* 结果底层数字：按出关时速率核算（期间若破境，expRate 随 rank 变，故不写成「速率×时长」。 */
     const rateNow = passiveRate(), stoneNow = stoneRate();
     const cdSpent = Math.min(dt * 1000, cdBefore);
     const cdLeftMs = secludeLeftMs();
@@ -5914,7 +6088,7 @@ function towerBossCompLetter(){
     const rows = document.getElementById('off-rows');
     const note = document.getElementById('off-note');
     if(dur){
-      /* dt 缺失时按 used+cut 还原「实际离开了多久」，避免回执印出 NaN（手动调用/老调用点兜底）。 */
+      /* dt 缺失时按 used+cut 还原「实际离开了多久」，避免结果印出 NaN（手动调用/老调用点兜底）。 */
       const dtAll = (typeof o.dt === 'number' && isFinite(o.dt)) ? o.dt : (Number(o.used) || 0) + (Number(o.cut) || 0);
       dur.textContent = '此番闭关 ' + fmtDur(o.used) +
         (o.capped ? ' —— 你离开了 ' + fmtDur(dtAll) + '，本次按 ' + fmtDur(o.cap || offlineCapSec()) + ' 结算，未计的 ' + fmtDur(o.cut || 0) + ' 不入账' : '');
@@ -5961,7 +6135,7 @@ function towerBossCompLetter(){
     render();
   }
   const ACT_NAMES = { sit: '打坐', herb: '采药', train: '历练', enlight: '顿悟', ponder: '参悟' };
-  /* 每日任务进度上报：Daily.bump 现在返回 Promise（要进跨窗口锁）。
+  /* 每日任务进度同步：Daily.bump 现在返回 Promise（要进跨窗口锁）。
      无 Web Locks 的环境下它会明确拒绝写入（"load→改→save" 跨标签页不安全），
      这里把"没记下"如实告诉玩家一次 —— 不要让他以为进度已经保存。 */
   let dailyNoLockWarned = false;
@@ -5971,7 +6145,7 @@ function towerBossCompLetter(){
     Promise.resolve(Daily.bump(kind)).then(r => {
       if(r && r.ok === true){
         /* batch6 对账：bump 走跨窗口锁是异步的，动作当场那次 render 读到的还是旧值。
-           这里在锁内写盘返回后再刷一次自课/今日清单，做到“点完一下，计数就 +1”。 */
+           这里在锁内保存返回后再刷一次自课/今日清单，做到“点完一下，计数就 +1”。 */
         try{ renderToday(); renderEvent(); renderQuest(); }catch(e){}
       }
       if(r && r.ok === false && r.code === 'NO_LOCK' && !dailyNoLockWarned){
@@ -5980,7 +6154,7 @@ function towerBossCompLetter(){
       } else if(r && r.ok === false &&
                (r.code === 'SAVE_FAILED' || r.code === 'BUMP_FAILED') &&
                !dailySaveFailWarned){
-        /* 有锁但写盘失败（进度已在 daily.js 回滚）：也要如实告知"本次没记下"，
+        /* 有锁但保存失败（进度已在 daily.js 回滚）：也要如实告知"本次没记下"，
            与无锁提示分开计数、各只提示一次，避免反复刷屏。
            ⚠️ 只认这两个码：UNKNOWN_TASK（herb/enlight/ponder 等正常动作本就不计入日常）
            必须静默忽略，否则每次采药/顿悟都会误报"保存失败"。 */
@@ -6406,7 +6580,7 @@ function towerBossCompLetter(){
       });
       rows += '<div class="bc-row"><span>逐项相加</span><b>' + (Math.round(info.raw * 1000) / 10) + '%</b></div>';
       if(info.raw > 0.85 && !guarantee){
-        rows += '<div class="bc-row"><span>八五以上折半 · 超出部分只留一成半</span><b>' +
+        rows += '<div class="bc-row"><span>超过 85% 后 · 超出部分只计 15%</span><b>' +
           (Math.round(info.final * 1000) / 10) + '%</b></div>';
       }
       rows += '<div class="bc-row"><span><b>这一次</b></span><b>' +
@@ -6646,7 +6820,10 @@ function towerBossCompLetter(){
       if(info.powBefore != null) rows += '<span class="brk-row"><span>战力</span><b>' + fmt(info.powBefore) + ' → ' + fmt(combatPower()) + '</b></span>';
       if(info.lifeBefore != null && isFinite(info.lifeBefore) && lifeOn()){
         const lm = lifeMax();
-        rows += '<span class="brk-row"><span>寿元上限</span><b>' + info.lifeBefore + ' → ' + (isFinite(lm) ? lm : '无量') + ' 年</b></span>';
+        /* 本次境界未抬寿元上限时不重复刷一行；只展示真实变化。 */
+        if(!isFinite(lm) || lm !== info.lifeBefore){
+          rows += '<span class="brk-row"><span>寿元上限</span><b>' + info.lifeBefore + ' → ' + (isFinite(lm) ? lm : '无量') + ' 年</b></span>';
+        }
       }
       const un = info.unlocked || [];
       rows += '<span class="brk-unlock"><b>' + (un.length ? '本境新解锁' : '本境新解锁') + '</b>' +
@@ -7177,6 +7354,36 @@ function towerBossCompLetter(){
       source: '灵兽内丹辅以聚灵阵炼成',
       description: '鸽卵大小的一颗灵珠，内里似有云雾流转不息。携之打坐，周遭灵气自会缓缓向体内汇聚，事半功倍。' }
   };
+  /* rv4 新增六件装备：三槽各两件，沿用加法通道；固定寄售价按 power×0.5 四舍五入。
+     独立表只做加法，不改旧六件装备、旧寄售额度与转世遗物候选。 */
+  const RV4_EQUIP_ROWS = [
+    { id:'eq_jiaoji', name:'蛟脊枪', slot:'weapon', power:9731, sell:4866, reqLv:5, reqM:3, rate:0.35, ore:200, stone:700,
+      img:'ui/icons/weapon2.png', cls:'good', mats:[['matb_dragon',3],['matb_qilin',3]], desc:'蛟脊为杆，麒麟竭为锋，沉稳处自见杀意。' },
+    { id:'eq_mangwen',name:'蟒纹甲', slot:'armor', power:73895, sell:36948, reqLv:5, reqM:3, rate:0.35, ore:200, stone:700,
+      img:'ui/icons/ore.png', cls:'good', mats:[['matb_bat',3],['matb_snake',3]], desc:'蝠齿扣合，蛇蜕织纹，贴身如一层无声水幕。' },
+    { id:'eq_zhusi', name:'蛛丝绦', slot:'accessory', power:73895, sell:36948, reqLv:5, reqM:3, rate:0.35, ore:200, stone:700,
+      img:'ui/icons/mat_feather.png', cls:'good', mats:[['matb_spider',3],['matb_scorpion',3]], desc:'蛛丝为经，蝎针为坠，束住周身浮动的灵气。' },
+    { id:'eq_yinglong',name:'应龙戟',slot:'weapon', power:841706,sell:420853,reqLv:8, reqM:5, rate:0.24, ore:700, stone:6000,
+      img:'ui/icons/weapon3.png', cls:'gold', mats:[['matb_hundun',10],['matb_goldencrow',10]], desc:'混沌胚壳藏于戟脊，金乌翎燃起一线赤金。' },
+    { id:'eq_molin', name:'墨麟铠', slot:'armor', power:841706,sell:420853,reqLv:8, reqM:5, rate:0.24, ore:700, stone:6000,
+      img:'ui/icons/weapon1.png', cls:'gold', mats:[['matb_baize',8],['matb_xiezhi',8]], desc:'白泽毛理气息，獬豸角断邪祟，墨纹层层如夜山。' },
+    { id:'eq_baize',name:'白泽佩', slot:'accessory',power:841706,sell:420853,reqLv:8, reqM:5, rate:0.24, ore:700, stone:6000,
+      img:'ui/icons/stone.png', cls:'gold', mats:[['matb_taotie',10],['matb_zhulong',10]], desc:'饕餮齿为骨，烛龙睛为魂，通灵而不外露。' }
+  ];
+  const RV4_EQUIP_BY_ID = {};
+  RV4_EQUIP_ROWS.forEach(e => {
+    e.mats = [{ t:'ore', n:e.ore }].concat(e.mats.map(m => ({ t:m[0], n:m[1] })), [{ t:'stone', n:e.stone }]);
+    e.tier = e.reqLv >= 8 ? 4 : 3;
+    e.recipeId = e.id;
+    RV4_EQUIP_BY_ID[e.id] = e;
+    ITEMS[e.id] = { n:e.name, img:e.img, cls:e.cls, slot:e.slot, power:e.power, sell:e.sell, rv4Equip:true,
+      usage:'装备后总战力 +' + fmt(e.power) + '（' + SLOT_NAME[e.slot] + '槽）',
+      source:'炼器坊专属配方所出；可寄售，不进转世遗物候选',
+      description:e.desc };
+    RECIPES[e.id] = { recipeId:e.id, bld:'forge', name:e.name, reqLv:e.reqLv, reqM:e.reqM,
+      rate:e.rate, out:e.id, img:e.img, cls:e.cls, mats:e.mats, note:e.desc,
+      tier:e.tier, rv4:true, rv4Equip:true };
+  });
   /* ---------- 交易反馈（2026-10-24）----------
      花钱要看得见：购买/升级原来只有日志一行 + 数字变化，刷新货架甚至没声音。
      三件套（全部复用既有模式，零新图片零数值改动）：
@@ -7271,8 +7478,116 @@ function towerBossCompLetter(){
   const SELL_K = { dan1:0.20, dan2:0.50, dan3:1.20,
     mat_core:0.30, mat_bone:0.60, mat_feather:1.50, mat_eye:3.00, mat_marrow:8.00,
     boss_core:1.00, boss_pearl:2.50, boss_feather:6.00, boss_heart:12.0 };
+
+  /* rv4 数据层：43 味妖兽专属料。名称逐字取 B 稿终表；旧通用料/Boss 料与旧掉落表不动。
+     本批先落物品与寄售元数据，不改背包容量、坊市货架或存档结构。 */
+  const RV4_MATS = [
+    { id:'matb_rat', beast:'rat', tier:1, n:'鼠须', img:'ui/icons/beast_rat.png', rate:0.06, sellK:0.18,
+      desc:'妖鼠颊边两根长须，夜行不触一物。分捻入药，可行气于精微之处。' },
+    { id:'matb_crow', beast:'crow', tier:1, n:'鸦翎', img:'ui/icons/beast_crow.png', rate:0.06, sellK:0.18,
+      desc:'妖鸦尾上一根黑翎，向日不反光。修士用它扫丹炉浮灰，也用它写没人认得的符。' },
+    { id:'matb_toad', beast:'toad', tier:1, n:'蟾酥', img:'ui/icons/mat_core.png', rate:0.06, sellK:0.18,
+      desc:'妖蟾眉间凝出的一层白霜，舔之舌麻。入药能镇心安神，用多了便是毒。' },
+    { id:'matb_boar', beast:'boar', tier:1, n:'豕牙', img:'ui/icons/beast_boar.png', rate:0.06, sellK:0.18,
+      desc:'妖豕拱山的两颗獠牙，牙根还带着泥。磨粉可引气下行，入器添一分蛮力。' },
+    { id:'matb_ox', beast:'ox', tier:1, n:'牛黄', img:'ui/icons/beast_ox.png', rate:0.06, sellK:0.18,
+      desc:'妖牛胆囊里结成的一块黄垢，一具只得一指许。镇惊开窍，是低阶丹里最稳的佐使。' },
+    { id:'matb_croc', beast:'croc', tier:1, n:'鳄甲', img:'ui/icons/beast_croc.png', rate:0.06, sellK:0.18,
+      desc:'妖鳄脊上脱落的一片冷甲，纹路如水。炼入器胎可挡一击，入药取其沉。' },
+    { id:'matb_wolf', beast:'wolf', tier:1, n:'狼毫', img:'ui/icons/beast_wolf.png', rate:0.06, sellK:0.18,
+      desc:'妖狼颈后一撮硬毫，月满时最盛。束而为笔能画符，入药可提气破滞。' },
+    { id:'matb_leopard', beast:'leopard', tier:1, n:'豹胆', img:'ui/icons/beast_leopard.png', rate:0.06, sellK:0.18,
+      desc:'妖豹一身精气聚在一只胆上，小如豆，苦入骨。服之胆壮，出手也沉。' },
+    { id:'matb_eagle', beast:'eagle', tier:1, n:'鹰爪', img:'ui/icons/beast_eagle.png', rate:0.06, sellK:0.18,
+      desc:'妖鹰搏石留下的四枚爪尖，风干了仍带腥。研末可强筋，炼器取其透。' },
+    { id:'matb_bear', beast:'bear', tier:1, n:'熊髓', img:'ui/icons/beast_bear.png', rate:0.06, sellK:0.18,
+      desc:'妖熊冬眠一季养出的白髓，一具刮得数滴。最善淬体，也最脏手。' },
+    { id:'matb_lion', beast:'lion', tier:1, n:'狮鬃', img:'ui/icons/beast_lion.png', rate:0.06, sellK:0.18,
+      desc:'妖狮颈间一圈鬃毛，吼时根根倒竖。编为索可缚低阶妖物，入药取其威。' },
+    { id:'matb_tiger', beast:'tiger', tier:1, n:'虎斑皮', img:'ui/icons/beast_tiger.png', rate:0.09, sellK:0.18,
+      desc:'兽王额后一片斑纹皮，「王」字天成。与稀有料「兽王精魄」是两物：魄存其威，皮存其形。' },
+    { id:'matb_horse', beast:'horse', tier:2, n:'骏骨', img:'ui/icons/beast_horse.png', rate:0.06, sellK:0.36,
+      desc:'妖马跑到底后留下的一节腿骨，轻如竹、坚如铁。古来千金买它，只为寻得同类。' },
+    { id:'matb_hound', beast:'hound', tier:2, n:'犬牙', img:'ui/icons/beast_hound.png', rate:0.06, sellK:0.36,
+      desc:'灵犬守主一生只换一次的那颗牙，牙尖已钝。含之行路不迷，入药可安神。' },
+    { id:'matb_monkey', beast:'monkey', tier:2, n:'猴枣', img:'ui/icons/beast_monkey.png', rate:0.06, sellK:0.36,
+      desc:'灵猴咽下不化的果核结成的结石，纹如小桃。清热化痰，亦解低阶丹毒。' },
+    { id:'matb_rabbit', beast:'rabbit', tier:2, n:'兔毫', img:'ui/icons/beast_rabbit.png', rate:0.06, sellK:0.36,
+      desc:'玉兔身上落下的一根细毫，软得立不住。蘸朱砂写符最灵，制笔之人名之为紫毫。' },
+    { id:'matb_deer', beast:'deer', tier:2, n:'鹿茸', img:'ui/icons/beast_deer.png', rate:0.06, sellK:0.36,
+      desc:'灵鹿初生的一对嫩角，尚未骨化，按之温热。大补精血，淬体一类丹方常用。' },
+    { id:'matb_moth', beast:'moth', tier:2, n:'蝶粉', img:'ui/icons/beast_moth.png', rate:0.06, sellK:0.36,
+      desc:'灵蝶翅上抖落的一层鳞粉，见光即散。掺入药里可引神，落在纸上能封住一行字。' },
+    { id:'matb_jiao', beast:'jiao', tier:2, n:'蛟脊鳞', img:'ui/icons/beast_jiao.png', rate:0.09, sellK:0.36,
+      desc:'蛟龙脊上一列倒生的鳞，取之必遭其反噬。与稀有料「蛟龙珠」是两物：珠是其千年道行，鳞是其护身之硬。' },
+    { id:'matb_crane', beast:'crane', tier:3, n:'鹤顶砂', img:'ui/icons/beast_crane.png', rate:0.06, sellK:0.90,
+      desc:'灵鹤顶上一点丹红，凝成细砂。服之轻身，亦是丹房里最不打眼的一味镇浮阳之药。' },
+    { id:'matb_dragon', beast:'dragon', tier:3, n:'龙须', img:'ui/icons/beast_dragon.png', rate:0.06, sellK:0.90,
+      desc:'妖龙颔下两根长须，离体犹自动。研粉可通灵窍，入药最能引气上行。' },
+    { id:'matb_qilin', beast:'qilin', tier:3, n:'麒麟竭', img:'ui/icons/beast_qilin.png', rate:0.06, sellK:0.90,
+      desc:'麒麟行走所伤之血凝成的赤块，旧名血竭。仁兽之血不作杀伐，反能续筋接骨。' },
+    { id:'matb_tortoise', beast:'tortoise', tier:3, n:'玄武屏', img:'ui/icons/beast_tortoise.png', rate:0.06, sellK:0.90,
+      desc:'玄武千年一换的一片腹甲，展开如水纹屏山。与防具「玄龟甲」并非一物：此为材，彼为器。' },
+    { id:'matb_phoenix', beast:'phoenix', tier:3, n:'离火砂', img:'ui/icons/beast_phoenix.png', rate:0.09, sellK:0.90,
+      desc:'朱雀浴火落灰中拣出的一粒赤砂，握久不退温。与稀有料「朱雀羽」是两物：羽取其势，砂取其温。' },
+    { id:'matb_bat', beast:'bat', tier:4, n:'蝠齿', img:'ui/icons/beast_bat.png', rate:0.06, sellK:1.80,
+      desc:'妖蝠口内一排细齿，齿根中空。古方称其类为伏翼，入药多用它散瘀通窍。' },
+    { id:'matb_snake', beast:'snake', tier:4, n:'蛇蜕', img:'ui/icons/beast_snake.png', rate:0.06, sellK:1.80,
+      desc:'蛇妖蜕下的一张整皮，连眼膜也在。洗净后白如绢，贴疮生肌，入药退翳。' },
+    { id:'matb_spider', beast:'spider', tier:4, n:'蛛丝', img:'ui/icons/beast_spider.png', rate:0.06, sellK:1.80,
+      desc:'妖蛛结网时最粗的那一根丝，韧得能吊起一人。织可为索，入药取其收摄。' },
+    { id:'matb_scorpion', beast:'scorpion', tier:4, n:'蝎尾针', img:'ui/icons/beast_scorpion.png', rate:0.06, sellK:1.80,
+      desc:'妖蝎尾末那节毒针，离体犹自蜷。以毒攻毒，是破幻祛风的一味猛药。' },
+    { id:'matb_rakshasa', beast:'rakshasa', tier:4, n:'罗刹角', img:'ui/icons/beast_rakshasa.png', rate:0.06, sellK:1.80,
+      desc:'罗刹额间独角，皮糙如老树。此兽不识药性，其角却被修士奉为定惊之品。' },
+    { id:'matb_ghoul', beast:'ghoul', tier:4, n:'魈骨', img:'ui/icons/beast_ghoul.png', rate:0.06, sellK:1.80,
+      desc:'尸魈指上的一节黑骨，阴气所钟。入药必先以火炼，否则反噬其身。' },
+    { id:'matb_python', beast:'python', tier:4, n:'蟒胆', img:'ui/icons/beast_python.png', rate:0.06, sellK:1.80,
+      desc:'蟒妖一吞一化养出的胆，大如鸡子。俗传胆有「斗」量，服之可壮气力。' },
+    { id:'matb_bonejiao', beast:'bonejiao', tier:4, n:'骨蛟逆鳞', img:'ui/icons/beast_bonejiao.png', rate:0.06, sellK:1.80,
+      desc:'骨蛟身上一片逆生之鳞，肉连着骨、骨连着魂。取鳞者必为其所噬，故价高。' },
+    { id:'matb_nethpython', beast:'nethpython', tier:4, n:'冥蟒涎', img:'ui/icons/beast_nethpython.png', rate:0.06, sellK:1.80,
+      desc:'幽冥蟒咽下的涎，入器即凝成黑筋。此物不见光，须以玉瓶盛，不可与阳药同炉。' },
+    { id:'matb_fox', beast:'fox', tier:4, n:'狐绒', img:'ui/icons/beast_fox.png', rate:0.09, sellK:1.80,
+      desc:'狐尾尖端一撮白绒，幻术自此处生。与稀有料「九尾心」是两物：心主其道行，绒主其幻。' },
+    { id:'matb_goldencrow', beast:'goldenCrow', tier:5, n:'金乌翎', img:'ui/icons/beast_goldenCrow.png', rate:0.04, sellK:4.80,
+      desc:'金乌振翅坠下的一根赤翎，翎影之中另有一日。炼入火器可增其烈，寒体者入药须辨。' },
+    { id:'matb_baize', beast:'baize', tier:5, n:'白泽毛', img:'ui/icons/beast_baize.png', rate:0.04, sellK:4.80,
+      desc:'白泽身上一寸之毛，毛端自然成文，识兽者争之——据说认全一册谱，靠的就是它。' },
+    { id:'matb_xiezhi', beast:'xiezhi', tier:5, n:'獬豸角', img:'ui/icons/beast_xiezhi.png', rate:0.04, sellK:4.80,
+      desc:'獬豸额上一角，能触不直者。修士佩之不为增力，只为心口那点不敢妄语的忌。' },
+    { id:'matb_taotie', beast:'taotie', tier:5, n:'饕餮齿', img:'ui/icons/beast_taotie.png', rate:0.06, sellK:4.80,
+      desc:'凶兽王口中一枚齿，齿纹如古鼎之饕。它掉落的稀有料仍是「九尾心」，此齿另是一物。' },
+    { id:'matb_zhulong', beast:'zhulong', tier:5, n:'烛龙睛', img:'ui/icons/beast_snake.png', rate:0.04, sellK:4.80,
+      desc:'烛龙一睁为昼、一闭为夜，其睛离体仍明。入药可安神魂之游，切勿多服。' },
+    { id:'matb_kunpeng', beast:'kunpeng', tier:5, n:'鲲鹏之羽', img:'ui/icons/beast_crane.png', rate:0.04, sellK:4.80,
+      desc:'鲲鹏徙南冥时振落的一羽，落地便堆成丘。此羽不受轻，反压舟——非风不能举。' },
+    { id:'matb_yinglong', beast:'yinglong', tier:5, n:'应龙鳞', img:'ui/icons/beast_dragon.png', rate:0.06, sellK:4.80,
+      desc:'应龙行雨时褪下的一鳞，鳞背犹带水痕。祖龙之裔，最善引水中之气。' },
+    { id:'matb_moqilin', beast:'moqilin', tier:5, n:'墨玉麟甲', img:'ui/icons/beast_qilin.png', rate:0.04, sellK:4.80,
+      desc:'墨玉麒麟身上一片甲，色如墨而温润胜玉。仁兽之甲不伤兵，只堪镇器、安神。' },
+    { id:'matb_hundun', beast:'hundun', tier:5, n:'混沌胚壳', img:'ui/icons/beast_fox.png', rate:0.06, sellK:4.80,
+      desc:'混沌无面目，七窍未开，其壳如卵膜。此物不受纹饰，炼之每坏三炉。' }
+  ];
+  const RV4_MAT_BY_ID = {}, RV4_MAT_BY_BEAST = {};
+  RV4_MATS.forEach(m => {
+    RV4_MAT_BY_ID[m.id] = m;
+    RV4_MAT_BY_BEAST[m.beast] = m;
+    const beast = BEASTS.find(b => b.id === m.beast);
+    ITEMS[m.id] = {
+      n: m.n, img: m.img, cls: m.tier >= 4 ? 'gold' : (m.tier === 3 ? 'good' : ''),
+      usage: '妖兽专属材料：可堆叠、可寄售卖出；坊市买入货架不收录',
+      source: '猎杀【' + (beast ? beast.name : m.beast) + '】所得，与同段通用料并行掉落',
+      description: m.desc
+    };
+    SELL_K[m.id] = m.sellK;
+  });
   danFillBagMeta();   /* 三十一枚新丹的背包元数据与寄售价：必须等 ITEMS / SELL_K 起栈后再写 */
   const marketItem = id => MARKET_POOL.find(x => x.id === id);
+  /* batch10：坊市货架与背包扩容共用同一买入价公式；k 与当日 buyRate 均只读既有锚点。 */
+  function marketBuyPrice(g){
+    return Math.max(1, Math.floor(needOf(S.rank) * g.k * S.market.buyRate));
+  }
   /* 跨天自动换一批货架 + 重掷行情（买价和卖价分开，今天适合买还是卖由行情决定） */
   function resetMarket(){
     const k = todayKey();
@@ -7290,7 +7605,7 @@ function towerBossCompLetter(){
     while(picked.length < BAL.marketSlots && src.length){
       picked.push(src.splice(Math.floor(Math.random() * src.length), 1)[0]);
     }
-    S.market.goods = picked.map(g => ({ id: g.id, price: Math.max(1, Math.floor(needOf(S.rank) * g.k * S.market.buyRate)), bought: false }));
+    S.market.goods = picked.map(g => ({ id: g.id, price: marketBuyPrice(g), bought: false }));
   }
   function refreshMarket(fromEl){
     resetMarket();
@@ -7386,13 +7701,29 @@ function towerBossCompLetter(){
     }
   }
   /* 寄售价：超过每日额度后坊市压价（防无限刷灵石） */
-  function sellPrice(t){
+  function sellPriceAt(t, sold){
+    const meta = ITEMS[t] || {};
+    if(meta.rv4Equip) return meta.sell || 0;   /* 新六装备固定半价；旧装备与旧材料价格不动 */
     const k = SELL_K[t] || 0;
     if(!k) return 0;
-    const over = S.market.sold >= BAL.marketSellMax;
+    const over = sold >= BAL.marketSellMax;
     return Math.max(1, Math.floor(needOf(S.rank) * k * S.market.sellRate * (over ? BAL.marketSellDown : 1)));
   }
+  function sellPrice(t){ return sellPriceAt(t, S.market.sold); }
   function sellMarket(idx){
+    resetMarket();
+    const it = S.bag[idx];
+    if(!it){ log('这件东西已经不在背包里了，请重新打开背包再看。', 'bad'); return; }
+    const p = sellPrice(it.t);
+    if(!p){ log('坊市不收「' + it.n + '」（只收丹药和妖兽材料）。', 'bad'); return; }
+    confirmAction({
+      icon:'💰', title:'坊市 · 确认寄售', okText:'确认寄售',
+      text:'物品：<b>' + escHTML(it.n) + '</b><br>数量：<b>1</b> 件' +
+        '<br>单价：<b>' + fmt(p) + '</b> 灵石<br>总价：<b>' + fmt(p) + '</b> 灵石',
+      foot:'确认后才扣除物品并发放灵石。'
+    }, ok => { if(ok) doSellMarket(idx); });
+  }
+  function doSellMarket(idx){
     resetMarket();
     const it = S.bag[idx];
     if(!it){ log('这件东西已经不在背包里了，请重新打开背包再看。', 'bad'); return; }
@@ -7406,24 +7737,42 @@ function towerBossCompLetter(){
     sfx.pop();
     save(); render(); renderMarket(); renderBag();
   }
-  /* 一键寄售：背包里坊市收的东西全部卖出（超额后不再继续，避免无脑清包） */
-  function sellAllMats(){
+  /* 一键寄售预览与执行共用同一计划，确认页显示的件数/总价就是实际成交值。 */
+  function sellAllPlan(){
     resetMarket();
+    const rows = [];
     let n = 0, sum = 0;
     for(let i = S.bag.length - 1; i >= 0; i--){
-      const left = BAL.marketSellMax * 2 - S.market.sold;
+      const left = BAL.marketSellMax * 2 - S.market.sold - n;
       if(left <= 0) break;
       const it = S.bag[i];
-      const p = sellPrice(it.t);
+      if(!it || (ITEMS[it.t] && ITEMS[it.t].slot)) continue;   /* 一键寄售只处理材料/丹药，不卖装备 */
+      const p = sellPriceAt(it.t, S.market.sold + n);
       if(!p) continue;
       const q = bagQtyOf(it);
       const take = Math.min(q, left);
-      if(take >= q) S.bag.splice(i, 1); else it.q = q - take;   /* 整叠卖，单价按件不变 */
-      sum += p * take; S.market.sold += take; n += take;
+      rows.push({ i, name:it.n, q, take, p, total:p * take });
+      sum += p * take; n += take;
     }
-    if(!n){ log('背包里没有坊市收的东西。', 'bad'); return; }
-    S.stone += sum; S.stats.stoneEarned += sum;
-    log('💰 一键寄售 ' + n + ' 件，灵石 +' + fmt(sum) + '。', 'gold');
+    return { rows, n, sum };
+  }
+  function sellAllMats(){
+    const plan = sellAllPlan();
+    if(!plan.n){ log('背包里没有坊市收的东西。', 'bad'); return; }
+    const detail = plan.rows.map(r => escHTML(r.name) + ' ×' + r.take + '（' + fmt(r.p) + ' 灵石/件）').join('<br>');
+    confirmAction({
+      icon:'💰', title:'坊市 · 确认一键寄售', okText:'确认全部寄售',
+      text:'物品：<br><b>' + detail + '</b><br>数量：<b>' + plan.n + '</b> 件' +
+        '<br>总价：<b>' + fmt(plan.sum) + '</b> 灵石',
+      foot:'确认后才扣除物品并发放灵石；受今日寄售额度限制。'
+    }, ok => { if(ok) doSellAllMats(); });
+  }
+  function doSellAllMats(){
+    const plan = sellAllPlan();
+    if(!plan.n){ log('背包里没有坊市收的东西。', 'bad'); return; }
+    plan.rows.forEach(r => bagConsumeIdx(r.i, r.take));
+    S.stone += plan.sum; S.stats.stoneEarned += plan.sum; S.market.sold += plan.n;
+    log('💰 一键寄售 ' + plan.n + ' 件，灵石 +' + fmt(plan.sum) + '。', 'gold');
     sfx.win();
     save(); render(); renderMarket(); renderBag();
   }
@@ -7494,7 +7843,7 @@ function towerBossCompLetter(){
         const q = bagQtyOf(it);
         const ico = meta.img ? '<img src="' + meta.img + '" alt="">' : '<img class="mk-emo" src="ui/icons/ic_box.png" alt="">';
         html += '<div class="mk-row">' + ico + '<div class="mk-main"><b>' + it.n + (q > 1 ? ' ×' + q : '') + '</b></div>' +
-          '<button class="mk-buy sell" data-sell="' + i + '">' + fmt(p) + '</button></div>';
+          '<button class="mk-buy sell" data-sell="' + i + '">' + fmt(p) + ' 灵石</button></div>';
       });
       const sellTotal = sellable.reduce((a, x) => a + bagQtyOf(x.it), 0);
       html += '<button class="mk-all"' + (sellable.length ? '' : ' disabled') + '>' + inkIco('💰') + '一键寄售全部（' + sellTotal + ' 件可卖）</button>';
@@ -7652,7 +8001,10 @@ function towerBossCompLetter(){
     const sum = DONGTIAN.reduce((a, c) => a + (c.eff.bag ? c.eff.bag[DT_MAX] : 0), 0);
     return BAG_CAP + Math.round(sum * 1.5);
   }
-  function bagCost(){ return Math.floor(needOf(S.rank) * BAG_BAG_COST); }
+  function bagCost(){
+    resetMarket();
+    return marketBuyPrice(marketItem('bag'));
+  }
   /* 满包暂存（阶段三 S1）：不新增存档字段，复用 S.letters 的既有形状。
      信匣里的一封「待领信」用 kind = 'overflow:itemId:count;...' 记录暂存物，
      text 是给人看的明细；拆信/背包页取回时才真正进背包。
@@ -7887,7 +8239,11 @@ function towerBossCompLetter(){
     if(EQUIP_SLOTS.indexOf(slot) < 0) return { ok:false, reason:'bad-slot' };
     if(equippedId(slot)) return unequipItem(slot);
     const c = equipCands(slot);
-    if(!c.top){ log(SLOT_NAME[slot] + '槽空着，背包里也没有能装的法宝。', ''); return { ok:false, reason:'empty-slot' }; }
+    if(!c.top){
+      const msg = SLOT_NAME[slot] + '槽尚无装备；可去城镇坊市购买，或洞府炼器坊炼制。';
+      log(msg, ''); try{ if(window.toast) toast(msg); }catch(e){}
+      return { ok:false, reason:'empty-slot' };
+    }
     return equipItem(c.top.id);
   }
   /* 第三批 B2：一键装备——只把「空槽 + 背包里该槽最好的一件」穿上，复用 slotTap，不新造数值。
@@ -8318,19 +8674,19 @@ function towerBossCompLetter(){
     if(!box) return;
     const forgeLv = bldLevel('forge');
     box.innerHTML = ART_FAMS.map(fam => {
-      const f = ART_FAM[fam], seg = artSeg(fam), d = artById(fam, seg);
+      const f = ART_FAM[fam], seg = artSeg(fam), soul = rv4SoulAt(fam);
       const owned = seg > 0;
       let sub, badge;
       if(owned){
         sub = artEffectText(fam, seg) || f.lead;
-        badge = '第 ' + seg + ' 阶';
+        badge = '第 ' + seg + ' 阶' + (soul && soul.seg >= oldArtSeg(fam) ? ' · 兽魂' : '');
       }else{
         sub = f.lead;
         const rec = artById(fam, 1);
-        badge = (rec && rec.reqLv > forgeLv) ? ('炼器坊差 ' + (rec.reqLv - forgeLv) + ' 级') : '可去炼器';
+        badge = (rec && rec.reqLv > forgeLv) ? ('炼器坊差 ' + (rec.reqLv - forgeLv) + ' 级') : '尚未炼制';
       }
       return '<button type="button" class="art-slot ' + (owned ? 'owned' : 'locked') + '" data-art="' + fam + '" data-owned="' + (owned ? 1 : 0) + '"' +
-        ' title="' + (owned ? (f.name + '第 ' + seg + ' 阶 · ' + sub + ' · 点开去强化') : (f.name + ' · 尚未持有 · 点开去炼器')) + '">' +
+        ' title="' + (owned ? (f.name + '第 ' + seg + ' 阶 · ' + sub + ' · 点击查看说明') : (f.name + ' · 尚未持有 · 点击查看说明')) + '">' +
         '<img src="' + f.img + '" alt="">' +
         '<b>' + f.name + '</b>' +
         '<small>' + sub + '</small>' +
@@ -8349,9 +8705,6 @@ function towerBossCompLetter(){
     }
     setTxt('cs-name', S.name || '无名散修');
     setTxt('cs-rank', RANK_NAMES[S.rank]);
-    const pn = (typeof S.path === 'string' && S.path && typeof pathName === 'function') ? pathName(S.path) : '未定';
-    const pb = (typeof S.path === 'string' && S.path && typeof pathBonusPct === 'function') ? pathBonusPct(S.path) : '';
-    setTxt('cs-path', '道途 · ' + pn + (pb && pb !== '基准' ? '（' + pb + '）' : '') + ' ｜ 灵根 · ' + rootOf().name);
     const need = needOf(S.rank);
     const eb = document.getElementById('cs-expbar');
     if(eb) eb.style.width = Math.max(0, Math.min(100, S.exp / need * 100)).toFixed(1) + '%';
@@ -8741,8 +9094,12 @@ function towerBossCompLetter(){
     if(!opts.blueprint && masteryOf(bld) < reqM){
       log('【' + rec.name + '】需' + masteryName(bld) + ' ' + reqM + ' 阶（当前 ' + masteryOf(bld) + ' 阶）：多炼低阶积累匠道经验。', 'bad'); return;
     }
-    /* 法器只能逐阶炼制，不能回炉同阶或越阶（四族各判各的持有阶，互不覆盖） */
-    if(rec.bld === 'forge' && rec.outLv && artSeg(rec.fam || 'lq') >= rec.outLv){
+    /* 兽魂唯一持有：重复炼制在扣料/随机/涨经验之前直接拒绝。 */
+    if(rec.soul && rv4HasSoul(rec.out)){
+      log('已持有兽魂【' + rec.name + '】，无需重复炼制。', 'bad'); return;
+    }
+    /* 旧法器仍按旧法宝自己的阶位逐阶炼制；兽魂是独立旁挂，不受旧阶位拦截。 */
+    if(rec.bld === 'forge' && rec.outLv && !rec.rv4 && oldArtSeg(rec.fam || 'lq') >= rec.outLv){
       log('已持有【' + artName(rec.fam || 'lq') + '】，无需回炉同阶或低阶。', 'bad'); return;
     }
     /* 2. 材料校验 */
@@ -8754,7 +9111,7 @@ function towerBossCompLetter(){
         log(matName(m.t) + '不足，炼【' + rec.name + '】要 ' + m.n + ' 个。', 'bad'); return;
       }
     }
-    if(rec.out !== 'weapon' && rec.out !== 'art' && !bagCanAccept(rec.out)){
+    if(!rec.soul && rec.out !== 'weapon' && rec.out !== 'art' && !bagCanAccept(rec.out)){
       const m = '背包已满（' + bagCap() + ' 格），先腾地方或扩个储物袋再炼。';
       log(m, 'bad'); try{ if(window.toast) toast(m); }catch(e){}
       return;
@@ -8783,7 +9140,16 @@ function towerBossCompLetter(){
     let settleProduct = '';
     let settleBack = [];
     if(success){
-      if(rec.out === 'weapon' || rec.out === 'art'){
+      if(rec.soul){
+        const fam = rec.fam, before = artSeg(fam);
+        ensureRv4().souls.push(rec.out);
+        const after = artSeg(fam);
+        const effect = after > before
+          ? '本族有效阶 ' + before + ' → ' + after + '，' + artEffectText(fam, after)
+          : '旧法宝阶位更高，本族仍按第 ' + after + ' 阶生效，不叠加';
+        log('⚒️ 兽魂【' + rec.name + '】炼成入魂；' + effect + '。', 'gold');
+        settleProduct = rec.name + ' ×1（兽魂已收 · ' + effect + '）';
+      }else if(rec.out === 'weapon' || rec.out === 'art'){
         const fam = rec.fam || 'lq';
         if(fam === 'lq'){
           const oldMult = weaponMult();
@@ -8870,7 +9236,7 @@ function towerBossCompLetter(){
     if(r.wisdom) rows.push(settleLine('悟道值', '+' + fmt(r.wisdom), 'good'));
     if(!rows.length) rows.push(settleLine('奖励', '已按任务配置入账', 'good'));
     showSettle({ icon: '✅', title: '日课结算', sub: '今日任务达成 · 逐项列账', rows,
-      note: '金额按任务配置重算，不读磁盘数字；领取记录与奖励同一次写盘。' });
+      note: '奖励按今日任务计算；领取记录与奖励一起保存。' });
   }
   function showCraftSettle(d){
     const m = document.getElementById('craft-settle');
@@ -8934,12 +9300,12 @@ function towerBossCompLetter(){
     });
     return out;
   }
-  /* 可服食的丹药（详情弹窗据此决定显示「服食」还是「寄售」）：36 枚全部由丹药表派生 */
-  const EATABLE = DAN_LIST.reduce((a, d) => { a[d.id] = 1; return a; }, {});
+  /* 可服食的丹药（详情弹窗据此决定显示「服食」还是「寄售」）：旧 36 枚 + rv4 专属 12 枚 */
+  const EATABLE = DAN_LIST.concat(RV4_DAN_LIST).reduce((a, d) => { a[d.id] = 1; return a; }, {});
   /* 服食分派（第 89 节）：四族四种结算写成一张表，加一族只加一个分支而不是五段 if-else。
      老五枚（dan1..dan5）的结算语义与文案格式一字不改，只是把数字挪进了 DAN_FX。 */
   function eatDan(id, fromEl){
-    const d = DAN_BY_ID[id];
+    const d = DAN_BY_ID[id] || RV4_DAN_BY_ID[id];
     if(!d) return false;
     const min = Math.round(BAL.pillDur / 60);
     const until = Date.now() + BAL.pillDur * 1000;
@@ -8959,6 +9325,13 @@ function towerBossCompLetter(){
     markDayDec('grow');   /* 阶段三收尾：今日四类决策 · 成长投资（服食丹药） */
     return true;
   }
+  function dropBagItem(idx){
+    const it = S.bag[idx];
+    if(!it) return;
+    log('🗑️ 丢掉了「' + it.n + '」。', '');
+    bagConsumeIdx(idx, 1);
+    save(); render(); renderBag();
+  }
   function eatItem(idx, force){
     const it = S.bag[idx];
     if(!it){ log('这件东西已经不在背包里了，请重新打开背包。', 'bad'); return; }
@@ -8973,8 +9346,12 @@ function towerBossCompLetter(){
         log('💰 寄售「' + it.n + '」，灵石 +' + fmt(sell) + '。', 'good');
         sfx.pop();
       }else{
-        if(typeof confirm === 'function' && !confirm('确定丢弃「' + it.n + '」？丢弃后不可找回。')) return;
-        log('🗑️ 丢掉了「' + it.n + '」。', '');
+        confirmAction({
+          icon:'🗑️', title:'背包 · 确认丢弃', okText:'确认丢弃',
+          text:'物品：<b>' + escHTML(it.n) + '</b><br>数量：<b>1</b> 件',
+          foot:'丢弃后不可找回。'
+        }, ok => { if(ok) dropBagItem(idx); });
+        return;
       }
       bagConsumeIdx(idx, 1);
       save(); render(); renderBag();
@@ -8991,8 +9368,12 @@ function towerBossCompLetter(){
         log('💰 卖掉「' + it.n + '」，灵石 +' + sell + '。', 'good');
         sfx.pop();
       }else{
-        if(!confirm('「' + it.n + '」暂时用不上（等后续版本）。要丢弃吗？')) return;
-        log('🗑️ 丢掉了「' + it.n + '」。', '');
+        confirmAction({
+          icon:'🗑️', title:'背包 · 确认丢弃', okText:'确认丢弃',
+          text:'物品：<b>' + escHTML(it.n) + '</b><br>数量：<b>1</b> 件',
+          foot:'此物暂时无用；丢弃后不可找回。'
+        }, ok => { if(ok) dropBagItem(idx); });
+        return;
       }
     }
     bagConsumeIdx(idx, 1);
@@ -9028,7 +9409,7 @@ function towerBossCompLetter(){
     setTxt('it-desc',   meta.description || '此物来历不明，典籍未见记载。');
     setTxt('it-usage',  meta.usage       || '暂无用途记载');
     setTxt('it-source', meta.source      || '来历不明');
-    setTxt('it-sell',   sellP ? (fmt(sellP) + ' 灵石（坊市实收，随行情浮动）') : '不可寄售');
+    setTxt('it-sell',   sellP ? (fmt(sellP) + ' 灵石（' + (meta.rv4Equip ? '固定寄售价' : '坊市实收，随行情浮动') + '）') : '不可寄售');
     /* 操作按钮：法宝给「装备」（置顶主按钮），丹药给「服食」，有售价的给「寄售」，任何物品都可「丢弃」 */
     const acts = document.getElementById('it-acts');
     if(acts){
@@ -9104,7 +9485,7 @@ function towerBossCompLetter(){
   let farmSel = 'herb';                                     /* 面板上选中的作物（UI 态，不进存档） */
   const plotActAt = {};                                     /* A3：连点防重复（内存态，不进存档） */
   let farmMsgT = 0;
-  /* A3（2026-11-20）：播种/收获的可见回执（田头浮字之外，再留一行文字回执，3 秒后收起） */
+  /* A3（2026-11-20）：播种/收获的可见结果（田头浮字之外，再留一行文字结果，3 秒后收起） */
   function farmSay(text, bad){
     const el = document.getElementById('xx-farm-msg');
     if(!el) return;
@@ -9312,6 +9693,30 @@ function towerBossCompLetter(){
       if(beast.boss && !S.bossKilled[beast.id]){
         S.bossKilled[beast.id] = 1;
         first = true;
+      }
+      /* rv4 专属料：每次击杀按本兽系数独立试掉落；旧 Boss/通用料的 added、bossCount 与停猎判定不动。
+         满格且不能并叠时整批转信匣，专属料本身绝不触发停猎，也不占新增背包容量。 */
+      const rv4 = RV4_MAT_BY_BEAST[beast.id];
+      let rv4Got = 0, rv4Mail = 0, rv4AutoMail = 0;
+      if(rv4){
+        for(let i = 0; i < killed; i++){
+          if(Math.random() >= rv4.rate) continue;
+          if(!bagCanAccept(rv4.id, rv4.n)){ rv4Mail++; continue; }
+          const r = bagAddQty(rv4.id, rv4.n, 1);
+          if(r.ok) rv4Got++; else if(r.mail){ rv4Mail++; rv4AutoMail++; }
+        }
+        if(rv4Mail > rv4AutoMail) stashOverflow(rv4.id, rv4Mail - rv4AutoMail);
+        if(rv4Got > 0 || rv4Mail > 0) rv4Found(rv4.id);   /* 入包或入信都算真正取得；未命中不入谱 */
+      }
+      if(rv4Got > 0 || rv4Mail > 0){
+        const text = rv4Got > 0
+          ? '🧪 猎杀【' + beast.name + '】所得专属料「' + rv4.n + '」×' + rv4Got + ' 已入背包。'
+          : '🧪 猎杀【' + beast.name + '】所得专属料「' + rv4.n + '」×' + rv4Mail + ' 已暂存信匣。';
+        if(rv4Got > 0 && rv4Mail > 0)
+          log(text.slice(0, -1) + '，另有 ×' + rv4Mail + ' 暂存信匣。', 'good');
+        else log(text, rv4Got > 0 ? 'good' : '');
+        renderBag();
+        if(rv4Got > 0) lootFloat(rv4.id, rv4Got);
       }
       if(added > 0 || bossCount > 0){
         S.stats.hunt = (S.stats.hunt || 0) + killed;
@@ -9641,7 +10046,12 @@ function towerBossCompLetter(){
   let multiBound = false;                       /* 页面按钮是否已绑（DOM 重注入后要重绑） */
 
   function multiSrvDefault(){
-    try{ return localStorage.getItem(MULTI_SRV_KEY) || ''; }catch(e){ return ''; }
+    try{
+      const raw = localStorage.getItem(MULTI_SRV_KEY) || '';
+      const clean = window.SECT && typeof SECT._safeHost === 'function' ? SECT._safeHost(raw) : '';
+      if(raw && !clean) localStorage.removeItem(MULTI_SRV_KEY);
+      return clean;
+    }catch(e){ return ''; }
   }
   function multiSrvRemember(addr){
     try{ addr ? localStorage.setItem(MULTI_SRV_KEY, addr) : localStorage.removeItem(MULTI_SRV_KEY); }catch(e){}
@@ -9649,14 +10059,14 @@ function towerBossCompLetter(){
   /* 红线①（2026-11-13 安全加固，客户端侧）：联机会话持久化（独立键，不进主存档）。
      刷新后能凭 token 回原队；只在 connect 成功与进出房间时落地；主动离开/转世/重开清空。
      安全约束（依据 evidence/TOKEN_SECURITY_DESIGN_20261112.md，客户端侧可落地部分）：
-       - savedAt + TTL：写入带时间戳，超过最大续接窗口（30 天）视为失效，不再发死 token、不无限重试。
-       - 续接失败区分网络错误（TIMEOUT/NETWORK/STREAM_FAIL）与 token 失效：网络错不清凭据、允许稍后重试；
+       - savedAt + TTL：写入带时间戳，超过最大重连窗口（30 天）视为失效，不再发死 token、不无限重试。
+       - 重连失败区分网络错误（TIMEOUT/NETWORK/STREAM_FAIL）与 token 失效：网络错不清登录状态、允许稍后重试；
          token 失效才清键并提示重登（防「死 token 无限重试」循环，Muse 原件点名）。
        - 登出清理顺序：先 post leave 通知服务端，再清本地键（disconnect/多标签一致）；绝不删除游戏主存档/角色数据（红线③）。
        - 多标签竞态：监听 storage 事件，任一标签清键后其它标签同步断连，避免死 token 被另一标签续上。
        - 不把 token 写进日志/调试输出（XSS 防护：localStorage 本身仍可被注入读走，属已知缺口，待服务端会话失效+HttpOnly 迁移）。 */
   const MULTI_SESSION_KEY = 'jxwd_multi_session_v1';
-  const MULTI_SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 天最大续接窗口（红线①）
+  const MULTI_SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 天最大重连窗口（红线①）
   function multiLoadSession(){
     try{
       const s = localStorage.getItem(MULTI_SESSION_KEY);
@@ -9664,8 +10074,8 @@ function towerBossCompLetter(){
       const o = JSON.parse(s);
       if(!o || typeof o !== 'object') return null;
       /* 红线① TTL fail-closed（GPT 独立审查阻断项修正）：
-         缺失 / 非安全整数 / 非正数 / 未来时间戳 / 达到或超过 30 天，一律不续接并清键。
-         旧格式（无 savedAt）会话直接作失效、要求重新登录——不让旧记录无限期绕过最大续接窗口。 */
+         缺失 / 非安全整数 / 非正数 / 未来时间戳 / 达到或超过 30 天，一律不重连并清键。
+         旧格式（无 savedAt）会话直接作失效、要求重新登录——不让旧记录无限期绕过最大重连窗口。 */
       const now = Date.now();
       if(!Number.isSafeInteger(o.savedAt) || o.savedAt <= 0 || o.savedAt > now || now - o.savedAt >= MULTI_SESSION_TTL){
         try{ localStorage.removeItem(MULTI_SESSION_KEY); }catch(e){}
@@ -9688,9 +10098,9 @@ function towerBossCompLetter(){
   function multiClearSession(){
     try{ localStorage.removeItem(MULTI_SESSION_KEY); }catch(e){}
   }
-  /* 明确的凭据/身份失效（服务器权威判定）——只有这些才清键要求重登。
-     依据 server/server.mjs 实际返回码：join 续接 token 校验失败 = BAD_TOKEN；
-     档案缺失 = NO_PROFILE；被顶号 = SUPERSEDED。其余一律不视为凭据失效。 */
+  /* 明确的登录状态/身份失效（服务器权威判定）——只有这些才清键要求重登。
+     依据 server/server.mjs 实际返回码：join 重连 token 校验失败 = BAD_TOKEN；
+     档案缺失 = NO_PROFILE；被顶号 = SUPERSEDED。其余一律不视为登录状态失效。 */
   function multiIsCredentialFailure(r){
     if(!r) return false;
     const c = r.code;
@@ -9698,7 +10108,7 @@ function towerBossCompLetter(){
        c === 'TOKEN_EXPIRED' || c === 'AUTH_FAILED' || c === 'REVOKED' || c === 'KICKED') return true;
     return false;
   }
-  /* 续接失败是否属可恢复的临时故障（保留凭据、允许稍后重试）。
+  /* 重连失败是否属可恢复的临时故障（保留登录状态、允许稍后重试）。
      依据 js/net.js 真实契约：TIMEOUT/NETWORK 在 code，STREAM_FAIL/流连接失败在 error 字段；
      环境缺 fetch、服务没响应等文本也在此列。 */
   function multiIsNetworkError(r){
@@ -9772,7 +10182,7 @@ function towerBossCompLetter(){
       /* #75：这里不再返回 null。服务器 legacy 回退已默认关闭，空快照会被直接拒绝，
          用户将完全进不了联机。改为回报"零养成"快照：服务器重算≈1000，既保证能进，
          又不把客户端自报战力当真相（防作弊边界不变）。 */
-      try{ log('⚠️ 读取养成状态失败，本次联机按最低战力上报。', 'note'); }catch(_e){}
+      try{ log('⚠️ 读取养成状态失败，本次联机按最低战力同步。', 'note'); }catch(_e){}
       return { rank: 0, gongLvs: [0, 0, 0], weapon: 0, weaponLv: 0, affixPct: 0, wuPct: 0, artBgPct: 0, danPowPct: 0, dtPowPct: 0, petPower: 0, equipPower: 0 };
     }
   }
@@ -9780,7 +10190,7 @@ function towerBossCompLetter(){
   function multiEnter(){
     hookMultiStorage();   // 红线①：多标签竞态保护（幂等注册；存储变更在其它标签触发）
     if(window.Net && Net.state() !== 'offline' && !multiNetHooked){ hookMultiNet(); }
-    /* P0-C：刷新后若仍有"在房间内"的上次联机会话，自动续接回原队（不再让用户重登重进） */
+    /* P0-C：刷新后若仍有"在房间内"的上次联机会话，自动重连回原队（不再让用户重登重进） */
     if(window.Net && Net.state() === 'offline'){
       /* 红线①：区分「本来就没有会话」与「旧会话被 TTL fail-closed 清掉」，
          后者必须提示重新登录，并明确说明角色/存档数据不受影响（GPT 独立审查意见）。 */
@@ -9788,23 +10198,23 @@ function towerBossCompLetter(){
       try{ hadSession = !!localStorage.getItem(MULTI_SESSION_KEY); }catch(e){}
       const s = multiLoadSession();
       if(hadSession && !s){
-        log('📡 上次联机会话已过期（超过 30 天或格式不兼容），请重新登录；角色与存档数据不受影响。', 'note');
+        log('📡 上次联机记录已过期（超过 30 天），请重新登录；角色与存档数据不受影响。', 'note');
       }
       if(s && s.token && s.base && s.roomId){
         log('📡 正在重接连机服务，回到上次的队伍…', 'note');
         Net.connect(s.base, s.name || '道友', multiPower(), s.token, multiSnapshot(), multiLoadPath()).then(r => {
           if(!r.ok){
             /* 红线①：三类区分（GPT 独立审查补正）。
-               ① 明确凭据失效（BAD_TOKEN/NO_PROFILE/SUPERSEDED 等服务器权威判定）→ 清键、要求重登；
-               ② 可恢复临时故障（TIMEOUT/NETWORK/STREAM_FAIL/超时文本）→ 保留凭据、稍后重试；
-               ③ 其余未知错误 → 保守保留凭据，不误清有效 token，只提示暂未接受。 */
+               ① 明确登录状态失效（BAD_TOKEN/NO_PROFILE/SUPERSEDED 等服务器权威判定）→ 清键、要求重登；
+               ② 可恢复临时故障（TIMEOUT/NETWORK/STREAM_FAIL/超时文本）→ 保留登录状态、稍后重试；
+               ③ 其余未知错误 → 保守保留登录状态，不误清有效 token，只提示暂未接受。 */
             if(multiIsCredentialFailure(r)){
               multiClearSession();
               log('📡 联机会话已失效，请重新登录。', 'bad');
             } else if(multiIsNetworkError(r)){
               log('📡 重连未成功（网络/服务暂不可达）：' + (r.error || '服务没响应') + '，稍后再试。', 'note');
             } else {
-              log('📡 服务器暂未接受续接（' + (r.code || '未知原因') + '），凭据已保留，可稍后重试。', 'note');
+              log('📡 服务器暂未接受重连（' + (r.code || '未知原因') + '），登录状态已保留，可稍后重试。', 'note');
             }
             renderMulti(); bindMultiDom(); return;
           }
@@ -9832,8 +10242,8 @@ function towerBossCompLetter(){
           renderMulti(); bindMultiDom();
         }).catch(function(){
           /* 红线①：Net.connect 契约上返回 {ok:false}，但流/依赖异常仍可能 reject；
-             兜底为「临时故障」保留凭据、不清键，避免未处理 Promise rejection 与误登出。 */
-          log('📡 重连异常中断（连接未完成），凭据已保留，可稍后重试。', 'note');
+             兜底为「临时故障」保留登录状态、不清键，避免未处理 Promise rejection 与误登出。 */
+          log('📡 重连异常中断（连接未完成），登录状态已保留，可稍后重试。', 'note');
           renderMulti(); bindMultiDom();
         });
         return;
@@ -9858,9 +10268,9 @@ function towerBossCompLetter(){
       if(old && window.MultiLedger) window.MultiLedger.claim(S, old);
     }catch(e){}
   }
-  /* 写盘失败的后备重试（第 124 轮）：内存里已经记了账，磁盘没写进去。
+  /* 保存失败的后备重试（第 124 轮）：内存里已经记了账，本机存档没写进去。
      不回滚——回滚等于把这次结算直接抹掉，事件若不重投就永久丢奖；
-     保留内存态 + 稍后重试写盘，最坏情况是玩家刷新后由重投补一次（至多补一次，不会丢）。
+     保留内存态 + 稍后重试保存，最坏情况是玩家刷新后由重投补一次（至多补一次，不会丢）。
      第 125 轮复核意见 H3：重试用尽后必须留一条明确的失败记录（含 runId），
      否则"没写进去"这件事在日志里彻底消失，事后无从追。 */
   function multiSaveRetry(times, rid){
@@ -9869,7 +10279,7 @@ function towerBossCompLetter(){
       n++;
       if(save()) return;
       if(n < times){ setTimeout(tick, 1200 * n); return; }
-      log('❌ 存档连续 ' + times + ' 次写入失败，本次结算（runId ' + (rid || '未知') + '）未落到磁盘。刷新页面后可让服务器重投补一次；若仍未到账，请保留这条记录。', 'bad');
+      log('❌ 存档连续 ' + times + ' 次保存失败，本次结算（本局编号 ' + (rid || '未知') + '）尚未保存。刷新页面后可重新结算；若仍未到账，请保留这条记录。', 'bad');
       try{ console.warn('[multi] settle save failed after retries, runId=' + (rid || 'unknown')); }catch(e){}
     };
     setTimeout(tick, 1200);
@@ -9877,7 +10287,7 @@ function towerBossCompLetter(){
   let multiLastFailLogRid = '';   /* 仅内存：防止"止步第 N 层"日志被重投刷屏 */
   /* 阶段四 C3（制作人 D6 批甲）：结算入账链抽成一处，真人局与本地陪练局共用同一条。
      抽出的动机就是 D6 的「复用」——幂等表 S.multiCreditedRuns、S.multiWins、崔九首次全通钩子、
-     写盘失败重试，这四件事只许有一份实现，否则本地局与真人局的口径会分叉。
+     保存失败重试，这四件事只许有一份实现，否则本地局与真人局的口径会分叉。
      函数体逐行照搬原 Net.on('run_settle') 回调，唯一改动是把「我是谁」从 Net.me() 改为入参 meId：
      本地局没有 Net.me()，其成员 id 固定为 'local-me'（js/multi-local.js）。
      meId 为空时 mine 恒为 null，与原先 me 为空时 find 返 undefined 等价（都是 falsy）。 */
@@ -9926,7 +10336,7 @@ function towerBossCompLetter(){
         }
         if(!save()){
           multiSaveRetry(3, rid);
-          log('⚠️ 存档写入失败，本次结算暂存内存并会自动重试；若此时刷新页面，请留意灵石是否到账。', 'bad');
+          log('⚠️ 存档保存失败，本次结果尚未保存，会自动重试；若此时刷新页面，请留意灵石是否到账。', 'bad');
         }
         render();   /* 奖励 + 幂等标记：同一次写入 */
       }
@@ -9956,7 +10366,7 @@ function towerBossCompLetter(){
      D6：runId 加 local- 前缀写进既有 S.multiCreditedRuns，复用 S.multiWins，**零新存档字段**——
          所以下面两个变量都只是内存态，刷新即散；本地局进行中刷新页面等于放弃该局（未结算不入账）。
      D7：陪练零战力贡献，队伍里只有玩家一个人；陪练同伴只是呈现层的事，引擎不持有它。
-     入账走 multiApplySettle —— 与真人局**同一条链**（幂等表 / multiWins / 崔九首次全通钩子 / 写盘重试）。 */
+     入账走 multiApplySettle —— 与真人局**同一条链**（幂等表 / multiWins / 崔九首次全通钩子 / 保存重试）。 */
   let multiLocalRun = null;      /* 当前本地局（js/multi-local.js 的 run 对象），仅内存 */
   let multiLocalSettle = null;   /* 本地局结算卡数据，形状同 Net.data().lastSettle，仅内存 */
   /* 本地局只在没连服务器时成立：真人局在线时不许并行开一局，免得两条结算链同时入账。 */
@@ -10305,7 +10715,12 @@ function towerBossCompLetter(){
       const srv = (document.getElementById('xx-multi-srv') || {}).value || '';
       multiSrvRemember(srv.trim());
       /* 先记地址再等道号：地址合法就切到道号行（connect 放到 login 一步） */
-      const addr = srv.trim() || ('http://127.0.0.1:7730');
+      const addr = srv.trim();
+      if(!addr){
+        const msg = document.getElementById('xx-multi-hallmsg');
+        if(msg){ msg.hidden = false; msg.textContent = '先填写房主提供的联机入口。'; }
+        return;
+      }
       multiCheckAddr(addr);
       /* 注释承诺的"切到道号行"必须真的做（原先只探活）：否则玩家点「进入」后屏幕毫无变化，
          因为 multiCheckAddr 的反馈写进了 S.log，而 S.log 只在修行日志页可见。
@@ -10321,14 +10736,19 @@ function towerBossCompLetter(){
       return;
     }
     if(act === 'login'){
-      const addr = (document.getElementById('xx-multi-srv') || {}).value || multiSrvDefault() || 'http://127.0.0.1:7730';
+      const addr = (document.getElementById('xx-multi-srv') || {}).value || multiSrvDefault();
       const name = ((document.getElementById('xx-multi-name') || {}).value || '').trim();
+      if(!addr){
+        const m = document.getElementById('xx-multi-hallmsg');
+        if(m) m.textContent = '先填写房主提供的联机入口。';
+        return;
+      }
       if(!name){ const m = document.getElementById('xx-multi-hallmsg'); if(m) m.textContent = '总得有个称呼。报上道号再来。'; return; }
-      Net.connect(addr.trim() || 'http://127.0.0.1:7730', name, multiPower(), null, multiSnapshot(), multiLoadPath()).then(r => {
+      Net.connect(addr.trim(), name, multiPower(), null, multiSnapshot(), multiLoadPath()).then(r => {
         if(!r.ok){ const m = document.getElementById('xx-multi-hallmsg'); if(m) m.textContent = '连不上：' + (r.error || '服务没响应'); return; }
         hookMultiNet();
         if(r.me && r.me.path) multiSavePath(r.me.path);
-        /* P0-C：记下会话，便于刷新续接（token/name/base；roomId 在进出房间时补） */
+        /* P0-C：记下会话，便于刷新重连（token/name/base；roomId 在进出房间时补） */
         multiSaveSession({ token: r.me.token, name: name, base: addr.trim(), roomId: null });
         log(r.resumed ? '📡 已连回原队伍。' : '📡 已连上联机服务。', 'good');
         renderMulti(); bindMultiDom();
@@ -10409,7 +10829,7 @@ function towerBossCompLetter(){
     /* 轻探活：失败也放行（用户可能后面才起服务），只提示 */
     try{
       fetch(addr.replace(/\/+$/, '') + '/api/health').then(r => r.json()).then(j => {
-        if(!j || !j.ok) log('📡 这个地址不像是联机服务（health 不通），先试一试也无妨。', 'note');
+        if(!j || !j.ok) log('📡 这个入口暂时没有响应，先试一试也无妨。', 'note');
       }).catch(() => { log('📡 探不到这个地址（服务还没起？），可以直接填道号试。', 'note'); });
     }catch(e){}
   }
@@ -11276,6 +11696,7 @@ function towerBossCompLetter(){
     S.mastery = { alchemyLv: 1, alchemyExp: 0, forgeLv: 1, forgeExp: 0 };   /* 匠道修为从头修 */
     S.herb = 0; S.ore = 0; S.weapon = 0;
     S.art = { bg: 0, brk: 0, cai: 0 };   /* 三族法器随转世归零（灵器已在上面的 S.weapon） */
+    ensureRv4().souls = [];                 /* 兽魂随转世归零；万兽谱 found/claimed 跨世保留 */
     S.plots = [];   /* 灵田作物、奇遇机缘一并归零 */
     S.equipment = { weapon: null, armor: null, accessory: null };   /* 装备三槽一并清空 */
     S.enc = { t: 0, bubble: null, lastId: '', seen: {} };   /* 阶段四 C4-1：转世连当日去重账一并归零 */
@@ -11305,7 +11726,7 @@ function towerBossCompLetter(){
     npcVisitReset();   /* 访客浮片属于上一世：连倒计时一起收掉，别让旧文案留在屏幕上 */
     try{ if(window.NpcVisitQueue) NpcVisitQueue.clear(); }catch(e){}   /* 崔九主动事件同样属于上一世（第 114 轮）；与上方 npcVisitReset（沈碑气泡）无关 */
     try{ if(window.Net) Net.disconnect(); }catch(e){}   /* 联机会话属于这一世：转世即下线（第 115 轮） */
-    try{ multiClearSession(); }catch(e){}   /* P0-C：转世清空联机会话（刷新续接只针对同一世内） */
+    try{ multiClearSession(); }catch(e){}   /* P0-C：转世清空联机会话（刷新重连只针对同一世内） */
     /* UI 态不属于任何一世，但它们的**取值**来自上一世的法宝/灵田：
        洗练锁记的是槽位号，转世后 affix 清空 → 残留的锁号会拼出"锁 2 条"这种不存在的状态；
        灵田选中作物同理（上一世种的可能这一世还没解锁）。一并归零。 */
@@ -11327,6 +11748,7 @@ function towerBossCompLetter(){
     const take = id => {
       const m = ITEMS[id];
       if(!m || !m.slot || EQUIP_SLOTS.indexOf(m.slot) < 0 || seen[id]) return;
+      if(m.rv4Equip) return;                 /* rv4 新增六件暂不进转世遗物候选 */
       if(!(equipPowerOf(id) > 0)) return;
       seen[id] = 1;
       list.push({ id: id, p: equipPowerOf(id) });
@@ -11392,7 +11814,14 @@ function towerBossCompLetter(){
 
   function reincarnate(){
     if(S.rank < TOP) return;
-    if(!confirm('转世重修？境界、功法、灵石、法宝全部归零，换取 1 点道韵（永久 +45% 修炼速度）。')) return;
+    confirmAction({
+      icon:'♻️', title:'修行 · 确认转世', okText:'确认转世重修',
+      text:'转世后境界、功法、灵石、法宝全部归零。<br>换取 <b>1 点道韵</b>（永久 +45% 修炼速度）。',
+      foot:'坐化转世是寿元耗尽后的唯一出路；此处确认才会结算。'
+    }, ok => { if(ok) doReincarnate(); });
+  }
+  function doReincarnate(){
+    if(S.rank < TOP) return;
     S.dao += 1;
     const relic = startNewLife();
     log('♻️ 转世重修，新灵根【' + rootOf().name + '】，道韵 ' + S.dao + ' 点。', 'gold');
@@ -11604,7 +12033,9 @@ function towerBossCompLetter(){
     if(en){
       const full = S.exp >= need && secludeLeftMs() <= 0;
       const pct = need > 0 ? Math.round(S.exp / need * 100) : 0;
-      en.textContent = full ? pct + '%' : fmt(S.exp);
+      en.textContent = full
+        ? pct + '% · ' + fmt(expInt(S.exp)) + ' / ' + fmt(expInt(need))
+        : fmt(expInt(S.exp));
       en.classList.toggle('warn', full);
       en.title = (S.exp >= need ? '灵气已满溢，宜速突破；破境只耗本境所需，余下修为仍在。' : '') + expReadout(S.exp, need).title;
       en.setAttribute('aria-label', '修为 ' + en.textContent + (S.exp >= need ? '，灵气已满溢，宜速突破' : ''));
@@ -11612,7 +12043,7 @@ function towerBossCompLetter(){
     /* 顶部突破按钮：修为满即可点（缺丹药时 attemptBreakthrough 会指路炼丹房） */
     const b = document.getElementById('sc-break');
     if(b){
-      const nb = breakButtonLabel({ rank: S.rank, exp: S.exp, need: need, top: TOP, nextRankName: RANK_NAMES[S.rank + 1], chancePct: Math.round(breakChance() * 100), cdLeft: gateCdMs(S.rank) > 0 ? secludeLeftMs() : 0 });
+      const nb = breakButtonLabel({ rank: S.rank, exp: S.exp, need: need, top: TOP, nextRankName: RANK_NAMES[S.rank + 1], chancePct: Math.round(breakChance() * 1000) / 10, cdLeft: gateCdMs(S.rank) > 0 ? secludeLeftMs() : 0 });
       b.disabled = nb.disabled;
       b.textContent = nb.text;
       b.title = nb.title;
@@ -12346,12 +12777,13 @@ function towerBossCompLetter(){
       setTxt('xx-expgap', gateLockNote() + '。可做：' + gateGoals().join('、') + '。');
     }else{
       const expPct = need > 0 ? Math.round(S.exp / need * 100) : 0;
+      const overflow = fmt(Math.max(0, expInt(S.exp) - expInt(need)));
       setTxt('xx-exptxt', expFull
-        ? expPct + '% · 溢出 ' + fmt(S.exp - need)
-        : fmt(S.exp) + ' / ' + fmt(need));
+        ? expPct + '% · 溢出 ' + overflow
+        : fmt(expInt(S.exp)) + ' / ' + fmt(expInt(need)));
       setTxt('xx-expgap', expFull
-        ? '修为已满（真实进度 ' + expPct + '%）· 溢出 ' + fmt(S.exp - need)
-        : '距下一境还差 ' + fmt(Math.max(0, need - S.exp)) + '（本行是当前存量，不是今日所得）');
+        ? '修为已满（真实进度 ' + expPct + '%）· 溢出 ' + overflow
+        : '距下一境还差 ' + fmt(expGapInt(S.exp, need)) + '（本行是当前存量，不是今日所得）');
     }
     const bar = document.getElementById('xx-expbar');
     if(bar) bar.style.width = expFull ? '100%' : Math.max(0, Math.min(100, S.exp / need * 100)).toFixed(1) + '%';
@@ -12395,14 +12827,14 @@ function towerBossCompLetter(){
         b.textContent = '⚡ 突破 ' + RANK_NAMES[S.rank + 1] +
           (useTianji || epiphanyFull
             ? '（必定成功 100%）'
-            : '（成功率 ' + Math.round(breakChanceFinal(null, useArray) * 100) + '%' +
+            : '（成功率 ' + pct1(breakChanceFinal(null, useArray)) + '%' +
               (sb > 0 ? ' · 护法 +' + Math.round(sb * 100) + '%' : '') +
               (pb > 0 ? ' · 丹药 +' + Math.round(pb * 100) + '%' : '') +
               (arrBonus > 0 ? ' · 阵法 +' + Math.round(arrBonus * 100) + '%' : '') + '）');
         b.onclick = doBreak;
       }else{
         b.disabled = true;
-        b.textContent = '修为不足，还差 ' + fmt(need - S.exp);
+        b.textContent = '修为不足，还差 ' + fmt(expGapInt(S.exp, need));
         b.onclick = null;
       }
     }
@@ -12453,6 +12885,7 @@ function towerBossCompLetter(){
     renderForge();
     renderBlueprintBox();
     renderCodex();
+    renderBestiary();
     renderEnhance();
     renderHunt();
     renderQuest();
@@ -12525,7 +12958,7 @@ function towerBossCompLetter(){
       const next = Math.pow(g.rate, Math.min(g.max, lv + 1));
       rows.push({
         k: g.id, unlocked, mirror: true, target: ['xiu', 'xx-gong-sec'],
-        name: '<img class="upg-ico" src="' + g.img + '" alt=""> 功法 · ' + g.name,
+        name: '功法 · ' + g.name,
         sub: unlocked
           ? '修炼速度 ×' + cur.toFixed(2) + (full
               ? ' · 已圆满'
@@ -12540,7 +12973,7 @@ function towerBossCompLetter(){
     });
     const caveCur = Math.pow(BAL.caveR, caveLv());
     const caveNext = Math.pow(BAL.caveR, Math.min(BAL.caveMax, caveLv() + 1));
-    rows.push({ k: 'cave', unlocked: true, mirror: true, target: ['dong', 'xx-array-sec'], name: '🏔️ 洞府 · 聚灵阵',
+    rows.push({ k: 'cave', unlocked: true, mirror: true, target: ['dong', 'xx-array-sec'], name: '洞府 · 聚灵阵',
       sub: '灵石产出 ×' + caveCur.toFixed(2) + (S.cave >= BAL.caveMax
         ? ' · 已圆满'
         : ' → ×' + caveNext.toFixed(2) + '（+' + Math.round((BAL.caveR - 1) * 100) + '%/级）'),
@@ -12560,7 +12993,7 @@ function towerBossCompLetter(){
       sub += ' · ' + masteryName(bld) + ' ' + masteryOf(bld) + ' 阶' + (full ? ' · 已圆满' : '');
       rows.push({
         k, unlocked: true, bld, mirror: true, target: ['dong', bld === 'alchemy' ? 'xx-alchemy-sec' : 'xx-forge-sec'],
-        name: '<img class="upg-ico" src="' + m.icon + '" alt=""> ' + m.name + (bld === 'alchemy' ? ' · 玄阳炉' : ' · 乾火炉'),
+        name: m.name + (bld === 'alchemy' ? ' · 玄阳炉' : ' · 乾火炉'),
         sub: sub,
         cost: cost.stone, mats: cost.mats, max: m.maxLevel, lv: bldLevel(bld)
       });
@@ -12583,16 +13016,16 @@ function towerBossCompLetter(){
       const t = row.querySelector('.t');
       if(t) t.innerHTML = '<b>' + r.name + '</b><small>' + r.sub + '</small>';
       const st = row.querySelector('.upg-state');
-      /* 只显等级/状态；状态同时驱动第 7 项的锁定/可升级锚点。 */
-      const matOk = !r.mats || r.mats.every(m => matHas(m.t, m.n));
-      const stoneOk = S.stone >= r.cost;
-      let state = '', txt = '';
-      if(!r.unlocked){ state = 'locked'; txt = '未解锁'; }
-      else if(r.lv >= r.max){ txt = '已圆满'; }
-      else if(stoneOk && matOk){ state = 'ready'; txt = '可升级'; }
-      else { state = 'locked'; txt = !stoneOk ? '缺灵石' : '缺材料'; }
+      /* 汇总页只报等级：不生成红点、锁标或「可升级」胶囊。 */
+      let txt;
+      if(!r.unlocked) txt = '未解锁';
+      else if(r.lv >= r.max) txt = '已圆满';
+      else if(String(r.k).indexOf('gong') === 0) txt = '第 ' + (r.lv | 0) + ' / ' + r.max + ' 层';
+      else txt = 'Lv.' + (r.lv | 0) + ' / ' + r.max;
       if(st) st.textContent = txt;
-      anchorState(row, state);
+      row.classList.remove('anchor-ready', 'anchor-locked');
+      const lock = row.querySelector(':scope > .anchor-lock');
+      if(lock) lock.remove();
     });
   }
   /* ===== 第三批 B5：功法 / 聚灵阵升级动作搬回各自页 ===== */
@@ -12643,11 +13076,12 @@ function towerBossCompLetter(){
         const costTxt = full ? '已圆满' : ('灵石 ' + fmt(cost));
         const detail = '<div class="gong-detail">' +
           '<span>当前效果：修炼 ×' + cur.toFixed(2) + '</span>' +
+          '<span>功法倍率同时计入战力</span>' +
           '<span>下一级：' + (full ? '—' : '×' + next.toFixed(2) + '（+' + Math.round((g.rate - 1) * 100) + '%）') + '</span>' +
           '<span>领悟条件：境界【' + RANK_NAMES[g.unlock] + '】' + (full ? '' : ' · ' + costTxt) + '</span>' +
-          '<span>类型：被动功法 · 冷却无 · 伤害倍率无（非战斗技能）</span>' +
-          '<span>前置链：' + (i === 0 ? '无（入门）' : '按境界逐门解锁（无前置技能等级）') + '</span>' +
-          '<span>获取方式：整篇领悟（无残篇/碎片）</span>' +
+          '<span>类型：被动功法 · 无需主动施放 · 不直接造成伤害</span>' +
+          '<span>学习顺序：' + (i === 0 ? '无（入门）' : '按境界逐门解锁，不要求先学其他功法') + '</span>' +
+          '<span>获取方式：境界达标后，在藏经阁参悟</span>' +
           '</div>';
         t.innerHTML = '<b><img class="upg-ico" src="' + g.img + '" alt=""> ' + g.name + '</b><small>' + sub + '</small>' + detail;
       }
@@ -12996,7 +13430,7 @@ function towerBossCompLetter(){
     const extra = {};
     Object.keys(RECIPES).forEach(k => {
       const rec = RECIPES[k];
-      if(rec.bld !== 'alchemy' || rec.fam !== fam || DAN_BY_ID[k]) return;
+      if(rec.bld !== 'alchemy' || rec.fam !== fam || DAN_BY_ID[k] || RV4_DAN_BY_ID[k]) return;
       if(!extra[rec.seg]) extra[rec.seg] = [];
       extra[rec.seg].push(rec);
     });
@@ -13007,6 +13441,7 @@ function towerBossCompLetter(){
       (extra[i + 1] || []).forEach(x => out.push({ rec: x, alt: false }));
       if(variantUnlocked(id)) out.push({ rec: DAN_VARIANTS[id], alt: true });
     });
+    RV4_DAN_LIST.filter(d => d.fam === fam).forEach(d => out.push({ rec:RECIPES[d.id], alt:false }));
     return out;
   }
   /* 丹药 buff 的剩余时间（第 106 轮清旧账）：三族各一槽、各 600 秒，此前只有拆账弹窗里
@@ -13082,7 +13517,7 @@ function towerBossCompLetter(){
     const lv = bldLevel(rec.bld);
     const reqM = rec.reqM || 1;
     const locked = lv < rec.reqLv || masteryOf(rec.bld) < reqM;
-    const dd = rec.fam ? DAN_BY_ID[rec.out] : null;   /* 丹药行才有「阶」与功效，法宝行照旧 */
+    const dd = rec.fam ? (DAN_BY_ID[rec.out] || RV4_DAN_BY_ID[rec.out]) : null;   /* 丹药行才有「阶」与功效，法宝行照旧 */
     const row = document.createElement('div');
     row.className = 'craft' + (rec.cls ? ' ' + rec.cls : '') + (isAlt ? ' alt' : '') + (dd ? ' dan t' + dd.tier : '');
     const mats = matLedger(rec.mats);
@@ -13104,7 +13539,7 @@ function towerBossCompLetter(){
     const lockTxt = lv < rec.reqLv
       ? inkIco('🔒') + '需炼丹房 ' + rec.reqLv + ' 级解锁（当前 ' + lv + ' 级）'
       : inkIco('🔒') + '需丹师 ' + reqM + ' 阶（当前 ' + masteryOf(rec.bld) + ' 阶）：多炼低阶丹涨经验';
-    row.innerHTML = '<div class="craft-main"><b>' + (isAlt ? '<i class="vtag">旁方</i>' : '') +
+    row.innerHTML = '<div class="craft-main"><b>' + (isAlt ? '<i class="vtag">旁方</i>' : rec.rv4 ? '<i class="vtag">专属</i>' : '') +
       (dd ? '<i class="dan-seg">' + dd.seg + ' 阶</i>' : '') +
       '<img src="' + rec.img + '" alt=""> ' + rec.name + '</b>' +
       (dd && !locked ? '<span class="craft-eff">' + danEffectText(dd) + '</span>' : '') +
@@ -13127,25 +13562,84 @@ function towerBossCompLetter(){
   /* 炼器坊面板：匠道线 + 「阶位签」分阶折叠（2026-11-18）。
      四族同阶并在一签里，默认展开当前能炼的最高一阶；族别仍由行内纹色与图标区分。
      行构造仍走 forgeRow：已装备/未解锁/缺料与点击绑定原样。 */
-  /* batch5：法宝图鉴（纯展示 ART_LIST 现有数据；不新增掉落） */
+  /* 万兽谱：只读曾取得 found；五段独立领取，跨世保留、每段仅一次。 */
+  function renderBestiary(){
+    const box = document.getElementById('xx-bestiary');
+    if(!box) return;
+    const r = ensureRv4();
+    const total = RV4_MATS.filter(m => r.found.indexOf(m.id) >= 0).length;
+    const prog = document.getElementById('bestiary-progress');
+    if(prog) prog.textContent = total + ' / ' + RV4_MATS.length;
+    box.innerHTML = RV4_BESTIARY_TIERS.map((t, i) => {
+      const tier = i + 1, mats = RV4_MATS.filter(m => m.tier === tier);
+      const got = bestiaryProgress(tier), done = got >= mats.length, claimed = r.claimed.indexOf(t.id) >= 0;
+      return '<section class="bestiary-tier' + (done ? ' done' : '') + '">' +
+        '<header><b>' + t.name + '</b><small>' + got + ' / ' + mats.length + ' · 集齐奖 ' + fmt(needOf(S.rank) * t.K) + ' 灵石</small>' +
+        '<button type="button" data-bestiary-claim="' + t.id + '"' + (!done || claimed ? ' disabled' : '') + '>' +
+        (claimed ? '已领取' : done ? '领取' : '未集齐') + '</button></header>' +
+        '<div class="bestiary-grid">' + mats.map(m => {
+          const found = r.found.indexOf(m.id) >= 0, beast = BEASTS.find(b => b.id === m.beast);
+          return '<div class="bestiary-card' + (found ? ' found' : '') + '"><img src="' + m.img + '" alt="">' +
+            '<b>' + m.n + '</b><small>' + (found ? '已收录' : '待寻 · ' + (beast ? beast.name : '')) + '</small></div>';
+        }).join('') + '</div></section>';
+    }).join('');
+    if(!box.dataset.bound){
+      box.dataset.bound = '1';
+      box.addEventListener('click', ev => {
+        const b = ev.target.closest ? ev.target.closest('[data-bestiary-claim]') : null;
+        if(b && !b.disabled) claimBestiary(b.dataset.bestiaryClaim);
+      });
+    }
+  }
+  /* batch5：法宝图鉴（旧四族 36 件）；rv4 同页增兽魂页签，持有来源各自独立。 */
+  let codexTab = 'art';
   function renderCodex(){
     const box = document.getElementById('xx-codex');
     if(!box) return;
-    const total = ART_LIST.length;
-    const ownedN = ART_LIST.filter(d => artSeg(d.fam) >= d.seg).length;
+    const tabs = document.getElementById('codex-tabs');
+    if(tabs && !tabs.dataset.bound){
+      tabs.dataset.bound = '1';
+      tabs.addEventListener('click', ev => {
+        const b = ev.target.closest ? ev.target.closest('[data-codex-tab]') : null;
+        if(!b || (b.dataset.codexTab !== 'art' && b.dataset.codexTab !== 'soul')) return;
+        codexTab = b.dataset.codexTab; renderCodex();
+      });
+    }
+    if(tabs) tabs.querySelectorAll('[data-codex-tab]').forEach(b => {
+      const on = b.dataset.codexTab === codexTab;
+      b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
     const prog = document.getElementById('codex-progress');
-    if(prog) prog.textContent = ownedN + ' / ' + total;
     const bar = document.getElementById('codex-bar');
-    if(bar) bar.style.width = (total ? ownedN / total * 100 : 0).toFixed(1) + '%';
     const fams = document.getElementById('codex-fams');
+    if(codexTab === 'soul'){
+      const ownedN = RV4_SOUL_ROWS.filter(s => rv4HasSoul(s.id)).length, total = RV4_SOUL_ROWS.length;
+      if(prog) prog.textContent = ownedN + ' / ' + total;
+      if(bar) bar.style.width = (ownedN / total * 100).toFixed(1) + '%';
+      if(fams) fams.textContent = ART_FAMS.map(f => ART_FAM[f].name + '有效 ' + artSeg(f) + ' 阶').join(' · ');
+      box.innerHTML = RV4_SOUL_ROWS.map(s => {
+        const owned = rv4HasSoul(s.id), rec = RECIPES[s.id];
+        return '<div class="codex-card' + (owned ? ' owned' : ' locked') + '" data-fam="' + s.fam + '">' +
+          '<div class="cc-img"><img src="' + s.img + '" alt=""></div><b>' + s.name + '</b>' +
+          '<small>兽魂 · ' + ART_FAM[s.fam].name + '第 ' + s.seg + ' 阶</small>' +
+          (owned ? '<span class="cc-owned">已入魂 · ' + artEffectText(s.fam, s.seg) + '</span>'
+            : '<span class="cc-src">出处：炼器坊 Lv.' + rec.reqLv + ' · 器师 ' + rec.reqM + ' 阶 · ' + matLedger(rec.mats) + '</span>') +
+          '</div>';
+      }).join('');
+      return;
+    }
+    const total = ART_LIST.length;
+    const ownedN = ART_LIST.filter(d => oldArtSeg(d.fam) >= d.seg).length;
+    if(prog) prog.textContent = ownedN + ' / ' + total;
+    if(bar) bar.style.width = (total ? ownedN / total * 100 : 0).toFixed(1) + '%';
     if(fams){
       fams.textContent = ART_FAMS.map(f => {
-        const n = ART_LIST.filter(d => d.fam === f && artSeg(f) >= d.seg).length;
+        const n = ART_LIST.filter(d => d.fam === f && oldArtSeg(f) >= d.seg).length;
         return ART_FAM[f].name + ' ' + n + '/9';
       }).join(' · ');
     }
     box.innerHTML = ART_LIST.map(d => {
-      const owned = artSeg(d.fam) >= d.seg;
+      const owned = oldArtSeg(d.fam) >= d.seg;
       const rec = RECIPES[d.id] || null;
       const src = rec
         ? ('炼器坊 Lv.' + rec.reqLv + (rec.reqM && rec.reqM > 1 ? ' · 器师 ' + rec.reqM + ' 阶' : '') +
@@ -13179,7 +13673,7 @@ function towerBossCompLetter(){
     }
     box.innerHTML = BLUEPRINTS.filter(b => bpCount(b.id) > 0).map(b => {
       const rec = RECIPES[b.fam + b.seg];
-      const owned = artSeg(b.fam) >= b.seg;
+      const owned = oldArtSeg(b.fam) >= b.seg;
       const n = bpCount(b.id);
       const rate = rec ? Math.round(craftRate(rec) * 100) : 0;
       return '<div class="bp-row">' +
@@ -13222,6 +13716,58 @@ function towerBossCompLetter(){
       artRowsOf(fam).forEach(rec => items.push({ rec: rec }));
     });
     renderCraftFold(box, 'forge', items, craftSegOf, it => forgeRow(it.rec));
+    const soulFold = document.createElement('details');
+    soulFold.className = 'rv4-forge-fold';
+    soulFold.open = true;
+    soulFold.innerHTML = '<summary><b>兽魂 · 十件</b><small>全部被动；与旧法宝同族共同取最高，只生效一个</small></summary>';
+    const soulList = document.createElement('div');
+    soulList.className = 'craft-list rv4-craft-list';
+    RV4_SOUL_ROWS.forEach(s => soulList.appendChild(rv4ForgeRow(RECIPES[s.id])));
+    soulFold.appendChild(soulList); box.appendChild(soulFold);
+    const equipFold = document.createElement('details');
+    equipFold.className = 'rv4-forge-fold';
+    equipFold.open = true;
+    equipFold.innerHTML = '<summary><b>专属装备 · 六件</b><small>三槽各两件；可重复炼制、穿戴与寄售</small></summary>';
+    const equipList = document.createElement('div');
+    equipList.className = 'craft-list rv4-craft-list';
+    RV4_EQUIP_ROWS.forEach(e => equipList.appendChild(rv4ForgeRow(RECIPES[e.id])));
+    equipFold.appendChild(equipList); box.appendChild(equipFold);
+  }
+  function rv4ForgeRow(rec){
+    const soul = RV4_SOUL_BY_ID[rec.out], equip = RV4_EQUIP_BY_ID[rec.out];
+    const lv = bldLevel('forge'), reqM = rec.reqM || 1;
+    const locked = lv < rec.reqLv || masteryOf('forge') < reqM;
+    const owned = !!(soul && rv4HasSoul(soul.id));
+    const stoneCost = recipeStoneCost(rec);
+    const stoneOk = S.stone >= stoneCost;
+    const matOk = rec.mats.every(m => matHas(m.t, m.n));
+    const bagOk = !equip || bagCanAccept(equip.id);
+    const miss = [];
+    if(!stoneOk) miss.push('灵石差 ' + fmt(stoneCost - S.stone));
+    rec.mats.forEach(m => { if(m.t !== 'stone' && !matHas(m.t, m.n)) miss.push(matName(m.t) + '差 ' + (m.n - Math.floor(matCount(m.t)))); });
+    const missTxt = (!locked && miss.length) ? ' · 缺：' + miss.join('、') : '';
+    const rate = craftRate(rec);
+    const lockTxt = lv < rec.reqLv
+      ? inkIco('🔒') + '需炼器坊 ' + rec.reqLv + ' 级解锁（当前 ' + lv + ' 级）'
+      : inkIco('🔒') + '需器师 ' + reqM + ' 阶（当前 ' + masteryOf('forge') + ' 阶）';
+    const tag = soul ? '<i class="dan-seg">' + soul.seg + ' 阶兽魂</i>'
+      : '<i class="dan-seg">' + SLOT_NAME[equip.slot] + '</i>';
+    const effect = soul ? artEffectText(soul.fam, soul.seg) : '装备后战力 +' + fmt(equip.power);
+    const row = document.createElement('div');
+    row.className = 'craft rv4-craft' + (rec.cls ? ' ' + rec.cls : '');
+    row.innerHTML = '<div class="craft-main"><b>' + tag + '<img src="' + rec.img + '" alt=""> ' + rec.name + '</b>' +
+      (locked ? '' : '<span class="craft-eff">' + effect + '</span>') +
+      '<small>' + (locked ? lockTxt
+        : matLedger(rec.mats) + ' · 成功率 ' + Math.round(rate * 100) + '% · <span class="alt-hint">失败返还 ' + Math.round(CRAFT.failRefund * 100) + '% 材料（灵石不退）</span>' + missTxt +
+          (equip && !bagOk ? ' · 背包已满' : '')) + '</small></div>' +
+      '<button type="button">' + (owned ? '已入魂' : locked ? '未解锁' : (!stoneOk || !matOk) ? '缺料' : bagOk ? '炼制' : '背包满') + '</button>';
+    const btn = row.querySelector(':scope > button');
+    const canDo = !owned && !locked && stoneOk && matOk && bagOk;
+    btn.disabled = !canDo;
+    if(canDo) btn.addEventListener('click', () => craftItem('forge', rec.recipeId));
+    anchorState(row, canDo ? 'ready' : 'locked');
+    row.dataset.recipe = rec.recipeId;
+    return row;
   }
   /* ---- 分阶折叠共用件（炼丹 / 炼器）----
      展开状态只存内存：自动态跟着「当前能炼的最高一阶」走，玩家点过签后改为手动态；
@@ -13353,7 +13899,7 @@ function towerBossCompLetter(){
     const lv = bldLevel('forge');
     const reqM = rec.reqM || 1;
     const locked = lv < rec.reqLv || masteryOf('forge') < reqM;
-    const owned = artSeg(fam) >= rec.outLv;
+    const owned = oldArtSeg(fam) >= rec.outLv;
     const row = document.createElement('div');
     row.className = 'craft art f-' + fam + (rec.cls ? ' ' + rec.cls : '');
     const sCost = recipeStoneCost(rec);
@@ -13462,10 +14008,16 @@ function towerBossCompLetter(){
     const p = S.pets[idx];
     if(!p) return;
     const b = BEASTS.find(x => x.id === p.bid);
-    if(!confirm('放生【' + (b ? b.name : p.bid) + '】？它会离开，但腾出一个灵兽槽。')) return;
-    S.pets.splice(idx, 1);
-    log('🕊️ 放生了灵兽，祝它山野自在。', '');
-    save(); render(); renderPets();
+    confirmAction({
+      icon:'🕊️', title:'灵兽园 · 确认放生', okText:'确认放生',
+      text:'灵兽：<b>' + escHTML(b ? b.name : p.bid) + '</b><br>放生后会离开，并腾出一个灵兽槽。',
+      foot:'确认后才放生。'
+    }, ok => {
+      if(!ok || !S.pets[idx]) return;
+      S.pets.splice(idx, 1);
+      log('🕊️ 放生了灵兽，祝它山野自在。', '');
+      save(); render(); renderPets();
+    });
   }
   function buyPetSlot(){
     const n = S.petSlots;
@@ -13510,7 +14062,7 @@ function towerBossCompLetter(){
         settleLine('凶性', a.lines[2]),
         settleLine('依据', BEAST_TIER_NAME[a.tier] + ' · Lv.' + a.lv)
       ],
-      note: '免费鉴定，按当前品阶与等级现算；不写入存档，不改变战力/产出。升级后评级会随现况变化。'
+      note: '免费鉴定，按当前品阶与等级计算；不写入存档，不改变战力/产出。升级后评级会随当前情况变化。'
     });
   }
   function renderPetBadge(){
@@ -14888,10 +15440,13 @@ function towerBossCompLetter(){
       const bossTag = b.boss ? '<span class="hunt-boss">BOSS</span>' : '';
       const firstDone = b.boss && S.bossKilled[b.id];
       const imgStyle = beastImgStyle(b);
+      const rv4Drop = RV4_MAT_BY_BEAST[b.id];
+      const dropTxt = ((ITEMS[b.drop] || {}).n || '') +
+        (rv4Drop ? ' · 专属「' + rv4Drop.n + '」' + Math.round(rv4Drop.rate * 100) + '%' : '');
       return '<div class="hunt-row' + (hunting ? ' hunting' : '') + (b.boss ? ' boss' : '') +
         (unlocked ? '' : ' rank-future') + (unlocked && !canHunt && !hunting ? ' power-future' : '') + '">' +
         '<img src="' + b.img + '"' + imgStyle + ' alt=""><div class="hunt-main"><b>' + b.name + '</b>' + bossTag +
-        '<small>战力 ' + fmt(b.power) + ' · 掉' + ((ITEMS[b.drop] || {}).n || '') + (b.boss ? ' · 稀有' : '') + (firstDone ? ' · 已首通' : '') + '</small></div>' +
+        '<small>战力 ' + fmt(b.power) + ' · 掉' + dropTxt + (b.boss ? ' · 稀有' : '') + (firstDone ? ' · 已首通' : '') + '</small></div>' +
         (hunting ? '<button class="hunt-btn stop" data-hunt="stop">停止</button>'
           : unlocked ? '<button class="hunt-btn" data-hunt="' + b.id + '"' + (canHunt ? '' : ' disabled') + '>' + (canHunt ? '猎杀' : '战力不足') + '</button>'
           : '<span class="hunt-lock">' + RANK_NAMES[b.rank] + '解锁</span>') +
@@ -15194,7 +15749,7 @@ function towerBossCompLetter(){
       try{ console.error('[tickLoop:fatal]', e); }catch(_){}
     }finally{
       /* 尽力存档：即使本轮业务整段炸掉，也要把已经发生的状态变更落盘。
-         lastSave 只在**保存成功**之后才推进——否则一次写盘失败会被记成"已保存"，
+         lastSave 只在**保存成功**之后才推进——否则一次保存失败会被记成"已保存"，
          3 秒节流就会一直空转。 */
       try{
         const now2 = Date.now();
@@ -15272,10 +15827,10 @@ function towerBossCompLetter(){
   /* P1-C（D1=(a)）：四道途，id 对齐联机枚举（PATH_IDS）。创角只露定位与一句话；
      九段成长系数收进「?」详情，避免把数值表当新手说明。 */
   const PATH_OPTS = [
-    { id: 'sword', name: '剑修', tag: '极致爆发 · 越级杀伐', hint: '以剑入道，攻伐凌厉，前期开荒最速' },
-    { id: 'body',  name: '体修', tag: '铜皮铁骨 · 越战越勇', hint: '淬体强身，稳如山岳，中后期容错极高' },
-    { id: 'dan',   name: '丹修', tag: '炼丹养元 · 寿元绵长', hint: '擅长炼丹与续航，资源产出丰厚' },
-    { id: 'array', name: '阵修', tag: '推演天机 · 悟性通玄', hint: '功法领悟极快，大后期上限最高' }
+    { id: 'sword', name: '剑修', tag: '前中段凌厉 · 后段平稳', hint: '剑势前中段更凌厉，后段归于平稳' },
+    { id: 'body',  name: '体修', tag: '前中段稳健 · 后段平稳', hint: '体魄前中段更稳健，后段趋于平常' },
+    { id: 'dan',   name: '丹修', tag: '中后段见长 · 前段平稳', hint: '丹火中后段更盛，前段伤害平稳' },
+    { id: 'array', name: '阵修', tag: '前后段见长 · 中段稍缓', hint: '阵威前后段更盛，中段稍缓' }
   ];
   const PATH_MARK = { sword: '剑', body: '岳', dan: '炉', array: '卦' };
   /* 道号随机池：放置玩家通常懒得取名，给一个一键可用的入口（不改存档结构） */
@@ -15611,17 +16166,17 @@ function towerBossCompLetter(){
         needOf: r => needOf(r),
         wisdomGain: b => wisdomGain(b),
         grant: rw => {
-          /* ⚠️ 先存旧值，写盘失败必须把**内存**也回滚。
+          /* ⚠️ 先存旧值，保存失败必须把**内存**也回滚。
              否则 isApplied() 读到的是内存里那份被改过的 S.dailyApplied（已含这笔 claimId），
              同一个会话里再跑 recoverPending 就会误判"已入账" → 删掉 pending，
-             而磁盘上根本没有这笔奖励 —— 那是静默丢奖，比不补发更糟。 */
+             而本机存档上根本没有这笔奖励 —— 那是静默丢奖，比不补发更糟。 */
           const oldStone  = S.stone;
           const oldEarned = S.stats.stoneEarned;
           const oldWisdom = S.wisdom;
           const oldApplied = Array.isArray(S.dailyApplied) ? S.dailyApplied.slice() : [];
           if(rw.stone){ S.stone += rw.stone; S.stats.stoneEarned += rw.stone; }
           if(rw.wisdom){ S.wisdom = moneyInt(S.wisdom) + rw.wisdom; }
-          /* D-006 J-1：奖励与「这笔发过没有」的凭据落在同一次 save() 里 */
+          /* D-006 J-1：奖励与「这笔发过没有」的登录状态落在同一次 save() 里 */
           if(rw.claimId && typeof rw.claimId === 'string'){
             if(!Array.isArray(S.dailyApplied)) S.dailyApplied = [];
             if(S.dailyApplied.indexOf(rw.claimId) < 0){
@@ -15652,22 +16207,27 @@ function towerBossCompLetter(){
         render();
         log('⚠️ 你的存档读不出来了（不是没有存档）。原始数据已原样留在本地，未被覆盖。', 'bad');
         log('👉 请打开「设置 → 存档备份」点「取回这份存档」，按提示写入即可恢复。' +
-            (corruptRawCache ? '（注意：备份键写不进去，原文只暂存在本页内存，刷新前务必导出。）' : ''), 'sys');
+            (corruptRawCache ? '（注意：备份没能写入，原文只留在当前页面，刷新前务必导出。）' : ''), 'sys');
         try{ if(typeof window.showToast === 'function') window.showToast('⚠️ 存档读取失败，请到设置里取回备份'); }catch(e){}
         finishBoot();
         return;
       }
-      if(!tryImport()){
-        /* 全新开局：先创立角色，确认后才正式开局 */
-        needNewGame = true;
-        render();
-        showCharModal(false);
-      }else{
-        offline();
-        log('回到洞府，继续修炼。（灵根：' + rootOf().name + '）', 'sys');
-        save();
-        finishBoot();
+      const arcade = readArcadeImport();
+      if(arcade){
+        askArcadeImport(arcade, imported => {
+          if(!imported){
+            needNewGame = true; render(); showCharModal(false); return;
+          }
+          offline();
+          log('回到洞府，继续修炼。（灵根：' + rootOf().name + '）', 'sys');
+          save(); finishBoot();
+        });
+        return;
       }
+      /* 全新开局：先创立角色，确认后才正式开局 */
+      needNewGame = true;
+      render();
+      showCharModal(false);
     }else{
       offline();
       checkMiles(true);        /* 离线期间攒下的进度，回来先立碑再说话 */
@@ -15677,7 +16237,14 @@ function towerBossCompLetter(){
     }
   }
   function resetAll(skipConfirm){
-    if(!skipConfirm && !confirm('确定重开？当前境界、灵石、功法、法宝全部清空。')) return;
+    if(!skipConfirm){
+      confirmAction({
+        icon:'⚠️', title:'设置 · 确认重开', okText:'确认重开',
+        text:'当前境界、灵石、功法、法宝等全部清空。<br><b>此操作不可撤销。</b>',
+        foot:'取消会保留当前存档。'
+      }, ok => { if(ok) resetAll(true); });
+      return;
+    }
     try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
     /* 玩家明确选择重开 = 主动放弃旧档：解除保护闸门并顺手清掉毁档备份，
        否则「清空存档」之后本地还留着一份完整旧档 JSON（隐私/一致性缺口）。 */
@@ -15691,6 +16258,7 @@ function towerBossCompLetter(){
     S.mastery = { alchemyLv: 1, alchemyExp: 0, forgeLv: 1, forgeExp: 0 };
     S.recipeN = {};
     S.herb = 0; S.ore = 0; S.weapon = 0; S.art = { bg: 0, brk: 0, cai: 0 }; S.plots = []; S.enc = { t: 0, bubble: null, lastId: '', seen: {} };   /* 阶段四 C4-1：重开同样清当日去重账 */
+    S.rv4 = emptyRv4();                       /* 重开＝新档：兽魂、万兽谱进度与领奖记录全清 */
     S.equipment = { weapon: null, armor: null, accessory: null };   /* 装备三槽一并清空 */
     S.encBuff = { mult: 0, until: 0 };
     S.bag = [];
@@ -15769,7 +16337,7 @@ function towerBossCompLetter(){
        「崔九首次闯通」的叙事永远不再触发（把上面 NpcMemory._reset 的效果抵消掉）；
        multiCreditedRuns 留着旧 runId 属残留，也一并清。 */
     S.multiWins = 0; S.multiCreditedRuns = [];
-    S.dailyApplied = [];        /* 每日任务入账凭据也是本世数据，重开一并清 */
+    S.dailyApplied = [];        /* 每日任务入账登录状态也是本世数据，重开一并清 */
     resetActs();
     S.dao = 0; S.log = [];
     S.name = ''; S.sex = 'm'; S.gender = 'male'; S.robe = 'bai'; S.path = '';
@@ -15781,7 +16349,7 @@ function towerBossCompLetter(){
     if(typeof Daily !== 'undefined') Daily._reset();   /* 每日任务进度一并重开 */
     try{ if(window.NpcVisitQueue) NpcVisitQueue.clear(); }catch(e){}   /* 重开 = 新的一生，崔九的主动事件一并清（第 114 轮） */
     try{ if(window.Net) Net.disconnect(); }catch(e){}   /* 重开同样下线（第 115 轮） */
-    try{ multiClearSession(); }catch(e){}   /* P0-C：重开清空联机会话（刷新续接只针对同一世内） */
+    try{ multiClearSession(); }catch(e){}   /* P0-C：重开清空联机会话（刷新重连只针对同一世内） */
     /* 重开 = 重新创立角色 */
     needNewGame = true;
     render();
@@ -15831,20 +16399,20 @@ function towerBossCompLetter(){
     if(typeof text !== 'string') return { ok:false, err:'没有读到文本' };
     let t = text.trim().replace(/^\uFEFF/, '');
     if(!t) return { ok:false, err:'存档文本是空的' };
-    if(t.length > SAVE_TEXT_MAX) return { ok:false, err:'超过 2MB，不像是本游戏的存档' };
+    if(t.length > SAVE_TEXT_MAX) return { ok:false, err:'文件过大（超过 2MB），不像是本游戏的存档' };
     let o;
-    try{ o = JSON.parse(t); }catch(e){ return { ok:false, err:'不是有效的 JSON 存档' }; }
+    try{ o = JSON.parse(t); }catch(e){ return { ok:false, err:'不是有效的游戏存档' }; }
     /* 有人会把存档当普通字符串再包一层 → 拆一层 */
     if(typeof o === 'string'){
       try{ o = JSON.parse(o); }catch(e){ return { ok:false, err:'存档内容不是对象' }; }
     }
-    if(!o || typeof o !== 'object' || Array.isArray(o)) return { ok:false, err:'存档内容不是对象' };
+    if(!o || typeof o !== 'object' || Array.isArray(o)) return { ok:false, err:'存档内容格式不正确' };
     if(typeof o.rank !== 'number' || !isFinite(o.rank) || o.rank < 0 || o.rank > TOP)
-      return { ok:false, err:'缺少境界（rank）或数值越界' };
+      return { ok:false, err:'缺少境界或数值越界' };
     if(typeof o.exp !== 'number' || !isFinite(o.exp) || o.exp < 0)
-      return { ok:false, err:'修为（exp）缺失或不是有效数字' };
+      return { ok:false, err:'修为缺失或不是有效数字' };
     const sig = SAVE_SIG_KEYS.filter(k => k in o).length;
-    if(sig < 3) return { ok:false, err:'缺少本游戏的系统字段，不像是《九霄问道》的存档' };
+    if(sig < 3) return { ok:false, err:'缺少角色记录，不像是《九霄问道》的存档' };
     const meta = saveMeta(o);
     meta.bytes = byteLen(t);
     return { ok:true, obj:o, text:t, meta };
@@ -15902,7 +16470,7 @@ function towerBossCompLetter(){
     let corruptHtml = '';
     if(curRaw){
       corruptHtml = '<div class="sv-corrupt" style="margin-top:6px">⚠️ <b>本次</b>读档失败，备份键写不进去（存储可能已满或被禁用）。' +
-        '本次原文（' + fmtSize(byteLen(curRaw)) + '）仍暂存在本页内存里，<b>刷新即丢</b>，请立刻导出：' +
+        '本次原文（' + fmtSize(byteLen(curRaw)) + '）只留在当前页面，<b>刷新即丢</b>，请立刻导出：' +
         '<button class="btn-main" type="button" data-sv-recover="3" style="margin-left:6px">下载本次原文</button>' +
         '<button class="btn-plain" type="button" data-sv-recover="4" style="margin-left:6px">复制本次原文</button>' +
         '<button class="btn-ghost" type="button" data-sv-recover="2" style="margin-left:6px">载入到导入框</button></div>';
@@ -15938,7 +16506,7 @@ function towerBossCompLetter(){
     let txt = '';
     try{ txt = localStorage.getItem('xiuxian_save_corrupt') || ''; }catch(e){}
     if(!txt) txt = corruptRawCache || '';
-    if(!txt){ log('没有可取回的原文（备份键与内存里都没有）。', 'bad'); return; }
+    if(!txt){ log('没有可取回的原文（备份和当前页面里都没有）。', 'bad'); return; }
     const inp = document.getElementById('sv-in');
     if(inp){
       inp.value = txt;
@@ -16049,11 +16617,11 @@ function towerBossCompLetter(){
       if(typeof v !== 'string' || !v.length || v.length > 512 * 1024) return;
       try{ localStorage.setItem(k, v); n++; }catch(e){ /* 配额满等：跳过，不阻断主档恢复 */ }
     });
-    /* 磁盘变了，常驻内存必须跟着重读：
+    /* 本机存档变了，常驻内存必须跟着重读：
        NpcMemory 的 st 与 NpcVisitQueue 的 st.q 都是加载时读一次的模块级状态，
        上面只改了 localStorage。若不重读，玩家导入后继续玩时任何一次 record()/push()
        都会用"导入前的旧内存"整体覆盖刚写进来的记忆 —— D-005 侧车打包等于白做。
-       load() 各自带 fail-closed 保护，失败只会禁写、不会用空态覆盖磁盘。 */
+       load() 各自带 fail-closed 保护，失败只会禁写、不会用空态覆盖本机存档。 */
     if(n){
       try{ if(window.NpcMemory && typeof window.NpcMemory.load === 'function') window.NpcMemory.load(); }catch(e){}
       try{ if(window.NpcVisitQueue && typeof window.NpcVisitQueue.load === 'function') window.NpcVisitQueue.load(); }catch(e){}
@@ -16194,13 +16762,14 @@ function towerBossCompLetter(){
   return {
     boot, reset: resetAll, save,
     /* M-2：只读诊断接口，仅供专项诊断与测试读取（产品业务未消费）。
-       failing 只表示「最近一次真实写盘结果」，不代表备份是否存在/有效，
+       failing 只表示「最近一次真实保存结果」，不代表备份是否存在/有效，
        也不代表业务已阻止失败后推进；不新增 window 全局。 */
     _saveHealth: () => ({ failing: saveFailActive, failures: saveFailCount, firstAt: saveFailFirstAt, inited: inited, frozen: frozenForImport }),
     ranks: RANK_NAMES,
     _s: S, _need: needOf, _rate: expRate, _passiveRate: passiveRate, _latePassiveMult: latePassiveMult, _break: doBreakNow, _openBreakConfirm: openBreakConfirm, _confirmBreak: confirmBreakNow,
     _bagMerge: () => lastBagMerge, _bagQty: bagQtyOf, _bagAdd: bagAddQty, _bagCanAccept: bagCanAccept, _countItem: countItem, _removeItems: removeItems,
     _closeBreakConfirm: closeBreakConfirm, _breakParts: breakChanceParts,
+    _expGapInt: expGapInt,
     _sign: act, _act: act,
     /* 成本曲线（纯函数）：等级曲线/经济体检的工具要用，导出以免工具自己抄一遍公式 */
     _caveCost: caveCost, _gongCost: gongCost, _fieldCost: fieldCost, _mineCost: mineCost,
@@ -16221,6 +16790,7 @@ function towerBossCompLetter(){
     _variantNext: variantNext, _recipeCodex: recipeCodexHtml,
     /* 第 89 节 · 丹药四族九阶：表、派生记录、三个 buff 槽与族内行序，全部只读出给测试 */
     _dan: { all: DAN_BY_ID, list: DAN_LIST, ids: DAN_IDS, fam: DAN_FAM, curve: DAN_CURVE,
+      rv4: { list: RV4_DAN_LIST, all: RV4_DAN_BY_ID },
       fx: DAN_FX, segName: DAN_SEG_NAME, sellTier: DAN_SELL_TIER, rowsOf: danRowsOf,
       effect: danEffectText, eat: eatDan, head: danFamHead,
       mineRate: () => minePerSec(),
@@ -16234,8 +16804,9 @@ function towerBossCompLetter(){
       state: () => S.art },
     _masteryOf: masteryOf, _masteryExp: masteryExp, _masteryNeed: masteryNeed, _masteryCfg: MASTERY,
     _beasts: BEASTS, _eggRate: EGG_RATE, _masteryExpCfg: MASTERY_EXP, _powK: POW_K,
+    _rv4Mats: RV4_MATS, _rv4MatById: RV4_MAT_BY_ID, _rv4MatByBeast: RV4_MAT_BY_BEAST,
     _claimQuest: claimQuest, _quests: questList,
-    _hunt: startHunt, _stopHunt: stopHunt, _power: combatPower,
+    _hunt: startHunt, _stopHunt: stopHunt, _huntTick: huntTick, _killTime: killTime, _power: combatPower,
     _powerSnapshot: multiSnapshot,   /* batch5：服务端战力重算的同一份养成快照 */
     _trace: () => trace, _traceSpawn: traceSpawn, _traceChase: traceChase, _traceLet: traceLet,
     _renderTrace: renderTrace, _tracePaint: tracePaint, _traceTick: traceUiTick,
@@ -16339,11 +16910,12 @@ function towerBossCompLetter(){
     _arenaProxy: arenaProxyPick, _arenaProxyCost: arenaProxyCost, _arenaProxyEligible: arenaProxyEligible,
     _arenaShop: ARENA_SHOP, _towerFight: towerFightCurrent, _towerBossCompLetter: towerBossCompLetter,
     _closeStance: closeStance,
+    _confirmAction: confirmAction, _setConfirmHandler: fn => { confirmHandler = typeof fn === 'function' ? fn : null; },
     _stanceOpen: () => { const m = document.getElementById('stance-modal'); return !!m && !m.classList.contains('hidden'); },
     _secretProg: secretProg, _secretReward: secretReward, _challengeSecret: challengeSecret, _secretPick: secretPick, _sweepSecret: sweepSecret,
     _secretTotal: secretTotal, _secretPower: secretPower,
-    _market: () => S.market, _buyMarket: buyMarket, _doBuyMarket: doBuyMarket, _sellMarket: sellMarket,
-    _sellAll: sellAllMats, _refreshMarket: refreshMarket, _sellPrice: sellPrice,
+    _market: () => S.market, _buyMarket: buyMarket, _doBuyMarket: doBuyMarket, _sellMarket: sellMarket, _doSellMarket: doSellMarket,
+    _sellAll: sellAllMats, _doSellAll: doSellAllMats, _sellAllPlan: sellAllPlan, _refreshMarket: refreshMarket, _sellPrice: sellPrice,
     _spendFloat: spendFloat, _flashEl: flashEl, _chip: gainChip,
     /* ===== 仙途道碑（里程碑） ===== */
     _miles: () => MILES.map(m => ({ id: m.id, g: m.g, n: m.n, h: m.h, at: S.miles[m.id] || 0 })),
@@ -16371,12 +16943,24 @@ function towerBossCompLetter(){
     },
     _npcUi: () => npcUi, _npcHeardTotal: npcHeardTotal,
     _resetAll: resetAll, _resetForNewLife: resetForNewLife,
+    /* ===== rv4 扩展：唯一容器 / 四表 / 共同最高 / 万兽谱 / 猎妖（旁挂测试同源） ===== */
+    _rv4: {
+      state: () => ensureRv4(), mats: RV4_MATS, matById: RV4_MAT_BY_ID, matByBeast: RV4_MAT_BY_BEAST,
+      souls: RV4_SOUL_ROWS, soulById: RV4_SOUL_BY_ID,
+      equips: RV4_EQUIP_ROWS, equipById: RV4_EQUIP_BY_ID,
+      tiers: RV4_BESTIARY_TIERS, hasSoul: rv4HasSoul, soulMax: rv4SoulMax, soulAt: rv4SoulAt,
+      oldArtSeg: oldArtSeg, artSeg: artSeg, found: rv4Found, progress: bestiaryProgress,
+      claim: claimBestiary, render: renderBestiary, empty: emptyRv4
+    },
+    _startHunt: startHunt, _stopHunt: stopHunt, _huntTick: huntTick, _renderHunt: renderHunt,
+    _renderBestiary: renderBestiary,
     /* ===== 信匣（离线见闻） ===== */
     _letters: () => (S.letters || []).map(x => ({ id: x.id, kind: x.kind, day: x.day, text: x.text, rw: x.rw, open: x.open })),
     _letterCount: letterCount, _openLetter: openLetter, _makeLetters: makeLetters, _pushLetters: pushLetters,
     _renderLetters: renderLetters,
-    _sellAll: sellAllMats, _refreshMarket: refreshMarket, _sellPrice: sellPrice,
+    _sellAll: sellAllMats, _doSellAll: doSellAllMats, _sellAllPlan: sellAllPlan, _refreshMarket: refreshMarket, _sellPrice: sellPrice,
     _marketGoods: () => { resetMarket(); return S.market.goods.map(s => ({ g: marketItem(s.id), price: s.price, bought: s.bought })); },
+    _marketPoolIds: () => MARKET_POOL.map(g => g.id),
     /* ===== 全局突破系统（配置表 + 顿悟进度/悟道值双轨 + 丹药分级 + 辅助道具） ===== */
     _attemptBreak: attemptBreakthrough, _breakState: breakState, _breakChanceWith: breakChanceWith, _breakChanceFinal: breakChanceFinal, _breakSoftKnee: breakSoftKnee,
     _pillValid: pillValid, _wisdomShop: wisdomShop, _exchangeWisdom: exchangeWisdom, _buyGuard: buyGuard,
@@ -16430,15 +17014,10 @@ const SECT = (function(){
   const PID_KEY = 'arcade_sect_pid';
   const HOST_KEY = 'arcade_sect_host';
   const NICK_KEY = 'arcade_nick';
-  const DEF_HOST = 'http://localhost:8787';
-  /* 官方常驻服务地址：定了之后只改这一行，所有玩家零配置直连山门。
-     现在是空的 —— 还没有公共服务，于是每个玩家默认去连自己本机的 8787，等于各玩各的。
-     临时隧道地址每次都会变，不写死在这里；等 VPS 或托管站点定下来再填 https://…。 */
-  const PUB_HOST = '';
   const POLL_MS = 25000;
 
   let host = '', pid = '', nick = '';
-  let online = false, ready = false, booting = false, busy = false;
+  let online = false, ready = false, booting = false, connecting = false, busy = false;
   let me = null, list = [], req = null;
   let bonus = 0.07, bonusNow = 0;
   let stats = null;                 /* 山门气象：全服活跃度快照 */
@@ -16472,41 +17051,40 @@ const SECT = (function(){
   }
   function refreshNick(){ readNick(); render(); }
 
-  /* 候选优先级：链接带的 ?sect=（一次性分享地址）> 玩家在设置里手填的 > 官方常驻地址
-     > 与本站同源 > 本机默认。全部并发探活，取序号最小的活口（见 firstAlive）。
-     env 只是留给测试的口子：verify.js 用合成的 location/localStorage 直接验优先级，
-     不必为了跑断言真起一个 http 站点。不传 env 就是真实路径。 */
+  /* 只接受远程 http(s) 地址；旧档残留的本机地址一律清空，默认走部署站点同源服务。 */
+  function safeHost(h){
+    try{
+      const raw = String(h || '').trim();
+      if(!raw) return '';
+      const u = new URL(raw);
+      if(u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+      if(['localhost','127.0.0.1','0.0.0.0','[::1]','::1'].indexOf(u.hostname) >= 0) return '';
+      return u.href.replace(/\/+$/, '');
+    }catch(e){ return ''; }
+  }
+
+  /* 候选优先级：分享地址 > 已保存的远程地址 > 本站同源；不再探测本机服务。 */
   function candidates(env){
     const real = !env;
     const out = [];
-    const push = h => { h = String(h || '').replace(/\/+$/, ''); if(h && out.indexOf(h) < 0) out.push(h); };
+    const push = h => { h = safeHost(h); if(h && out.indexOf(h) < 0) out.push(h); };
     let search = '', proto = '', origin = '', stored = '';
     try{
       search = real ? location.search : (env.search || '');
       proto = real ? location.protocol : (env.protocol || '');
       origin = real ? location.origin : (env.origin || '');
-      stored = real ? (localStorage.getItem(HOST_KEY) || '') : (env.stored || '');
+      stored = safeHost(real ? (localStorage.getItem(HOST_KEY) || '') : (env.stored || ''));
+      if(real && localStorage.getItem(HOST_KEY) && !stored) localStorage.removeItem(HOST_KEY);
     }catch(e){}
     let q = '';
     try{
-      q = new URLSearchParams(search).get('sect');
+      q = safeHost(new URLSearchParams(search).get('sect'));
       if(q){ push(q); if(real){ try{ localStorage.setItem(HOST_KEY, q); }catch(e){} } }
       push(stored);
     }catch(e){}
-    /* B-35 裁定：无配置的 file:// 环境不发起宗门服务探活。
-       仅当 协议为 file: 且 无 ?sect、无已存地址、无官方常驻地址 时，返回空候选（不探活）。
-       - 已配置地址（?sect 或手填地址）仍按优先级探活；
-       - http(s) 部署保持原有同源 + DEF_HOST 探活能力；
-       - 不扩大白名单、不改 H3 结算代码。 */
-    if(proto === 'file:' && !q && !stored && !PUB_HOST) return out;
-    push(PUB_HOST);
-    /* 以前只在 hostname 是 localhost 时才试同源，结果游戏真发到公网上也不去找同域的服务，
-       只会回头试本机 8787 → 永远「山门未开」。一律试：死候选只是多一个并发请求，不拖时间。 */
+    /* file:// 无远程配置时不探活；http(s) 部署默认认同源。 */
+    if(proto === 'file:' && !q && !stored) return out;
     if(proto === 'http:' || proto === 'https:') push(origin);
-    /* 2026-11-19 制作人批：sect 只监听 127.0.0.1，公网直连 :8787 不通；
-       线上走 nginx 同源反代（/api/sect → 127.0.0.1:8787），客户端只认同源。
-       这里不再追加同域 :8787 候选，避免浏览器被混合内容/连接拒绝拖 2.5 秒。 */
-    push(DEF_HOST);
     return out;
   }
 
@@ -16590,7 +17168,7 @@ const SECT = (function(){
     if(quota){
       quota.textContent = online && me
         ? '护法 ' + me.guard + '/' + me.guardMax + ' · 求助 ' + me.pub + '/' + me.pubMax
-        : (ready ? '连接中…' : '未连接');
+        : (connecting ? '连接中…' : '未连接');
       quota.className = 'sc-quota' + (online ? '' : ' off');
     }
     const mine = el('sc-mine');
@@ -16611,8 +17189,11 @@ const SECT = (function(){
     const eb = el('sc-events');
     if(!sb) return;
     if(!stats || !online){
-      if(wq){ wq.textContent = online ? '读取中…' : '未连接'; wq.className = 'sc-quota off'; }
-      sb.innerHTML = '<div class="sc-none">山门气象需连上互助服务。</div>' +
+      if(wq){
+        wq.textContent = connecting ? '连接中…' : (online ? '读取中…' : '未连接');
+        wq.className = 'sc-quota' + (connecting ? '' : ' off');
+      }
+      sb.innerHTML = '<div class="sc-none">' + (connecting ? '正在连接互助服务…' : '山门气象需连上互助服务。') + '</div>' +
         (noteTxt ? '<p class="sc-note ' + esc(noteCls) + '">' + esc(noteTxt) + '</p>' : '') +
         '<button type="button" class="btn-sub" data-sect-retry>重新连接</button>';
       if(rb) rb.innerHTML = '';
@@ -16646,9 +17227,11 @@ const SECT = (function(){
       }
     }
   }
-  /* 动态时间戳：刚刚 / N 分钟前 / N 小时前 / N 天前 */
+  /* 动态时间戳；缺失/非法时间不按 Unix 纪元计算。 */
   function fmtAgo(t){
-    const s = Math.max(0, Math.floor((Date.now() - (t || 0)) / 1000));
+    const at = Number(t);
+    if(!Number.isFinite(at) || at <= 0) return '—';
+    const s = Math.max(0, Math.floor((Date.now() - at) / 1000));
     if(s < 60) return '刚刚';
     if(s < 3600) return Math.floor(s / 60) + ' 分前';
     if(s < 86400) return Math.floor(s / 3600) + ' 时前';
@@ -16656,7 +17239,7 @@ const SECT = (function(){
   }
 
   /* ---- 战力榜（batch5 第 4 项 · 乙案） ----
-     客户端每 2 秒防抖上报一次养成快照，60 秒心跳；服务端重算后回 power/at。
+     客户端每 2 秒防抖同步一次养成快照，60 秒心跳；服务端重算后回 power/at。
      榜单上限 50，只显示服务端认可的战力，不显示 pid。 */
   async function powerReport(){
     if(!ready || !online) return null;
@@ -16700,8 +17283,8 @@ const SECT = (function(){
     if(!box) return;
     const st = el('sc-pw-state');
     if(!online){
-      if(st){ st.textContent = '未连接'; st.className = 'sc-quota off'; }
-      box.innerHTML = '<div class="sc-none">战力榜需连上互助服务。</div>';
+      if(st){ st.textContent = connecting ? '连接中…' : '未连接'; st.className = 'sc-quota' + (connecting ? '' : ' off'); }
+      box.innerHTML = '<div class="sc-none">' + (connecting ? '正在连接互助服务…' : '战力榜需连上互助服务。') + '</div>';
       return;
     }
     const pb = powerBoard;
@@ -16710,11 +17293,11 @@ const SECT = (function(){
       box.innerHTML = '<div class="sc-none">榜单读取中…</div>';
       return;
     }
-    if(st){ st.textContent = '已上报 ' + pb.total + ' 人 · 每 25 秒刷新'; st.className = 'sc-quota'; }
+    if(st){ st.textContent = '已同步 ' + pb.total + ' 人 · 每 25 秒刷新'; st.className = 'sc-quota'; }
     const list = pb.list || [];
     let h = '<div class="sc-listhead"><span>名次 · 道号</span><span>战力</span></div>';
     if(!list.length){
-      h += '<div class="sc-none">尚无同门上报战力。进入宗门后会自动同步。</div>';
+      h += '<div class="sc-none">尚无同门同步战力。进入宗门后会自动同步。</div>';
     }else{
       h += list.map(x => '<div class="sc-pw-row' + (x.me ? ' me' : '') + '">' +
         '<span class="sc-pw-no">' + x.no + '</span>' +
@@ -16725,7 +17308,7 @@ const SECT = (function(){
     }
     h += '<p class="sc-hint">' + ((pb.me && pb.me.fresh)
       ? '你的战力：' + fmt(pb.me.power) + ' · ' + fmtAgo(pb.me.at) + (pb.me.rank ? ' · 第 ' + pb.me.rank + ' 名' : '')
-      : '你的战力尚未上报，稍后自动同步。') + '</p>';
+      : '你的战力尚未同步，稍后自动同步。') + '</p>';
     box.innerHTML = h;
   }
 
@@ -16734,7 +17317,7 @@ const SECT = (function(){
       return '<div class="sc-off">' +
         '<b>' + inkIco('⛩️') + '山门未开</b>' +
         '<p>互助得有人记住「谁帮了谁」，所以要连上山门服务。连不上时游戏照常挂机，进度一点不少。</p>' +
-        '<p>每 25 秒会自己再试一次；手上有服务地址的话，去「设置 · 宗门服务地址」填上再重连。</p>' +
+        '<p>每 25 秒会自己再试一次；默认连接本站山门。需要其他入口时，可在「设置 · 宗门连接」填写。</p>' +
         '<button type="button" class="btn-sub" data-act="retry">重新连接</button>' +
         '</div>';
     }
@@ -16831,15 +17414,21 @@ const SECT = (function(){
   }
   async function cancelReq(){
     if(!online || !req || busy) return;
-    if(!confirm('撤回求助？今天已经用掉的发布次数不会退。')) return;
-    busy = true;
-    let r;
-    try{ r = await post('cancel', { reqId: req.id }); }
-    catch(e){ online = false; busy = false; note('连不上互助服务' + errTag(e) + '，可点「重新连接」重试。', 'bad'); render(); return; }
-    busy = false;
-    if(r.ok){ req = null; me = r.me; note('求助已撤回。', ''); }
-    else note(r.msg || '撤回失败', 'bad');
-    render();
+    confirmAction({
+      icon:'📮', title:'宗门互助 · 确认撤回', okText:'确认撤回',
+      text:'撤回当前求助？<br>今天已经用掉的发布次数不会退。',
+      foot:'确认后才向互助服务发送撤回请求。'
+    }, async ok => {
+      if(!ok || !online || !req || busy) return;
+      busy = true;
+      let r;
+      try{ r = await post('cancel', { reqId: req.id }); }
+      catch(e){ online = false; busy = false; note('连不上互助服务' + errTag(e) + '，可点「重新连接」重试。', 'bad'); render(); return; }
+      busy = false;
+      if(r.ok){ req = null; me = r.me; note('求助已撤回。', ''); }
+      else note(r.msg || '撤回失败', 'bad');
+      render();
+    });
   }
   async function claim(){
     if(!online) return null;
@@ -16873,7 +17462,7 @@ const SECT = (function(){
         await claim();
         refreshSoon();
       }else if(r.err === 'gone'){ req = null; }
-    }catch(e){ note('结算回执暂时失败' + errTag(e) + '，可稍后重试。', 'bad'); }
+    }catch(e){ note('结算结果暂时失败' + errTag(e) + '，可稍后重试。', 'bad'); }
     try{ render(); }catch(e){}
   }
 
@@ -16916,19 +17505,19 @@ const SECT = (function(){
   }
 
   async function boot(){
-    try{ await bootInner(); }catch(e){ booting = false; online = false; note('山门服务连接失败' + errTag(e) + '，可点「重新连接」。', 'bad'); try{ render(); }catch(x){} }
+    try{ await bootInner(); }catch(e){ booting = false; connecting = false; online = false; note('山门服务连接失败' + errTag(e) + '，可点「重新连接」。', 'bad'); try{ render(); }catch(x){} }
   }
   async function bootInner(){
     if(booting) return;
     if(ready){ refresh(); return; }
-    booting = true;
+    booting = true; connecting = true;
     /* ⚠️ buildSceneFX 是 XX 模块私有函数，SECT 里裸调会 ReferenceError 把整个 boot 炸掉
        （历史 bug：宗门服务因此从来没连上过、背景粒子层也一直是空的）→ 必须经 XX 调 */
     ensurePid(); readNick(); bindUI(); render();
     try{ if(XX._sceneFX) XX._sceneFX(); }catch(e){}
     const cands = candidates();
     const okHost = await firstAlive(cands);
-    booting = false;
+    booting = false; connecting = false;
     /* 探活全灭也要把轮询挂上：pollTick 见到 !ready 就会重新 boot。
        否则首屏没连上的页面永远不会自己重试（服务后起来、隧道刚开都得玩家手点「重新连接」）。 */
     if(!okHost){ ready = false; online = false; render(); startPoll(); return; }
@@ -17073,7 +17662,7 @@ const SECT = (function(){
        ready 已 true、boot 不再跑，新 sc-box 就没监听器 → 面板按钮全失灵。所以每次开面板都重绑。 */
     bindUI();
     render();
-    if(!ready){ boot(); return; }   /* 打开面板立刻重试一次，不用干等 25 秒的轮询 */
+    if(!ready){ await boot(); return; }   /* 打开面板立刻重试一次，探测结束后再画状态 */
     if(!online) return;
     try{
       const st = await get('stats', { rank: rankNo() });
@@ -17090,7 +17679,8 @@ const SECT = (function(){
     chatBind, chatOpen, chatClose, chatSend,
     powerReport, powerBoard: () => powerBoard, powerBoardAt: () => powerBoardAt,
     host: () => host,
-    _candidates: candidates, _firstAlive: firstAlive, _readJson: readJson, _errTag: errTag,
+    _candidates: candidates, _firstAlive: firstAlive, _readJson: readJson, _errTag: errTag, _fmtAgo: fmtAgo,
+    _safeHost: safeHost,
     _state: () => ({ online, ready, host, pid, nick, me, list, req, bonus, bonusNow, noteTxt,
       stats, timer: !!timer,
       chatUnread, chatMsgs: chatMsgs.length })
@@ -17104,31 +17694,45 @@ const SECT = (function(){
   const modal = document.getElementById('settings-modal');
   function open(){
     modal.classList.remove('hidden');
-    document.getElementById('m-sect').value = (() => {
-      try{ return localStorage.getItem('arcade_sect_host') || ''; }catch(e){ return ''; }
-    })();
+    const sectInput = document.getElementById('m-sect');
+    let rawHost = '';
+    try{ rawHost = localStorage.getItem('arcade_sect_host') || ''; }catch(e){}
+    const cleanHost = SECT._safeHost(rawHost);
+    if(sectInput) sectInput.value = cleanHost;
+    if(rawHost && !cleanHost){
+      try{ localStorage.removeItem('arcade_sect_host'); }catch(e){}
+      SECT.reconnect();
+    }
     document.getElementById('m-nick').value = (() => {
       try{ return localStorage.getItem('arcade_nick') || ''; }catch(e){ return ''; }
     })();
-    /* 把「到底连上没、连的是哪个地址」摊在设置里：换服务器/开隧道时不用开控制台猜 */
-    const ss = document.getElementById('m-sect-state');
-    if(ss){
+    /* 设置与宗门页共用同一连接状态；打开设置也主动探测，不等待下一轮。 */
+    const paint = () => {
+      const ss = document.getElementById('m-sect-state');
+      if(!ss) return;
       const st = (() => { try{ return SECT._state(); }catch(e){ return null; } })();
-      /* 2026-11-19 第 14 条：玩家界面不显示服务器地址/IP */
       if(st && st.online){ ss.textContent = '已连上'; ss.className = 'on'; }
       else if(st && st.ready){ ss.textContent = '连接中…'; ss.className = ''; }
       else { ss.textContent = '未连接（每 25 秒自动重试）'; ss.className = ''; }
       const ni = document.getElementById('m-nick');
       if(ni && st && st.nick) ni.placeholder = st.nick;
-    }
+    };
+    paint();
+    try{ Promise.resolve(SECT.panelOpen()).then(paint, paint); }catch(e){}
   }
   function close(){ modal.classList.add('hidden'); }
   document.getElementById('sc-settings').addEventListener('click', open);
   document.getElementById('m-close').addEventListener('click', close);
   document.getElementById('m-cancel').addEventListener('click', close);
   document.getElementById('m-save').addEventListener('click', () => {
-    const host = document.getElementById('m-sect').value.trim().replace(/\/+$/, '');
+    const requested = document.getElementById('m-sect').value.trim();
+    const host = SECT._safeHost(requested);
     const nick = document.getElementById('m-nick').value.trim().slice(0, 12);
+    if(requested && !host){
+      const ss = document.getElementById('m-sect-state');
+      if(ss){ ss.textContent = '地址无效，请留空自动连接'; ss.className = ''; }
+      return;
+    }
     try{
       if(host) localStorage.setItem('arcade_sect_host', host);
       else localStorage.removeItem('arcade_sect_host');

@@ -28,6 +28,9 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(() => t.classList.remove('show'), 1700);
   }
+  function escHTML(v){
+    return String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+  }
   /* 修复单 P1：给游戏侧购买/升级失败用同一个可见提示 */
   try{ window.toast = toast; }catch(e){}
 
@@ -59,8 +62,7 @@
     h.querySelectorAll('.panel-back').forEach(b => b.addEventListener('click', back));
     const fb = h.querySelector('#xx-field-buy'); if(fb) fb.addEventListener('click', () => XX._buyField(fb));
     const mb = h.querySelector('#xx-mine-buy');   if(mb) mb.addEventListener('click', () => XX._buyMine(mb));
-    /* 人物面板：道行拆账入口（弹窗在 #power-modal，主 DOM 静态元素） */
-    const pb = h.querySelector('#xx-role-break');  if(pb) pb.addEventListener('click', () => XX._openPower());
+    /* 人物页不再设置道行拆账或任何功能入口；装备与兽魂格沿用下方既有动作。 */
     /* hub 页的入口格：点一格进一个独立页（不是在同页里跳锚点） */
     const cn = h.querySelector('.hub-nav');
     if(cn) cn.addEventListener('click', ev => {
@@ -86,27 +88,32 @@
     const bb = h.querySelector('#xx-bag-buy'); if(bb) bb.addEventListener('click', () => XX._buyBag(bb));
     /* 世界频道（传音）面板：DOM 每次整体替换，绑定随元素回收，在此重绑 */
     try{ SECT.chatBind(); }catch(e){}
-    /* 人物面板的三个圈（第 95 轮）：已穿 → 问一句再卸下；空着 → 背包里有能装的就穿上最好的一件。
-       只此一处绑监听：上一轮加过第二条监听，两条同挂一个元素，第二条点空圈时也会走到这里的 confirm。 */
+    /* 人物页三个圈：已穿先经游戏内确认再卸下；空槽由 XX._slotTap 给出去向提示。 */
     h.querySelectorAll('.equip-slot').forEach(sl => sl.addEventListener('click', () => {
       const k = sl.dataset.slot;
       if(XX._equippedId(k)){
         const m = XX._equippedMeta(k);
-        if(confirm('卸下【' + (m && m.n || '') + '】？')) XX._unequipItem(k);
+        XX._confirmAction({
+          icon: '🎒', title: '人物 · 确认卸下',
+          text: '装备：<b>' + escHTML(m && m.n || '') + '</b><br>确认后放回背包。',
+          okText: '确认卸下'
+        }, ok => { if(ok) XX._unequipItem(k); });
         return;
       }
       XX._slotTap(k);
     }));
-    /* 寿元页（第 96 轮）：开寿元不可逆 → 问一句；坐化转世是死后唯一的出路 → 不问。
-       ⚠️ 这条 confirm 是原生框：headless Edge 在 virtual-time 下不会作答，
-       测试与截图脚本点这个按钮前必须先把 window.confirm 换成 () => true（见 DEV_NOTES §95.3）。 */
-    /* 第三批 B2：四族法宝位 → 已持有去强化页，未持有去炼器页（动作不在人物页办）。
-      法宝格由 renderCharSheet 在 bindPanel 之后才填，所以用委托挂在容器上。 */
+    /* 寿元页：开启不可逆，与全站危险动作共用游戏内确认层。 */
+    /* 人物页四族法宝只展示与提示；所有炼制、强化动作留在炼器坊。 */
     const artsBox = h.querySelector('#xx-role-arts');
     if(artsBox) artsBox.addEventListener('click', ev => {
       const sl = ev.target && ev.target.closest ? ev.target.closest('.art-slot') : null;
       if(!sl) return;
-      ROUTER.open('dong', sl.dataset.owned === '1' ? 'xx-enhance-sec' : 'xx-forge-sec');
+      const fams = (window.XX && XX._art && XX._art.fam) || {};
+      const f = fams[sl.dataset.art];
+      const name = f ? f.name : '法宝';
+      toast((sl.dataset.owned === '1'
+        ? name + '正在生效；强化请前往炼器坊。'
+        : name + '尚未炼制；请前往炼器坊。'));
     });
     /* 人物页：一键装备（只填空槽，复用现有 slotTap / equipItem） */
     const ae = h.querySelector('#xx-role-auto');
@@ -116,12 +123,12 @@
       if(r && r.ok) toast('已换上 ' + r.n + ' 件（' + r.slots.join(' / ') + '）');
       else toast('没有可换的空槽装备');
     });
-    /* 人物页内页签：札记 / 道碑 / 悟道 / 断天门 / 识人（都属人物自己的东西） */
-    h.querySelectorAll('[data-role-jump]').forEach(b => b.addEventListener('click', () => {
-      open('role', b.dataset.roleJump);
-    }));
-    /* batch5：法宝图鉴入口（人物页 / 炼器页） */
+    /* rv4：炼器坊双入口压栈，返回仍落炼器坊；旧 data-codex 兼容直接开页。 */
+    h.querySelectorAll('[data-forge-codex]').forEach(b => b.addEventListener('click', () => openSub('codex')));
+    h.querySelectorAll('[data-forge-bestiary]').forEach(b => b.addEventListener('click', () => openSub('bestiary')));
     h.querySelectorAll('[data-codex]').forEach(b => b.addEventListener('click', () => open('codex')));
+    /* rv4：主场景猎妖入口，只开自动战斗页，不替代原「历练」文字冒险。 */
+    h.querySelectorAll('[data-hunt-open]').forEach(b => b.addEventListener('click', () => open('hunt')));
     /* P0.5：料仓 ↔ 背包互指 */
     h.querySelectorAll('[data-cross]').forEach(b => b.addEventListener('click', () => {
       const p = b.dataset.cross;
@@ -159,7 +166,11 @@
     });
     const le = h.querySelector('#xx-life-enable');
     if(le) le.addEventListener('click', () => {
-      if(confirm('开启寿元？开了就关不掉：这一世会老、会坐化，只能转世续道统。')) XX._enableLife();
+      XX._confirmAction({
+        icon: '⏳', title: '寿元 · 确认开启',
+        text: '开启后这一世会老、会坐化，只能转世续道统。<br><b>开启后不可关闭。</b>',
+        okText: '确认开启'
+      }, ok => { if(ok) XX._enableLife(); });
     });
     const lr = h.querySelector('#xx-life-reborn');
     if(lr) lr.addEventListener('click', () => XX._reborn());
@@ -222,14 +233,15 @@
   }
 
   /* 从场景进面板 = 新的一层，栈清空。
-     木牌带的 data-scroll 若是某个分区的锚点，直接落到那一个功能的独立页，
-     不再「先进长页再滚到那一节」；底下仍压着 hub 一页，所以 ← 先回 hub。 */
-  function open(name, scrollTo){
+     batch10：场景木牌/常驻入口直达子页时只压子页，返回认来源回场景；
+     从 hub 格子进入则仍压 hub + 子页。程序内旧签名不传 fromScene，保持既有深链语义。 */
+  function open(name, scrollTo, fromScene){
     /* 只认同一个面板的分区：木牌写错了（锚点属于别家）就当没有，落回 hub 本身 */
     const sub = subView(scrollTo);
     const hop = sub && panelOf(sub) === name ? sub : null;
     stack.length = 0;
-    if(hop){ stack.push(name, hop); enter(hop); }
+    if(hop && (fromScene || name === 'role')){ stack.push(hop); enter(hop); }
+    else if(hop){ stack.push(name, hop); enter(hop); }
     else { stack.push(name); enter(name, scrollTo); }
     /* 太虚真人·跳过者补讲（tellSystem 内部已判 skipped 与去重；window.Guide 守卫避免加载时序问题） */
     if (typeof window.Guide !== 'undefined') {
@@ -298,7 +310,7 @@
   function bindScene(){
     document.querySelectorAll('[data-bld]').forEach(b => {
       b.addEventListener('click', () => {
-        open(b.dataset.bld, b.dataset.scroll);
+        open(b.dataset.bld, b.dataset.scroll, true);
       });
     });
     /* 底部五签（第三批 B2）：人物 / 洞府 / 城镇 / 宗门 / 背包 */
@@ -306,7 +318,7 @@
       t.addEventListener('click', () => {
         const k = t.dataset.tab;
         if(k === 'cave' || k === 'town'){ toScene(k); return; }
-        if(k === 'role'){ open('role', 'xx-role-equip'); return; }
+        if(k === 'role'){ open('role', 'xx-role-equip', true); return; }
         if(k === 'zong'){ open('zong'); return; }
         if(k === 'bag'){ open('bag'); return; }
       });
@@ -315,6 +327,7 @@
     document.querySelectorAll('.cave-act').forEach(b => {
       b.addEventListener('click', () => { try{ XX._act(b.dataset.k); }catch(e){} });
     });
+    document.querySelectorAll('[data-hunt-open]').forEach(b => b.addEventListener('click', () => open('hunt')));
     document.querySelectorAll('[data-soon]').forEach(b => {
       b.addEventListener('click', () => toast('「' + b.dataset.soon + '」建设中，敬请期待'));
     });
@@ -323,10 +336,10 @@
     if(pc) pc.addEventListener('click', () => XX._openPower());
     /* 顶栏寿元 chip → 寿元 hub（第 96 轮，同为静态元素） */
     const lc = document.getElementById('sc-life-chip');
-    if(lc) lc.addEventListener('click', () => open('life'));
+    if(lc) lc.addEventListener('click', () => open('life', undefined, true));
     /* 第三批 P0：主界面「今日」小钮 → 今日清单 */
     const td = document.getElementById('sc-today');
-    if(td) td.addEventListener('click', () => open('today'));
+    if(td) td.addEventListener('click', () => open('today', undefined, true));
         /* 入门八事纸签（第 105 轮）：同样常驻主 DOM，只绑一次 */
     const tr = document.getElementById('sc-trail');
     if(tr) tr.addEventListener('click', () => { try{ XX._trail.go(); }catch(e){} });
