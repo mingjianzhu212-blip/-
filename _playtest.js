@@ -249,7 +249,7 @@ const SCENARIOS = [
     id: 'onboard', name: '真人开局全链路（全新档）', budget: 26000, size: '900,1200', fresh: true,
     body: `
       var MODS = ['battle-modal','break-modal','trib-modal','story-modal','off-modal','hatch-modal'];
-      var O = { ov: [], refuel: 0, stone: 0, steps: [], got: 0 };
+      var O = { ov: [], refuel: 0, stone: 0, steps: [], got: 0, charActs: [], charBack: 0, charPathBack: 0 };
       var seen = {};
       setInterval(function(){
         var on = MODS.filter(__vis);
@@ -276,7 +276,8 @@ const SCENARIOS = [
           trail: !tr ? 'noEl' : (tr.hidden ? 'hidden' : 'shown'),
           legacy: localStorage.getItem('hasFinishedTutorial'),
           dan: (XX._s.bag || []).filter(function(x){ return x && x.t === 'dan1'; }).length,
-          steps: O.steps, ov: O.ov, claimed: Object.keys(XX._s.story.claimed || {}) });
+          steps: O.steps, ov: O.ov, charActs: O.charActs, charBack: O.charBack, charPathBack: O.charPathBack,
+          claimed: Object.keys(XX._s.story.claimed || {}) });
       }
       setInterval(function(){
         if(O.done) return;
@@ -284,10 +285,28 @@ const SCENARIOS = [
         if(t > 21000){ fin('cap'); return; }
         if(typeof XX === 'undefined' || !XX._s) return;
         if(__vis('char-modal')){
-          if(!document.querySelector('#char-path-picks .char-pick.active'))
-            O.path = __click('#char-path-picks .char-pick[data-path]', 'body');
-          var ni = document.getElementById('char-name'); if(ni) ni.value = '问心';
-          __click('#char-confirm', 'body');
+          var cm = document.getElementById('char-modal'), act = cm.getAttribute('data-act');
+          if(O.charActs[O.charActs.length - 1] !== act) O.charActs.push(act);
+          if(act === '1'){
+            var ni = document.getElementById('char-name'); if(ni) ni.value = '问心';
+            __click('#char-act1-next', 'body');
+            return;
+          }
+          if(act === '2'){
+            if(!O.charBack){ O.charBack = 1; __click('#char-act2-back', 'body'); }
+            else __click('#char-act2-next', 'body');
+            return;
+          }
+          if(act === '3'){
+            if(!document.querySelector('#char-path-picks .char-pick.active'))
+              O.path = __click('#char-path-picks .char-pick[data-path]', 'body');
+            if(!O.charPathBack){
+              O.charPathBack = 1;
+              __click('#char-act3-back', 'body');
+              return;
+            }
+            __click('#char-confirm', 'body');
+          }
           return;
         }
         if(__clearPopups()) return;
@@ -356,6 +375,9 @@ const SCENARIOS = [
     `,
     checks(d) {
       return [
+        { ok: (d.charActs || []).join(',') === '1,2,1,2,3,2,3' && d.charBack === 1 && d.charPathBack === 1,
+          label: '创角三幕可前进与返回，道号输入不丢',
+          detail: (d.charActs || []).join('>') + ' / 返回 ' + d.charBack + '/' + d.charPathBack },
         { ok: Number(d.rank) >= 1 && d.brk === 1 && d.gskipped === false,
           label: '点【突破】真的突破成功（现行引导不拦自己让点的那颗钮）',
           detail: '境界 ' + d.rank + ' / 突破点击 ' + d.brk + ' / 跳过 ' + d.gskipped },
@@ -368,6 +390,53 @@ const SCENARIOS = [
         { ok: (d.claimed || []).length >= 1 && d.dan === 1 && d.trail === 'shown',
           label: '引导结束后主线立刻接上（赠丹落背包、纸签露头）',
           detail: (d.claimed || []).join(',') + ' / 丹 ' + d.dan + ' / 纸签 ' + d.trail }
+      ];
+    }
+  },
+
+  /* ②b 老档编辑：设置→改名/换装直达 edit 单屏；已有道途只读，未选老档可补选 */
+  {
+    id: 'charedit', name: '老档编辑角色直达单屏', budget: 5000, size: '390,844',
+    save: () => Object.assign(midSave(), { path: 'sword' }),
+    body: `
+      setTimeout(function(){
+        document.getElementById('sc-settings').click();
+        document.getElementById('m-char').click();
+        var m = document.getElementById('char-modal');
+        function snap(){
+          var pb = document.getElementById('char-path-picks');
+          return {
+            act: m.getAttribute('data-act'), shown: __vis('char-modal'),
+            confirm: document.getElementById('char-confirm').textContent,
+            close: getComputedStyle(document.getElementById('char-close')).display,
+            picks: __sh('#char-picks') && __sh('#char-name'),
+            path: __sh('#char-path-picks'),
+            readonly: pb.querySelectorAll('.readonly').length,
+            active: pb.querySelectorAll('.active').length,
+            nextHidden: getComputedStyle(document.getElementById('char-act1-next')).display === 'none' &&
+              getComputedStyle(document.getElementById('char-act2-next').closest('.char-act')).display === 'none'
+          };
+        }
+        var locked = snap();
+        document.getElementById('char-close').click();
+        XX._s.path = '';
+        XX._showCharModal(false);
+        var fill = snap();
+        __ptDone({ locked: locked, fill: fill });
+      }, 500);
+    `,
+    checks(d) {
+      return [
+        { ok: d.locked.act === 'edit' && d.fill.act === 'edit' && d.locked.shown && d.fill.shown,
+          label: '老档改名/换装直接进入 edit 单屏', detail: d.locked.act + '/' + d.fill.act },
+        { ok: d.locked.confirm === '保存更改' && d.fill.confirm === '保存更改' &&
+          d.locked.close !== 'none' && d.fill.close !== 'none',
+          label: '编辑态显示保存更改与关闭入口', detail: d.locked.confirm + '/' + d.locked.close },
+        { ok: d.locked.picks && d.fill.picks && d.locked.nextHidden && d.fill.nextHidden,
+          label: '编辑态同屏展示身形道号且不重走三幕', detail: 'picks ' + d.locked.picks + '/' + d.fill.picks },
+        { ok: d.locked.path && d.fill.path && d.locked.readonly === 4 && d.locked.active === 1 &&
+          d.fill.readonly === 0,
+          label: '编辑态已有道途只读、未选老档可补选', detail: '只读 ' + d.locked.readonly + '/' + d.fill.readonly }
       ];
     }
   },

@@ -430,9 +430,20 @@ const DIAG = `
     L('heroOfFemale', XX._heroImg('f'));                                      // f → hero_female
     L('genderOfM', XX._genderOf('m') + '/' + XX._genderOf('f'));              // male/female
     L('sexOfMale', XX._sexOf('male') + '/' + XX._sexOf('female'));            // m/f 互认
-    // 创角界面：两张立绘并排
+    // 序章三幕：既有 ID 全保留，新档从立名→异象→择道，并实测返回不丢输入
     XX._s.sex = 'm'; XX._s.gender = 'male';
-    document.getElementById('char-modal').classList.remove('hidden');
+    XX._showCharModal(false);
+    const charModal = document.getElementById('char-modal');
+    const charCard = charModal.querySelector('.char-card');
+    const charCardFit = () => {
+      const r = charCard.getBoundingClientRect();
+      return r.top >= -1 && r.bottom <= window.innerHeight + 1 &&
+        charCard.scrollWidth <= charCard.clientWidth + 1 ? 'ok' : 'bad';
+    };
+    L('charDomIds', ['char-modal','char-picks','char-name','char-dice','char-path-picks','char-path-label',
+      'char-confirm','char-close'].every(id => !!document.getElementById(id)) ? 'ok' : 'missing');
+    L('charAct0', charModal.dataset.act);
+    L('charFit0', charCardFit());
     XX._renderCharPreview();
     L('pickN', document.querySelectorAll('#char-picks .char-pick').length);   // 2 张
     L('pickImgs', document.querySelectorAll('#char-picks .cp-img').length);   // 2 个 img
@@ -443,24 +454,46 @@ const DIAG = `
     document.querySelector('#char-picks [data-sex="f"]').click();
     L('pickActive1', document.querySelector('#char-picks .char-pick.active').dataset.sex);   // 变女
     L('pickActiveN', document.querySelectorAll('#char-picks .char-pick.active').length);     // 只有 1 个 active
-    /* 创角必选道途（组 A/B 五条红的根因，制作人拍板 2026-11-13）：
-       少点这一下，confirmChar 会在 game.js:11579 那句「if(needNewGame && !charPath)」直接 return ——
-       弹窗不关 → finalizeNewGame/finishBoot 不跑 → Story.init() 不跑 → story.js:25 D=null →
-       cur() 返回 null → settle() 返回 null（主线发奖那条红跟着来）。
-       ⚠️ 真实容器是 #char-path-picks（game.js:11511 动态注入，不依赖 index.html），
-          任务单写的 #char-paths 在 DOM 里不存在，按实际 DOM 走。 */
+    document.getElementById('char-name').value = '碧落';
+    document.getElementById('char-act1-next').click();
+    L('charAct1', charModal.dataset.act);
+    L('charFit1', charCardFit());
+    const charStele = charModal.querySelector('.char-stele');
+    const charSteleRect = charStele.getBoundingClientRect();
+    const charSteleStyle = getComputedStyle(charStele);
+    const charSteleTextStyle = getComputedStyle(charModal.querySelector('.char-stele b'));
+    L('charSteleShape', (charSteleRect.width / charSteleRect.height).toFixed(2) + '/' +
+      charSteleTextStyle.whiteSpace + '/' + charSteleStyle.backgroundImage);
+    document.getElementById('char-act2-back').click();
+    L('charBackName', charModal.dataset.act + '/' + document.getElementById('char-name').value);
+    document.getElementById('char-act1-next').click();
+    document.getElementById('char-act2-next').click();
+    L('charAct2', charModal.dataset.act + '/' + document.getElementById('char-confirm').textContent);
+    L('charFit2', charCardFit());
+    document.getElementById('char-act3-back').click();
+    L('charPathBack', charModal.dataset.act);
+    document.getElementById('char-act2-next').click();
+    L('charPathReturn', charModal.dataset.act + '/' + document.getElementById('char-confirm').textContent);
+    /* 创角必选道途：未选时 confirmChar 仍拦回；选完才落档并进 finishBoot。 */
+    XX._confirmChar();
+    L('charPathBlocked', charModal.classList.contains('hidden') ? 'closed' : charModal.dataset.act);
     const pathBtn0 = document.querySelector('#char-path-picks .char-pick[data-path]');
     L('cargPathBtn', pathBtn0 ? pathBtn0.dataset.path : 'MISSING');
     if (pathBtn0) pathBtn0.click();
     const pathBtn1 = document.querySelector('#char-path-picks .char-pick[data-path].active');
     L('cargPathPicked', pathBtn1 ? pathBtn1.dataset.path : 'none');
     // 确认 → gender 落进 playerState
-    document.getElementById('char-name').value = '碧落';
     XX._confirmChar();
     L('genderSaved', XX._s.gender);
     L('sexSaved', XX._s.sex);
     L('nameSaved', XX._s.name);
     L('modalClosed', document.getElementById('char-modal').classList.contains('hidden') ? 'hidden' : 'open');
+    // 老档编辑入口直达单屏，不重走三幕
+    XX._showCharModal(false);
+    L('charEditAct', charModal.dataset.act + '/' + document.getElementById('char-confirm').textContent + '/' +
+      getComputedStyle(document.getElementById('char-close')).display);
+    L('charFitEdit', charCardFit());
+    document.getElementById('char-close').click();
     // 主界面：中心立绘跟着 gender 换
     L('sceneHeroSrc', document.querySelector('#sc-figure .sc-hero').getAttribute('src'));
     L('sceneBeam', !!document.querySelector('#sc-figure .sc-hero-beam'));   // 阵法光柱
@@ -4453,6 +4486,21 @@ const DIAG = `
      'heroImg() 按性别取对应立绘（' + F.heroOfMale + ' / ' + F.heroOfFemale + '）');
   ok(F.genderOfM === 'male/female', 'genderOf() 把 m/f 映射成 male/female（' + F.genderOfM + '）', F.genderOfM);
   ok(F.sexOfMale === 'm/f', 'sexOf() 把 male/female 映射回 m/f（老档兼容）', F.sexOfMale);
+  ok(F.charDomIds === 'ok', '创角既有 DOM ID 全部保留');
+  ok(F.charAct0 === '1', '新档默认进入第一幕 · 立名');
+  ok(F.charAct1 === '2' && F.charBackName === '1/碧落',
+     '第一幕可进异象、第二幕可返回立名且道号不丢');
+  ok(F.charAct2 === '3/隐入后山', '异象可进问心择道，新档确认文案为「隐入后山」');
+  ok(F.charPathBack === '2' && F.charPathReturn === '3/隐入后山', '第三幕可回看异象并再次进入择道');
+  ok(F.charPathBlocked === '3', '未选道途确认仍拦截并停在第三幕');
+  ok(F.charFit0 === 'ok' && F.charFit1 === 'ok' && F.charFit2 === 'ok' && F.charFitEdit === 'ok',
+     '三幕与编辑态卡片均不超出当前视口或横向溢出');
+  ok((() => {
+    const parts = String(F.charSteleShape || '').split('/');
+    return parts.length >= 3 && Number(parts[0]) <= 0.62 && parts[1] === 'nowrap' &&
+      parts.slice(2).join('/').indexOf('gradient') >= 0;
+  })(), '黑碑为纯 CSS 竖碑、碑文单列不折行', F.charSteleShape);
+  ok(F.charEditAct === 'edit/保存更改/grid', '老档从角色入口直达 edit 单屏，显示保存更改与关闭按钮');
   ok(F.pickN === '2' && F.pickImgs === '2', '创角界面并排展示 2 张立绘（' + F.pickN + '/' + F.pickImgs + '）');
   ok(F.pickMImg === F.heroOfMale && F.pickFImg === F.heroOfFemale, '两张立绘各挂对的图');
   ok(F.pickActive0 === 'm', '默认选中男修');
@@ -5822,12 +5870,17 @@ setInterval(function(){
     }
     else if(!tb){O.bothNo=(O.bothNo||0)+1;}
     else{O.bothOff=(O.bothOff||0)+1;}}
-  if(sh("char-modal")){                                   /* 创角：道途四选一必点，否则 game.js:11579 挡回 */
-    if(!document.querySelector("#char-path-picks .char-pick.active")){
-      var p=q("#char-path-picks .char-pick[data-path]");
-      if(p){O.path=p.getAttribute("data-path");p.click();}else O.path="MISSING";}
-    var ni=document.getElementById("char-name");if(ni)ni.value="问心";
-    clk("#char-confirm","confirm");return;}
+  if(sh("char-modal")){                                   /* 序章三幕：立名→异象→择道，道途四选一必点 */
+    var cm=document.getElementById("char-modal"),ca=cm.getAttribute("data-act");
+    if(ca==="1"){
+      var ni=document.getElementById("char-name");if(ni)ni.value="问心";
+      clk("#char-act1-next","char1");return;}
+    if(ca==="2"){clk("#char-act2-next","char2");return;}
+    if(ca==="3"){
+      if(!document.querySelector("#char-path-picks .char-pick.active")){
+        var p=q("#char-path-picks .char-pick[data-path]");
+        if(p){O.path=p.getAttribute("data-path");p.click();}else O.path="MISSING";}
+      clk("#char-confirm","confirm");return;}}
   if(sh("trib-modal")){clk("#trib-skip","trib");return;}
   if(sh("break-modal")){O.brkModalSeen=1;clk("#b-close","bclose");return;}
   if(sh("story-modal")){                                    /* 主线卡也会压上来（A/B 探针实测 tick4-12 可见）。

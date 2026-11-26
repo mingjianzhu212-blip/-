@@ -306,22 +306,51 @@
   </div>
 </div>
 
-<!-- 创立角色（首次进入触发，向大型网游看齐） -->
-<div class="modal hidden" id="char-modal">
+<!-- 序章 · 测灵台：新档三幕创角；data-act 只切显隐，不改既有 DOM ID 与绑定 -->
+<div class="modal hidden" id="char-modal" data-act="1">
   <div class="m-card char-card char-card-lg">
-    <h3><span class="char-orn l" aria-hidden="true"></span><span class="char-title">创立角色</span><span class="char-orn r" aria-hidden="true"></span><button class="m-close" id="char-close" type="button" style="display:none" aria-label="关闭">×</button></h3>
-    <!-- 立绘选择区：两张立绘并排居中，点击选中（放大 + 高亮），下方是道号输入 -->
-    <div class="char-picks" id="char-picks"></div>
-    <div class="m-row char-name-row">
-      <label>道号（1~12 字）</label>
-      <div class="char-name-wrap">
-        <input id="char-name" type="text" maxlength="12" placeholder="如：青玄子">
-        <button class="char-dice" id="char-dice" type="button" aria-label="随机道号" title="随机道号">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/></svg>
-        </button>
+    <p class="char-prologue">测灵台前，山风微寒。请留身形与道号。</p>
+    <h3><span class="char-orn l" aria-hidden="true"></span><span class="char-title">序章 · 测灵台</span><span class="char-orn r" aria-hidden="true"></span><button class="m-close" id="char-close" type="button" aria-label="关闭">×</button></h3>
+
+    <!-- 第一幕 · 立名；编辑态也复用这一屏的身形与道号区 -->
+    <div class="char-act char-act-identity" data-char-act="1">
+      <div class="char-picks" id="char-picks"></div>
+      <div class="m-row char-name-row">
+        <label>道号（1~12 字）</label>
+        <div class="char-name-wrap">
+          <input id="char-name" type="text" maxlength="12" placeholder="如：青玄子">
+          <button class="char-dice" id="char-dice" type="button" aria-label="随机道号" title="随机道号">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="char-actions">
+        <button class="btn-main char-confirm-main" id="char-act1-next" type="button">手按测灵碑</button>
       </div>
     </div>
-    <button class="btn-main char-confirm-main" id="char-confirm">踏入仙途</button>
+
+    <!-- 第二幕 · 黑碑异象：纯 CSS 水墨意象，不新增图片依赖 -->
+    <div class="char-act char-act-omen" data-char-act="2">
+      <div class="char-omen-visual" aria-hidden="true">
+        <i class="char-ink char-ink-a"></i><i class="char-ink char-ink-b"></i>
+        <span class="char-stele"><b>测灵碑</b></span>
+      </div>
+      <div class="char-omen-copy">
+        <p>你伸手按上测灵碑。</p>
+        <p>碑面没有亮起青金灵光，反而墨色倒涌，吞没了整块石面。</p>
+        <p>暗处传来一声极轻的叹息：『三千年，碑只黑过两次。』</p>
+      </div>
+      <div class="char-actions char-actions-split">
+        <button class="btn-plain" id="char-act2-back" type="button">返回立名</button>
+        <button class="btn-main" id="char-act2-next" type="button">问心择道</button>
+      </div>
+    </div>
+
+    <!-- 第三幕与编辑态共用：#char-path-label / #char-path-picks 仍由 game.js 动态注入到此 -->
+    <div class="char-path-zone">
+      <button class="btn-plain char-act-back" id="char-act3-back" type="button">回看异象</button>
+      <button class="btn-main char-confirm-main" id="char-confirm">隐入后山</button>
+    </div>
   </div>
 </div>
 

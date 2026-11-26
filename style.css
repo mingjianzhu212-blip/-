@@ -6220,19 +6220,29 @@ html,body{ background:var(--jx-paper); }
   .panel-body{ padding-top:8px; }
 }
 
-/* ===== batch6 创角页：商业首屏信息减法 / 选中态 / 道号随机 ===== */
+/* ===== 序章 · 测灵台：三幕创角 / 老档编辑单屏 ===== */
 #char-modal{
   background:rgba(20,18,15,.76);
   backdrop-filter:blur(12px) saturate(.82);
   -webkit-backdrop-filter:blur(12px) saturate(.82);
 }
 #char-modal .char-card{
+  position:relative; display:flex; flex-direction:column;
+  max-height:calc(100vh - 24px); max-height:calc(100dvh - 24px); overflow-y:auto;
   background:linear-gradient(180deg,#faf6ea,#f4eedf);
   box-shadow:0 24px 70px rgba(0,0,0,.45), inset 0 0 0 1px rgba(138,109,59,.18);
+  scrollbar-width:thin;
 }
-#char-modal .char-card h3{ display:flex; align-items:center; justify-content:center; gap:10px; color:#5a4a2e; }
-.char-title{ letter-spacing:4px; }
-.char-orn{ width:40px; height:12px; position:relative; opacity:.75; }
+#char-modal .char-card h3{ display:flex; align-items:center; justify-content:center; gap:10px; color:#5a4a2e; flex:none; }
+.char-title{ letter-spacing:3px; }
+.char-prologue{
+  flex:none; margin:0 0 10px; text-align:center; color:#7b715f;
+  font:12.5px/1.65 'KaiTi','STKaiti','SimSun',serif; letter-spacing:1px;
+}
+#char-modal[data-act="2"] .char-prologue,
+#char-modal[data-act="3"] .char-prologue,
+#char-modal[data-act="edit"] .char-prologue{ display:none; }
+.char-orn{ width:40px; height:12px; position:relative; opacity:.75; flex:none; }
 .char-orn::before,.char-orn::after{
   content:""; position:absolute; top:6px; width:22px; height:8px;
   border-top:1px solid rgba(138,109,59,.55); border-radius:50%;
@@ -6240,6 +6250,20 @@ html,body{ background:var(--jx-paper); }
 .char-orn::before{ left:0; border-left:1px solid rgba(138,109,59,.45); }
 .char-orn::after{ right:0; border-right:1px solid rgba(138,109,59,.45); }
 .char-orn.l{ transform:scaleX(-1); }
+#char-close{ display:none; margin-left:auto; }
+#char-modal[data-act="edit"] #char-close{ display:grid; place-items:center; }
+.char-act,.char-path-zone{ display:none; }
+#char-modal[data-act="1"] .char-act-identity,
+#char-modal[data-act="edit"] .char-act-identity,
+#char-modal[data-act="2"] .char-act-omen,
+#char-modal[data-act="3"] .char-path-zone,
+#char-modal[data-act="edit"] .char-path-zone{ display:block; }
+.char-actions{ display:flex; gap:10px; margin-top:4px; flex:none; }
+.char-actions-split .btn-main{ flex:1.45; }
+.char-actions-split .btn-plain{ flex:1; }
+.char-act-back{ width:100%; margin:10px 0 8px; }
+#char-modal[data-act="edit"] .char-act-back,
+#char-modal[data-act="edit"] #char-act1-next{ display:none !important; }
 .char-pick.active{
   box-shadow:0 0 0 2px #c9a35a inset, 0 0 0 1px rgba(201,163,90,.45), 0 10px 26px rgba(138,109,59,.22) !important;
 }
@@ -6254,7 +6278,6 @@ html,body{ background:var(--jx-paper); }
   border-radius:3px; box-shadow:0 2px 6px rgba(120,30,20,.3);
   font-family:'ZCOOL XiaoWei',serif; line-height:1.2; pointer-events:none;
 }
-.char-path-picks .char-pick .cp-seal{ left:7px; right:auto; }
 .char-name-wrap{ display:flex; align-items:stretch; gap:8px; }
 .char-name-wrap #char-name{
   flex:1; min-width:0; background:#fffdf7; color:#2c2c2c;
@@ -6282,26 +6305,131 @@ html,body{ background:var(--jx-paper); }
   0%,100%{ box-shadow:0 6px 18px rgba(180,58,44,.20); filter:brightness(1); }
   50%{ box-shadow:0 8px 26px rgba(180,58,44,.34); filter:brightness(1.04); }
 }
+
+/* 第二幕：纯 CSS 墨色翻涌与黑碑，克制一次入场，不循环晃动 */
+.char-omen-visual{
+  position:relative; flex:none; height:clamp(180px,32vh,280px); overflow:hidden;
+  border:1px solid rgba(138,109,59,.22); border-radius:16px;
+  background:
+    radial-gradient(ellipse at 50% 115%,rgba(20,24,23,.92),transparent 62%),
+    linear-gradient(160deg,rgba(250,246,234,.94),rgba(224,216,199,.86));
+  box-shadow:inset 0 0 34px rgba(32,31,28,.16),0 10px 24px rgba(60,48,30,.10);
+}
+.char-omen-visual::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(115deg,transparent 20%,rgba(255,255,255,.24) 43%,transparent 62%);
+  mix-blend-mode:soft-light;
+}
+.char-stele{
+  position:absolute; z-index:2; left:50%; bottom:12%; height:76%; width:auto; aspect-ratio:.56; max-width:44%;
+  transform:translateX(-50%); clip-path:polygon(8% 0,92% 2%,100% 94%,84% 100%,5% 96%,0 10%);
+  background:
+    linear-gradient(103deg,rgba(255,255,255,.10),transparent 24%,rgba(0,0,0,.24) 70%),
+    radial-gradient(circle at 36% 24%,#343b38,#111614 72%);
+  box-shadow:inset 0 0 0 1px rgba(230,224,205,.12),inset 0 -20px 30px rgba(0,0,0,.55);
+}
+.char-stele::before,.char-stele::after{
+  content:""; position:absolute; left:12%; right:12%; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(219,211,192,.24),transparent);
+}
+.char-stele::before{ top:13%; } .char-stele::after{ bottom:12%; }
+.char-stele b{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  writing-mode:vertical-rl; white-space:nowrap; color:rgba(232,226,209,.72); text-shadow:0 2px 8px #000;
+  font:700 20px/1 'Ma Shan Zheng','ZCOOL XiaoWei','KaiTi',serif; letter-spacing:8px;
+}
+.char-ink{ position:absolute; z-index:1; border-radius:50%; filter:blur(13px); opacity:0; pointer-events:none; }
+.char-ink-a{
+  width:74%; height:58%; left:-14%; bottom:-10%;
+  background:radial-gradient(ellipse,rgba(13,19,17,.88),rgba(27,34,30,.36) 52%,transparent 72%);
+  animation:charInkSweep 1.35s var(--ease-soft) .04s both;
+}
+.char-ink-b{
+  width:66%; height:50%; right:-16%; bottom:-4%;
+  background:radial-gradient(ellipse,rgba(8,13,11,.78),rgba(31,38,34,.28) 54%,transparent 74%);
+  animation:charInkSweep 1.55s var(--ease-soft) .12s both reverse;
+}
+.char-card.char-omen-enter{ animation:charOmenShake .42s ease-out both; }
+.char-omen-copy{ flex:none; padding:16px 4px 2px; }
+.char-omen-copy p{
+  margin:0 0 9px; color:#4d493f; font:14px/1.75 'KaiTi','STKaiti','SimSun',serif; letter-spacing:.4px;
+}
+.char-omen-copy p:last-child{ margin-bottom:0; color:#8d3f34; }
+@keyframes charInkSweep{
+  0%{ opacity:0; transform:translate3d(-8%,24%,0) scale(.82); }
+  55%{ opacity:.92; }
+  100%{ opacity:.78; transform:translate3d(4%,0,0) scale(1.08); }
+}
+@keyframes charOmenShake{
+  0%,100%{ transform:translateX(0); }
+  22%{ transform:translateX(-2px); }
+  48%{ transform:translateX(2px); }
+  72%{ transform:translateX(-1px); }
+}
+
+/* 道途卡：样式统一收口到 style.css，不再由 renderPathPreview 动态注入 */
+.char-path-label{ text-align:center; font-size:12px; letter-spacing:1px; color:var(--muted); margin:10px 0 6px; }
+.char-path-picks{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0 0 10px; }
+.char-path-picks .char-pick{ min-height:78px; padding:10px 9px 9px; align-items:flex-start; text-align:left; justify-content:center; cursor:pointer; }
+.char-path-picks .char-pick .cp-tag{ font-size:11.5px; font-weight:700; color:#8a6d3b; letter-spacing:.5px; padding-right:22px; }
+.char-path-picks .char-pick .cp-hint{ font-size:10.2px; line-height:1.5; color:var(--muted); padding-right:20px; }
+.char-path-picks .char-pick .cp-info{
+  position:absolute; right:7px; top:7px; width:18px; height:18px; border-radius:50%;
+  display:grid; place-items:center; cursor:help; font:11px/1 "PingFang SC","Microsoft YaHei",sans-serif;
+  color:#8a6d3b; background:rgba(255,253,246,.78); box-shadow:0 0 0 1px rgba(138,109,59,.35);
+}
+.char-path-picks .char-pick::before{
+  content:attr(data-mark); position:absolute; right:7px; bottom:2px;
+  font-family:"Ma Shan Zheng","ZCOOL XiaoWei",serif; font-size:34px; line-height:1;
+  color:rgba(138,109,59,.10); pointer-events:none;
+}
+.char-path-picks .char-pick.active::before{ color:rgba(138,109,59,.16); }
+.char-path-picks .char-pick.readonly{ cursor:default; filter:grayscale(.55); opacity:.62; }
+.char-path-picks .char-pick.readonly.active{ filter:none; opacity:1; }
+.char-path-picks .char-pick .cp-seal{ left:7px; right:auto; }
+.char-path-picks .char-pick .cp-name{
+  font-family:'Ma Shan Zheng','ZCOOL XiaoWei',serif;
+  font-size:16px; letter-spacing:2px; color:#5a4a2e; line-height:1.25; padding-right:22px;
+}
+.char-path-picks .char-pick:not(.active) .cp-name{ color:#6b6252; }
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{
     animation-duration:.001ms !important;
     animation-iteration-count:1 !important;
     transition-duration:.001ms !important;
   }
-  .char-pick .cp-img,.char-confirm-main{ animation:none !important; }
+  .char-pick .cp-img,.char-confirm-main,
+  .char-card.char-omen-enter,.char-ink{ animation:none !important; }
+  .char-ink{ opacity:.78; transform:none; }
 }
 @media (max-width:520px){
   #char-modal .char-card{ padding:16px 14px; }
   .char-picks .cp-img{ height:150px; }
   .char-path-picks .char-pick{ min-height:74px; }
+  .char-omen-visual{ height:clamp(170px,30vh,230px); }
+  .char-omen-copy{ padding-top:13px; }
+  .char-omen-copy p{ font-size:13px; line-height:1.7; }
 }
-
-/* 道途卡：名称优先，定位标签其次（创角信息减法） */
-.char-path-picks .char-pick .cp-name{
-  font-family:'Ma Shan Zheng','ZCOOL XiaoWei',serif;
-  font-size:16px; letter-spacing:2px; color:#5a4a2e; line-height:1.25; padding-right:22px;
+@media (max-height:720px){
+  #char-modal .char-card{ padding:14px; }
+  .char-picks{ margin-bottom:10px; }
+  .char-picks .cp-img{ height:132px; }
+  .char-name-row{ margin-bottom:10px; }
+  .char-omen-visual{ height:170px; }
+  .char-omen-copy{ padding-top:11px; }
+  .char-omen-copy p{ margin-bottom:6px; line-height:1.55; }
+  .char-path-picks .char-pick{ min-height:68px; padding-top:8px; padding-bottom:7px; }
 }
-.char-path-picks .char-pick:not(.active) .cp-name{ color:#6b6252; }
+@media (max-height:560px){
+  #char-modal .char-card{ padding:12px; }
+  .char-prologue{ margin-bottom:6px; }
+  .char-picks .cp-img{ height:106px; }
+  .char-picks{ margin:2px 0 8px; }
+  .char-pick{ padding-top:6px; padding-bottom:7px; }
+  .char-omen-visual{ height:138px; }
+  .char-stele b{ font-size:17px; }
+  .char-confirm-main{ padding:11px 14px !important; }
+}
 
 /* ===== batch6 外部评审：战斗微演出 / 遮挡修正 / 安全区 ===== */
 /* 妖兽水墨白底融进战斗框；人物立绘保持透明底，不叠白 */

@@ -15819,6 +15819,23 @@ function towerBossCompLetter(){
   let charPath = '';          /* P1-C：创角/编辑时暂存的道途选择（D1=(a) 创角必选） */
   let charEditing = false;    /* P1-C：区分创角必选与老档补选的提示文案 */
   let pathLocked = false;     /* P1-C：编辑已有合法道途时为 true，道途选择器只读（终身道途，禁止转职） */
+  const CHAR_ACT_TITLE = { '1':'序章 · 测灵台', '2':'黑碑异象', '3':'问心择道', edit:'更改角色' };
+  /* 三幕只切显隐；姓名/性别/道途仍只 confirmChar 落档，返回上一幕不写任何字段。 */
+  function setCharAct(act){
+    const modal = document.getElementById('char-modal');
+    if(!modal) return;
+    modal.dataset.act = act;
+    const title = modal.querySelector('.char-title');
+    if(title) title.textContent = CHAR_ACT_TITLE[act] || CHAR_ACT_TITLE['1'];
+    if(act === '2'){
+      const card = modal.querySelector('.char-card');
+      if(card){
+        card.classList.remove('char-omen-enter');
+        void card.offsetWidth;                 /* 重触发一次克制微震动，不循环 */
+        card.classList.add('char-omen-enter');
+      }
+    }
+  }
   /* 性别键与展示名。sex 是存档里的旧值（m/f），gender 是新的显式字段（male/female），两者同源 */
   const SEX_OPTS = [
     { sex: 'm', gender: 'male', name: '男修', hint: '剑眉星目，青竹般挺拔' },
@@ -15827,10 +15844,10 @@ function towerBossCompLetter(){
   /* P1-C（D1=(a)）：四道途，id 对齐联机枚举（PATH_IDS）。创角只露定位与一句话；
      九段成长系数收进「?」详情，避免把数值表当新手说明。 */
   const PATH_OPTS = [
-    { id: 'sword', name: '剑修', tag: '前中段凌厉 · 后段平稳', hint: '剑势前中段更凌厉，后段归于平稳' },
-    { id: 'body',  name: '体修', tag: '前中段稳健 · 后段平稳', hint: '体魄前中段更稳健，后段趋于平常' },
-    { id: 'dan',   name: '丹修', tag: '中后段见长 · 前段平稳', hint: '丹火中后段更盛，前段伤害平稳' },
-    { id: 'array', name: '阵修', tag: '前后段见长 · 中段稍缓', hint: '阵威前后段更盛，中段稍缓' }
+    { id: 'sword', name: '剑修', tag: '前中段凌厉 · 后段平稳', hint: '前半程剑不肯收，后半程它自己收锋。' },
+    { id: 'body',  name: '体修', tag: '前中段稳健 · 后段平稳', hint: '这一世先靠这副骨头撑住，往后才轮到骨头靠你。' },
+    { id: 'dan',   name: '丹修', tag: '中后段见长 · 前段平稳', hint: '火是慢热的，烧到后半夜才认人。' },
+    { id: 'array', name: '阵修', tag: '前后段见长 · 中段稍缓', hint: '首尾都有落子处，最难熬的是中间那段空盘。' }
   ];
   const PATH_MARK = { sword: '剑', body: '岳', dan: '炉', array: '卦' };
   /* 道号随机池：放置玩家通常懒得取名，给一个一键可用的入口（不改存档结构） */
@@ -15845,6 +15862,11 @@ function towerBossCompLetter(){
   function initCharUI(){
     const cf = document.getElementById('char-confirm');
     if(cf) cf.addEventListener('click', confirmChar);
+    const bindAct = (id, fn) => { const b = document.getElementById(id); if(b) b.addEventListener('click', fn); };
+    bindAct('char-act1-next', () => setCharAct('2'));
+    bindAct('char-act2-next', () => setCharAct('3'));
+    bindAct('char-act2-back', () => setCharAct('1'));
+    bindAct('char-act3-back', () => setCharAct('2'));
     const dice = document.getElementById('char-dice');
     if(dice) dice.addEventListener('click', () => {
       const input = document.getElementById('char-name');
@@ -15909,27 +15931,9 @@ function towerBossCompLetter(){
       note: '道途只影响对战斗伤害的侧重；修行速度、资源产出与存档规则不变。'
     });
   }
-  /* P1-C（D1=(a)）：道途选择预览。动态注入容器（不依赖 index.html 改动），
-     复用 .char-pick 样式；无障碍：文字名称 + aria-pressed 选中态。 */
+  /* P1-C（D1=(a)）：道途选择预览。容器动态生成，样式统一收口在 style.css；
+     无障碍：文字名称 + aria-pressed 选中态。 */
   function renderPathPreview(){
-    /* P1-C 样式随容器动态注入：不依赖 index.html / style.css 改动（白名单：唯一修改点 js/game.js）。 */
-    if(!document.getElementById('p1c-path-style')){
-      const st = document.createElement('style');
-      st.id = 'p1c-path-style';
-      st.textContent =
-        '.char-path-label{text-align:center;font-size:12px;letter-spacing:1px;color:var(--muted);margin:10px 0 6px}' +
-        '.char-path-picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 10px}' +
-        '.char-path-picks .char-pick{min-height:78px;padding:10px 9px 9px;align-items:flex-start;text-align:left;justify-content:center;cursor:pointer}' +
-        '.char-path-picks .char-pick .cp-tag{font-size:11.5px;font-weight:700;color:#8a6d3b;letter-spacing:.5px;padding-right:22px}' +
-        '.char-path-picks .char-pick .cp-hint{font-size:10.2px;line-height:1.5;color:var(--muted);padding-right:20px}' +
-        '.char-path-picks .char-pick .cp-info{position:absolute;right:7px;top:7px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;cursor:help;font:11px/1 "PingFang SC","Microsoft YaHei",sans-serif;color:#8a6d3b;background:rgba(255,253,246,.78);box-shadow:0 0 0 1px rgba(138,109,59,.35)}' +
-        '.char-path-picks .char-pick::before{content:attr(data-mark);position:absolute;right:7px;bottom:2px;font-family:"Ma Shan Zheng","ZCOOL XiaoWei",serif;font-size:34px;line-height:1;color:rgba(138,109,59,.10);pointer-events:none}' +
-        '.char-path-picks .char-pick.active::before{color:rgba(138,109,59,.16)}' +
-        '.char-path-picks .char-pick.readonly{cursor:default;filter:grayscale(.55);opacity:.62}' +
-        '.char-path-picks .char-pick.readonly.active{filter:none;opacity:1}' +
-        '@media(max-width:520px){.char-path-picks{grid-template-columns:repeat(2,minmax(0,1fr))}}';
-      document.head.appendChild(st);
-    }
     let box = document.getElementById('char-path-picks');
     if(!box){
       box = document.createElement('div');
@@ -15976,10 +15980,9 @@ function towerBossCompLetter(){
       : (charPath
           ? ('已选道途：' + pathName(charPath))
           : ('请选择道途' + (charEditing ? '（老档补选）' : '（创角必选）')));
-    /* batch11：改名/换装是已有存档的编辑态，只改道号与外观；道途标签和选择器一起隐藏。
-       每次打开都重设 display，避免编辑后再重开创角时留下隐藏状态。 */
-    label.style.display = charEditing ? 'none' : '';
-    box.style.display = charEditing ? 'none' : '';
+    /* 编辑态同屏展示：已有道途只读，未选老档可补选；显隐交给 #char-modal[data-act]。 */
+    label.style.display = '';
+    box.style.display = '';
     if(!box.dataset.bound){
       box.dataset.bound = '1';
       box.addEventListener('click', ev => {
@@ -16025,12 +16028,13 @@ function towerBossCompLetter(){
         const m = document.getElementById(id); if(m) m.classList.add('hidden');
       });
     }catch(e){}
+    setCharAct(charEditing ? 'edit' : '1');
     document.getElementById('char-modal').classList.remove('hidden');
     /* P2b：改名/换装（编辑态）给明确关闭；新档创角必须确认，不提供关闭 */
     const cc = document.getElementById('char-close');
     if(cc) cc.style.display = charEditing ? '' : 'none';
     const cf = document.getElementById('char-confirm');
-    if(cf) cf.textContent = charEditing ? '保存' : '踏入仙途';
+    if(cf) cf.textContent = charEditing ? '保存更改' : '隐入后山';
   }
   function closeCharModal(){
     if(!charEditing) return;   /* 新档创角：必须确认后才可进入 */
@@ -16043,7 +16047,11 @@ function towerBossCompLetter(){
     const nameInput = document.getElementById('char-name');
     let name = (nameInput ? nameInput.value : '').trim().slice(0, 12);
     if(!name) name = '无名散修';
-    if(needNewGame && !charPath){ log('请先选择道途，再确认创角。', 'bad'); return; } /* 创角必选（GPT 审查④） */
+    if(needNewGame && !charPath){
+      setCharAct('3');
+      log('请先选择道途，再确认创角。', 'bad');
+      return;
+    } /* 创角必选（GPT 审查④） */
     /* 终身道途：仅当本源尚未确定（创角/老档补选）才写入；已选道途不可被普通编辑覆盖（禁止转职，GPT 代码审查②）。
        P1-C GPT 终审阻断项①修正：写入前先校验 incoming charPath 本身属 PATH_IDS（数据完整性守卫，防非法/越界值落入本源）。 */
     if(PATH_IDS.indexOf(charPath) >= 0 && (typeof S.path !== 'string' || PATH_IDS.indexOf(S.path) < 0)) S.path = charPath;
@@ -16066,7 +16074,7 @@ function towerBossCompLetter(){
   function finalizeNewGame(){
     S.rootIdx = pickRoot();
     S.last = Date.now();
-    log('你睁开眼，站在一座荒山的石阶上。灵根：' + rootOf().name, 'sys');
+    log('你睁开眼，山风还在测灵台前打转；那块被你碰黑的碑没有再亮——灵根：' + rootOf().name, 'sys');
     if(rootOf().name === '废灵根'){
       log('灵根定的是这一世走路快慢：废灵根修得慢些，战力不打折。要再掷一次，得等这一世走到头。', 'note');
     }
