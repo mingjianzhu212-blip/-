@@ -273,7 +273,12 @@ const MIME = {
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
-  '.md': 'text/plain; charset=utf-8'
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+  '.ttf': 'font/ttf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2'
 };
 
 /* ===================== 配置 ===================== */
@@ -940,6 +945,10 @@ function apiStream(req, res, u) {
         if (!room) return;
         if (room.phase === 'run') { armKick(); return; }
         announceRoomChange(removeFromRoom(p));
+        if (!p.online && !p.roomId) {
+          players.delete(p.token);
+          byId.delete(p.id);
+        }
       }, OFFLINE_KICK_MS);
       if (p.kickTimer.unref) p.kickTimer.unref();
     };
@@ -1286,8 +1295,16 @@ function serveStatic(req, res, pathname) {
     return forbidden(res);
   }
   if (decoded.indexOf('..') >= 0) return forbidden(res);
+  const norm = decoded.startsWith('/') ? decoded : '/' + decoded;
+  const segs = norm.split('/').filter(Boolean);
+  if (segs.some(seg => seg.startsWith('.'))) return forbidden(res);
+  const ALLOW_FILES = new Set(['/', '/index.html', '/style.css', '/favicon.ico']);
+  const ALLOW_DIRS = ['/js/', '/ui/', '/audio/'];
+  if (!ALLOW_FILES.has(norm) && !ALLOW_DIRS.some(dir => norm.startsWith(dir))) {
+    return forbidden(res);
+  }
   const root = CFG.root;
-  const target = path.resolve(root, '.' + (decoded.startsWith('/') ? decoded : '/' + decoded));
+  const target = path.resolve(root, '.' + norm);
   if (target !== root && target.startsWith(root + path.sep) === false) return forbidden(res);
   let file = target;
   let st;
@@ -1349,8 +1366,8 @@ server.requestTimeout = 0;
 server.headersTimeout = 60000;
 server.keepAliveTimeout = 5000;
 
-process.on('uncaughtException', () => {
-  /* 任何异步漏网异常都不打崩进程 */
+process.on('uncaughtException', (err) => {
+  console.error('[server] uncaughtException:', err && err.stack ? err.stack : err);
 });
 
 /* 测试钩子：同值回归直接 import recomputePower 时用 SERVER_NO_LISTEN=1 阻止监听；

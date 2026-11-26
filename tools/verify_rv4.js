@@ -18,7 +18,7 @@ const ok = (v, label, got) => { if (v) { pass++; console.log('PASS ' + label); }
 
 ok(/const combatPower = \(\) => Math\.floor\(10 \* POW_K/.test(gameSrc), '战力公式本体保持锁定');
 ok(gameSrc.includes('POW_K = 100') && gameSrc.includes('needG: 1.85'), 'POW_K 与 needG=1.85 保持锁定');
-ok(indexSrc.includes('20261125rv4m7'), 'JS/CSS 版本号已同步');
+ok(indexSrc.includes('20261126rv5'), 'JS/CSS 版本号已同步');
 ok(!roleSrc.includes('xx-role-break') && !roleSrc.includes('data-role-jump') && !roleSrc.includes('xx-role-stats'), '人物页无拆账/四维/传送门');
 ok(caveSrc.includes('data-forge-codex') && caveSrc.includes('data-forge-bestiary') && caveSrc.includes('VIEWS.hunt'), '炼器坊双入口与独立猎妖页已注册');
 

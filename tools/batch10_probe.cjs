@@ -54,7 +54,7 @@ function countConfirm(files) {
     const allFiles = sourceFiles(ROOT).filter(f => !/node_modules/.test(f));
     const archiveScan = countConfirm(allFiles);
     console.log('CONFIRM_SCAN runtime=' + scan.count + ' all=' + archiveScan.count + ' archive_hits=' + JSON.stringify(archiveScan.hits));
-    ok(!indexSrc.includes('20261125rv4m6') && (indexSrc.match(/20261125rv4m7/g) || []).length === 11, 'JS/CSS 版本号统一为 rv4m7', { old: indexSrc.includes('20261125rv4m6'), refs: (indexSrc.match(/20261125rv4m7/g) || []).length });
+    ok(!indexSrc.includes('20261125rv4m7') && !indexSrc.includes('20261125rv4m6') && (indexSrc.match(/20261126rv4m8/g) || []).length === 11, 'JS/CSS 版本号统一为 rv4m8', { old: indexSrc.includes('20261125rv4m7') || indexSrc.includes('20261125rv4m6'), refs: (indexSrc.match(/20261126rv4m8/g) || []).length });
     const gameSrc = fs.readFileSync(path.join(ROOT, 'js/game.js'), 'utf8');
     ok(/const combatPower = \(\) => Math\.floor\(10 \* POW_K/.test(gameSrc) && gameSrc.includes('needG: 1.85'), '战力公式与 needG=1.85 锁定未改');
 
@@ -131,25 +131,29 @@ function countConfirm(files) {
     const gongs = await p.eval(`Array.from(document.querySelectorAll('#xx-gong-list .upg')).map(x=>({name:x.querySelector('b').textContent.trim(),detail:x.querySelector('.gong-detail').textContent}))`);
     ok(gongs.length === 3 && gongs.every(x => x.detail.includes('功法倍率同时计入战力')), '三门功法均披露倍率计入战力', gongs);
 
-    await p.eval(`S.bag=[{t:'mat_core',n:'妖丹',q:1}];S.market.sold=0;S.stone=10000;XX._render();ROUTER.open('market','mk-sell')`); await sleep(100);
-    const beforeSingle = await p.eval(`({stone:S.stone,bag:S.bag.length,sold:S.market.sold,price:XX._sellPrice('mat_core'),btn:document.querySelector('#mk-sell [data-sell="0"]').textContent.trim()})`);
+    await p.eval(`S.bag=[{t:'mat_core',n:'妖丹',q:1}];S.market.sold=0;S.stone=10000;S.field=0;XX._render();ROUTER.open('market','mk-sell')`); await sleep(100);
+    const beforeSingle = await p.eval(`({stone:S.stone,bag:S.bag.length,sold:S.market.sold,price:XX._sellPrice('mat_core'),rate:XX._stoneRate(),btn:document.querySelector('#mk-sell [data-sell="0"]').textContent.trim()})`);
+    const passiveCap = Math.min(beforeSingle.price - 1e-6, beforeSingle.rate * 2 + 1e-6);
     ok(beforeSingle.btn === beforeSingle.price + ' 灵石', '单件寄售按钮显示全价 N 灵石', beforeSingle);
     await click('#mk-sell [data-sell="0"]'); await sleep(80);
-    const singleCancel = await p.eval(`({stone:S.stone,bag:S.bag.length,sold:S.market.sold,shown:!document.getElementById('stance-modal').classList.contains('hidden'),text:document.getElementById('st-text').textContent})`);
-    ok(singleCancel.stone === beforeSingle.stone && singleCancel.bag === 1 && singleCancel.sold === 0 && singleCancel.shown && /妖丹/.test(singleCancel.text) && /数量：1 件/.test(singleCancel.text) && /总价：/.test(singleCancel.text), '单件寄售先确认且件名数量总价齐全', singleCancel);
+    const singleCancel = await p.eval(`({stone:S.stone,delta:S.stone-${beforeSingle.stone},bag:S.bag.length,sold:S.market.sold,shown:!document.getElementById('stance-modal').classList.contains('hidden'),text:document.getElementById('st-text').textContent})`);
+    ok(singleCancel.delta >= 0 && singleCancel.delta <= passiveCap && singleCancel.bag === 1 && singleCancel.sold === 0 && singleCancel.shown && /妖丹/.test(singleCancel.text) && /数量：1 件/.test(singleCancel.text) && /总价：/.test(singleCancel.text), '单件寄售先确认且件名数量总价齐全（不把挂机 passive 当寄售所得）', singleCancel);
     await click('#st-close'); await sleep(60);
-    ok(await p.eval(`S.stone===${beforeSingle.stone}&&S.bag.length===1&&S.market.sold===0`), '单件寄售取消不扣货不发钱');
+    const singleClosed = await p.eval(`({stone:S.stone,delta:S.stone-${beforeSingle.stone},bag:S.bag.length,sold:S.market.sold})`);
+    ok(singleClosed.delta >= 0 && singleClosed.delta <= passiveCap && singleClosed.bag === 1 && singleClosed.sold === 0, '单件寄售取消不扣货不发钱（仅允许至多 2 秒挂机产出）', singleClosed);
     await click('#mk-sell [data-sell="0"]'); await sleep(60);
     const singleDone = await p.eval(`(()=>{const before=S.stone;document.querySelector('#st-opts [data-st="ok"]').click();return {before,stone:S.stone,bag:S.bag.length,sold:S.market.sold};})()`);
     ok(singleDone.stone === singleDone.before + beforeSingle.price && singleDone.bag === 0 && singleDone.sold === 1, '单件寄售确认后按总价成交', singleDone);
 
-    await p.eval(`S.bag=[{t:'mat_core',n:'妖丹',q:3},{t:'mat_bone',n:'兽骨',q:2}];S.market.sold=0;S.stone=10000;XX._render()`); await sleep(100);
-    const beforeAll = await p.eval(`({stone:S.stone,bag:S.bag.length,plan:XX._sellAllPlan()})`);
+    await p.eval(`S.bag=[{t:'mat_core',n:'妖丹',q:3},{t:'mat_bone',n:'兽骨',q:2}];S.market.sold=0;S.stone=10000;S.field=0;XX._render()`); await sleep(100);
+    const beforeAll = await p.eval(`({stone:S.stone,bag:S.bag.length,rate:XX._stoneRate(),plan:XX._sellAllPlan()})`);
+    const passiveCapAll = Math.min(beforeAll.plan.sum - 1e-6, beforeAll.rate * 2 + 1e-6);
     await click('#mk-sell .mk-all'); await sleep(80);
     const allText = await p.eval(`document.getElementById('st-text').textContent`);
     ok(/数量：5 件/.test(allText) && allText.includes('总价：') && /妖丹 ×3/.test(allText) && /兽骨 ×2/.test(allText), '一键寄售确认显示逐项件数与总价', allText);
     await click('#st-close'); await sleep(60);
-    ok(await p.eval(`S.stone===${beforeAll.stone}&&S.bag.length===2&&S.market.sold===0`), '一键寄售取消不扣货不发钱');
+    const allClosed = await p.eval(`({stone:S.stone,delta:S.stone-${beforeAll.stone},bag:S.bag.length,sold:S.market.sold})`);
+    ok(allClosed.delta >= 0 && allClosed.delta <= passiveCapAll && allClosed.bag === 2 && allClosed.sold === 0, '一键寄售取消不扣货不发钱（仅允许至多 2 秒挂机产出）', allClosed);
     await click('#mk-sell .mk-all'); await sleep(60);
     const allDone = await p.eval(`(()=>{const before=S.stone;document.querySelector('#st-opts [data-st="ok"]').click();return {before,stone:S.stone,bag:S.bag.length,sold:S.market.sold};})()`);
     ok(allDone.stone === allDone.before + beforeAll.plan.sum && allDone.bag === 0 && allDone.sold === 5, '一键寄售确认数量与总价等于实际成交', { before: beforeAll.plan, after: allDone });

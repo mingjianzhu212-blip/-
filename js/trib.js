@@ -18,7 +18,7 @@
  *   · 异常一律兜底（try/catch + onDone 必达），绝卡死突破流程。
  * ============================================================ */
 (function(){
-  var timers = [], busy = false, phase = '', lastOk = null, onDone = null;
+  var timers = [], busy = false, phase = '', lastOk = null, onDone = null, pendingDones = [];
 
   function el(){ return document.getElementById('trib-modal'); }
   function cap(){ return document.getElementById('trib-cap'); }
@@ -60,11 +60,15 @@
   function finish(){
     clearTimers();
     var done = onDone;
+    var extra = pendingDones.splice(0);
     onDone = null;
     busy = false;
     setPhase('');
     hide();
     if(done){ try{ done(); }catch(e){} }
+    for(var i = 0; i < extra.length; i++){
+      try{ extra[i](); }catch(e){}
+    }
   }
 
   /* 主入口：ok = 是否渡劫成功；opt.onDone = 演出收尾回调（成功结算弹窗） */
@@ -85,8 +89,8 @@
          要修必须二选一：允许补发结算卡（改本文件的幂等契约），
          或禁止演出期间突破（等于给突破加 4.6 秒冷却，属玩法变更）。
          这里只留一条控制台记录以便事后追查，不改变任何既有行为。 */
-      try{ console.warn('[TRIB] 演出中重复触发，已按幂等契约忽略其 onDone（该次结算不会弹卡）'); }catch(e){}
-      return { playing:false, dropped:!!opt.onDone };
+      if(typeof opt.onDone === 'function') pendingDones.push(opt.onDone);
+      return { playing:false, queued:!!opt.onDone };
     }
     busy = true; lastOk = !!ok; onDone = opt.onDone || null;
     m.classList.remove('hidden');

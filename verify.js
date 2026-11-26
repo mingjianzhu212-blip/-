@@ -1939,10 +1939,11 @@ const DIAG = `
     })();
 
     // ---- 新手引导 js/guide_taixu.js（太虚真人 V1；2026-11-11 换代，旧 tutorial.js 已下线）----
-    /* 换代口径：状态在 S.guide（与主存档同一事务），UI 是 #taixu-bubble > .tb-text / .tb-skip，
+    /* 换代口径：状态在 S.guide（与主存档同一事务），UI 是 #taixu-bubble > .tb-text / #taixu-skip，
        台上时 body 挂 guide-active 与 data-guide-step，未教系统加 .guide-locked（只变灰、不挡点击）；
        不再有 tut-mask / tut-tip / tut-btn，也不再写 localStorage.hasFinishedTutorial。
-       完成判定两条路都要拍到：POLL（认权威业务状态）与 Guide.complete()（业务成功后回调）。 */
+       完成判定两条路都要拍到：POLL（认权威业务状态）与 Guide.complete()（业务成功后回调）。
+       2026-11-26 rv5：现行引导为 10 拍，台词拍点击推进、动作拍读状态推进。 */
     L('guideLoaded', !!window.Guide ? 'yes' : 'no');
     L('guideLegacyUi', (document.getElementById('tut-mask') || document.getElementById('tut-tip') ||
                         document.getElementById('tut-btn')) ? 'present' : 'none');
@@ -1955,22 +1956,28 @@ const DIAG = `
     const gstep = () => { const s = window.Guide._state(); return s ? s.step : 'nostate'; };
     const gDanN = () => XX._s.bag.filter(b => b.t === 'dan1').length;
     const gLogN = k => XX._s.log.filter(l => (l.t || '').indexOf(k) >= 0).length;
-    const gkill = () => { const b = gbub(); if (b && b.parentNode) b.parentNode.removeChild(b); };
+    const gkill = () => { ['taixu-bubble', 'taixu-skip'].forEach(id => {
+      const b = document.getElementById(id); if (b && b.parentNode) b.parentNode.removeChild(b);
+    }); };
     const gLockN = () => document.querySelectorAll('.guide-locked').length;
-    /* 界面推进是 400ms tick + 2600/3000/3200ms 演出定时器驱动的：一律轮询等，不写死 sleep */
+    /* 界面推进是 400ms tick + 2600ms 追叙定时器驱动的：一律轮询等，不写死 sleep */
     const gwait = async (cond, ms) => { let w = 0; while (!cond() && w++ < ms / 100) await sleep(100); return cond(); };
     // ① 旧档保护：没有引导档 + 已有业务进度 → init() 整段跳过，不建气泡、不写任何标记
     gkill(); delete XX._s.guide;
     XX._s.rank = 12; XX._s.exp = 8519000; XX._s.stats.sit = 0; XX._s.plots = [];
     window.Guide.init();
     L('guideOldSkip', (!gbub() && !XX._s.guide) ? 'ok' : ('bub=' + !!gbub() + '/state=' + !!XX._s.guide));
-    // ② 新档起盘：14 拍（2026-11-20 呆呆审结论；台词拍点击推进 / 动作拍读状态）
+    // ② 新档起盘：10 拍（enter.a / enter.b / sit / sit.b1 / brk / field.intro / field / bag / flash.a / handoff）
     gkill(); delete XX._s.guide;
     XX._s.rank = 0; XX._s.exp = 0; XX._s.stone = 10; XX._s.stats.sit = 0; XX._s.plots = []; XX._s.bag = [];
+    if (XX._s.npcs && XX._s.npcs.stele) XX._s.npcs.stele.met = 0;
     /* batch6：引导层级降到所有弹窗之下，弹窗在场时主动让位。
-       本段是隔离的业务测试，先清掉前序用例可能留下的弹窗，再验气泡本身。 */
+       本段是隔离的业务测试，先清掉前序用例可能留下的弹窗，再验气泡本身。
+       rv5 入场锚点是主场景 .tb-char，因此先回洞府场景，避免在面板页把气泡憋成不可见。 */
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+    window.ROUTER.toScene('cave');
     window.Guide.init();
+    await sleep(60);
     const gclick = () => { const b = gbub(); if (b) b.click(); };
     const gto = async (n) => { for (let i = 0; i < 60 && gstep() !== n; i++) { gclick(); await sleep(120); } return gstep() === n; };
     L('guideStart', (function(){ const b = gbub(); if (!b) return 'noBubble';
@@ -1978,9 +1985,9 @@ const DIAG = `
       return (b.style.display !== 'none' && s && s.step === 0 && s.started === true &&
               document.body.classList.contains('guide-active') && document.body.dataset.guideStep === '0') ? 'ok' : 'bad'; })());
     gclick(); await sleep(150);
-    L('guideEnterTxt', gtxt().indexOf('太虚真人') >= 0 ? 'ok' : gtxt().slice(0, 20));
-    L('guideSkipBtn', (document.getElementById('taixu-skip') || (gbub() && gbub().querySelector('.tb-skip'))) ? 'ok' : 'bad');
-    L('guideLocks0', gLockN());                                                     // 6：除入场拍（整页）外 6 个 target 全灰
+    L('guideEnterTxt', gtxt().indexOf('老道太虚') >= 0 ? 'ok' : gtxt().slice(0, 20));
+    L('guideSkipBtn', document.getElementById('taixu-skip') ? 'ok' : 'bad');
+    L('guideLocks0', gLockN());                                                     // 6：六个业务 target 全灰
     L('guideToSit', await gto(2) ? 'ok' : 'stuck@' + gstep());
     L('guideSitTxt', gtxt().indexOf('盘腿') >= 0 ? 'ok' : gtxt().slice(0, 20));
     L('guideLocks1', gLockN());                                                     // 5：已教到 sit，那一格去灰
@@ -1991,35 +1998,33 @@ const DIAG = `
     /* POLL 路径：只改权威业务状态（打过坐），引导自己认出来——不是猜点了哪一下 */
     XX._s.stats.sit = 1;
     L('guidePollSit', await gwait(() => gstep() === 3, 5000) ? 'ok' : 'stuck@' + gstep());
-    L('guideSelfGrowTxt', gtxt().indexOf('它自己会涨') >= 0 ? 'ok' : gtxt().slice(0, 20));
-    L('guideToBrkPre', await gto(5) ? 'ok' : 'stuck@' + gstep());
-    L('guideToBrk', await gto(6) ? 'ok' : 'stuck@' + gstep());
-    L('guideBrkTxt', gtxt().indexOf('攒够了') >= 0 ? 'ok' : gtxt().slice(0, 20));
+    L('guideSelfGrowTxt', gtxt().indexOf('灵气会自己聚拢') >= 0 ? 'ok' : gtxt().slice(0, 20));
+    L('guideToBrk', await gto(4) ? 'ok' : 'stuck@' + gstep());
+    L('guideBrkTxt', gtxt().indexOf('炼气二层') >= 0 ? 'ok' : gtxt().slice(0, 20));
     /* complete 路径：错步不推进 → 本步成功 → 追叙一句 → 2600ms 后才进下一步 → 重复调用幂等 */
-    L('guideWrongStep', (window.Guide.complete('field') === false && gstep() === 6) ? 'ok' : 'bad');
+    L('guideWrongStep', (window.Guide.complete('field') === false && gstep() === 4) ? 'ok' : 'bad');
     L('guideBrkComplete', window.Guide.complete('brk') === true ? 'ok' : 'bad');
-    L('guideAfterTxt', gtxt().indexOf('完完整整') >= 0 ? 'ok' : gtxt().slice(0, 20));
-    L('guideAfterKey', gtxt().indexOf('吓唬你的') >= 0 ? 'ok' : gtxt().slice(0, 26));
-    L('guideBrkIdem', (window.Guide.complete('brk') === false && gstep() === 6) ? 'ok' : 'bad');
+    L('guideAfterTxt', gtxt().indexOf('黑碑的反噬') >= 0 ? 'ok' : gtxt().slice(0, 20));
+    L('guideAfterKey', gtxt().indexOf('呼吸稳了些') >= 0 ? 'ok' : gtxt().slice(0, 26));
+    L('guideBrkIdem', (window.Guide.complete('brk') === false && gstep() === 4) ? 'ok' : 'bad');
     L('guideFlagBrk', window.Guide._state().flags['c_brk'] === true ? 'ok' : 'bad');
-    L('guideAfterAdvance', await gwait(() => gstep() === 7, 5000) ? 'ok' : 'stuck@' + gstep());
-    L('guideFieldIntroTxt', gtxt().indexOf('这块地归你了') >= 0 ? 'ok' : gtxt().slice(0, 20));
-    L('guideToFieldJoke', await gto(8) ? 'ok' : 'stuck@' + gstep());
-    L('guideFieldJokeTxt', gtxt().indexOf('炖出一锅寂寞') >= 0 ? 'ok' : gtxt().slice(0, 20));
-    L('guideToFieldAction', await gto(9) ? 'ok' : 'stuck@' + gstep());
+    L('guideAfterAdvance', await gwait(() => gstep() === 5, 5000) ? 'ok' : 'stuck@' + gstep());
+    L('guideFieldIntroTxt', gtxt().indexOf('荒废的灵田') >= 0 ? 'ok' : gtxt().slice(0, 20));
+    L('guideToFieldAction', await gto(6) ? 'ok' : 'stuck@' + gstep());
+    L('guideFieldActionTxt', gtxt().indexOf('第一茬灵草') >= 0 ? 'ok' : gtxt().slice(0, 20));
     L('guideField', window.Guide.complete('field') === true ? 'ok' : 'bad');
-    L('guideFieldAdvance', await gwait(() => gstep() === 10, 5000) ? 'ok' : 'stuck@' + gstep());
+    L('guideFieldAdvance', await gwait(() => gstep() === 7, 5000) ? 'ok' : 'stuck@' + gstep());
     /* bag 步（进入即发下品破境丹，唯一凭证 taixu_intro_dan_v1，与进度同一事务落盘） */
     L('guideDanCount', gDanN());                                                    // 1
     L('guideDanClaim', window.Guide._state().rewardClaims['taixu_intro_dan_v1'] === true ? 'ok' : 'bad');
     L('guideDanSaved', (function(){ try{ const j = JSON.parse(XX._saveText());
       return (j.guide && j.guide.rewardClaims && j.guide.rewardClaims['taixu_intro_dan_v1'] === true &&
               (j.bag || []).some(b => b.t === 'dan1')) ? 'ok' : 'bad'; }catch(e){ return 'ERR'; } })());
-    // bag（点击）→ flash.a → flash.b（问句版）→ handoff
-    L('guideToFlash', await gto(11) ? 'ok' : 'stuck@' + gstep());
-    L('guideToFlashB', await gto(12) ? 'ok' : 'stuck@' + gstep());
-    L('guideFlashBTxt', gtxt().indexOf('听课不专心') >= 0 ? 'ok' : gtxt().slice(0, 20));
-    L('guideToHandoff', await gto(13) ? 'ok' : 'stuck@' + gstep());
+    // bag（点击）→ flash.a（点击）→ handoff（POLL）
+    L('guideToFlash', await gto(8) ? 'ok' : 'stuck@' + gstep());
+    L('guideFlashTxt', gtxt().indexOf('镇妖塔') >= 0 ? 'ok' : gtxt().slice(0, 20));
+    L('guideToHandoff', await gto(9) ? 'ok' : 'stuck@' + gstep());
+    L('guideHandoffTxt', gtxt().indexOf('守碑老头') >= 0 ? 'ok' : gtxt().slice(0, 20));
     /* 收尾步 POLL：认「见过碑」这个业务状态（S.npcs.stele.met），不是猜点击 */
     L('guideSteleShape', (XX._s.npcs && XX._s.npcs.stele) ? 'set' : 'made');
     if (XX._s.npcs && XX._s.npcs.stele) XX._s.npcs.stele.met = 1;
@@ -2027,30 +2032,34 @@ const DIAG = `
     L('guideFinish', await gwait(() => window.Guide._state().done === true, 5000) ? 'ok' : 'stuck@' + gstep());
     L('guideFinishLog', gLogN('（太虚真人）去吧。后山那位') ? 'ok' : 'none');
     L('guideOutBubble', (function(){ const b = gbub();
-      /* B1（2026-11-20）：走完即整组摘除，nodom / hidden 均属无残留 */
+      /* B1：走完即整组摘除，nodom / hidden 均属无残留 */
       return ((!b || b.style.display === 'none') && !document.body.classList.contains('guide-active') &&
               (document.body.dataset.guideStep || '') === '') ? 'ok' : 'bad'; })());
     L('guideLockCleared', gLockN());                                                // 0
     // ③ 断点续走：气泡被摘掉（等价刷新后重挂）→ init() 必须从档里那一步接着讲，不回第一步
     gkill();
-    XX._s.guide = { step: 7, done: false, skipped: false, started: true,
+    XX._s.guide = { step: 5, done: false, skipped: false, started: true,
                     flags: {}, rewardClaims: { taixu_intro_dan_v1: true }, toldSystems: {} };
+    window.ROUTER.toScene('cave');
     window.Guide.init();
-    L('guideResume', (gstep() === 7 && gtxt().indexOf('这块地归你了') >= 0 &&
-                      document.body.dataset.guideStep === '7') ? 'ok' : (gstep() + '/' + gtxt().slice(0, 16)));
-    /* ④ 已完结再进：只留一个隐藏气泡壳，不再上台、不再写日志 */
+    await sleep(60);
+    L('guideResume', (gstep() === 5 && gtxt().indexOf('荒废的灵田') >= 0 &&
+                      document.body.dataset.guideStep === '5') ? 'ok' : (gstep() + '/' + gtxt().slice(0, 16)));
+    /* ④ 已完结再进：整组摘除，不再上台、不再写日志 */
     gkill();
-    XX._s.guide = { step: 7, done: true, skipped: false, started: true,
+    XX._s.guide = { step: 5, done: true, skipped: false, started: true,
                     flags: {}, rewardClaims: {}, toldSystems: {} };
     window.Guide.init();
     L('guideNoRepop', (function(){ const b = gbub();
-      /* B1（2026-11-20）：完成档整组摘除，nodom / hidden 均属无残留 */
       return ((!b || b.style.display === 'none') && !document.body.classList.contains('guide-active')) ? 'ok' : 'bad'; })());
     // ⑤ 跳过路径：点「先别唠叨」→ 解除限制 + 收尾旁白，无残留气泡/灰置
     gkill(); delete XX._s.guide;
     XX._s.rank = 0; XX._s.stats.sit = 0; XX._s.plots = [];
+    if (XX._s.npcs && XX._s.npcs.stele) XX._s.npcs.stele.met = 0;
+    window.ROUTER.toScene('cave');
     window.Guide.init();
-    { const sb = document.getElementById('taixu-skip') || (gbub() && gbub().querySelector('.tb-skip')); if (sb) sb.click(); }
+    await sleep(60);
+    { const sb = document.getElementById('taixu-skip'); if (sb) sb.click(); }
     L('guideSkip', (function(){ const s = window.Guide._state(); const b = gbub();
       return (s && s.skipped === true && s.done === true && (!b || b.style.display === 'none') &&
               !document.body.classList.contains('guide-active') && gLockN() === 0) ? 'ok' : 'bad'; })());
@@ -2059,7 +2068,7 @@ const DIAG = `
     { const n0 = gLogN('灵田这处'); window.Guide.tellSystem('field'); window.Guide.tellSystem('field');
       L('guideTellOnce', gLogN('灵田这处') - n0); }                                 // 1
     { gkill();
-      XX._s.guide = { step: 7, done: true, skipped: false, started: true,
+      XX._s.guide = { step: 5, done: true, skipped: false, started: true,
                       flags: {}, rewardClaims: {}, toldSystems: {} };
       window.Guide.reset();
       const n1 = gLogN('背包里的物件'); window.Guide.tellSystem('bag');
@@ -2072,7 +2081,7 @@ const DIAG = `
     XX._s.rank = gR0; XX._s.exp = gE0; XX._s.stone = gS0;
     XX._s.bag = gBag0; XX._s.log = gLog0; XX._s.plots = gPlots0; XX._s.stats.sit = gSit0;
     if (XX._s.npcs && XX._s.npcs.stele && gMet0 >= 0) XX._s.npcs.stele.met = gMet0;
-    XX._s.guide = { step: 7, done: true, skipped: false, started: true,
+    XX._s.guide = { step: 5, done: true, skipped: false, started: true,
                     flags: {}, rewardClaims: { taixu_intro_dan_v1: true }, toldSystems: {} };
     window.Guide.reset();
     XX._render();
@@ -2123,10 +2132,11 @@ const DIAG = `
     L('tribPlaying', tp.busy ? 'yes' : 'no');
     L('tribPhase', tp.phase);
     L('tribRankDelta', XX._s.rank - tribR0);
-    /* 防叠播：busy 期间再 play 不叠播、不重复收尾（TRIB 内部幂等） */
+    /* 防叠播：busy 期间再 play 不叠播；新契约把本次 onDone 排队，收尾时依次补发 */
     let tribDoneN = 0;
     const stackR = window.TRIB.play(true, { onDone: function(){ tribDoneN++; } });
     L('tribStack', stackR && stackR.playing === false ? 'no' : 'yes');
+    L('tribStackQueued', stackR && stackR.queued === true ? 'yes' : 'no');
     L('tribSkipR', window.TRIB.skip());
     await sleep(80);
     L('tribDoneOnce', tribDoneN);
@@ -2502,6 +2512,7 @@ const DIAG = `
     /* 先把局面清成"刚出新手村"：只有 1-1 天然达成，其余全部未满足（否则前面的用例会把条件提前做完） */
     XX._s.story = { claimed: {} };
     XX._s.cave = 0; XX._s.rank = 0; XX._s.towerMax = 0; XX._s.mastery.alchemyExp = 0;
+    if (XX._s.npcs && XX._s.npcs.stele) XX._s.npcs.stele.met = 0;             // rv5：1-2 改认见过沈碑
     XX._s.stats.farmN = 0; XX._s.secret.prog = [0, 0, 0, 0]; XX._s.pets = []; XX._s.enc.lastId = '';
     XX._s.arena.win = 0; XX._s.gong1 = 0; XX._s.gong2 = 0; XX._s.gong3 = 0;
     Story.init(stD);
@@ -2551,7 +2562,7 @@ const DIAG = `
     L('storyHintTxt', ((stLogs.filter(t => t.indexOf('下一步') >= 0).pop() || '').split('下一步：')[1] || ''));
 
     /* 卡片在台上时不叠第二张 */
-    XX._s.cave = 2;                                                          // 1-2 条件达成
+    XX._s.npcs.stele.met = 1;                                                 // rv5：1-2 条件达成
     Story._tick();
     L('storyNoStack', (XX._s.story.claimed || {})['1-2'] ? 'yes' : 'no');    // 应为 no
     Story.closeCard();
@@ -2566,7 +2577,7 @@ const DIAG = `
     /* 4 段同时达成（1-4b 上线后：1-3 / 1-4 / 1-4b / 1-5 一次全成，
        正好达到既有补记阈值 MERGE_AT=4）→ 出一张补记卡，名目全列、奖励先记 */
     XX._s.story = { claimed: { '1-1': 1, '1-2': 1 } };
-    XX._s.rank = 1;                                                          // 1-3 需 rank>=1
+    XX._s.rank = 2;                                                          // rv5：1-3 需 rank>=2
     XX._s.towerMax = 3;                                                      // 1-4 需 3（1-4b 读 claimed['1-4']）
     XX._s.mastery.alchemyExp = 0;                                            // 2-1 不给
     XX._s.stats.farmN = 0;
@@ -2581,13 +2592,13 @@ const DIAG = `
 
     /* 两张浮片之间至少隔 6 秒：同一秒里又达成一段，卡不会立刻怼上来，只排着 */
     XX._s.story = { claimed: { '1-1': 1 } };
-    XX._s.cave = 2;                                                          // 1-2 满足
+    XX._s.npcs.stele.met = 1;                                                // rv5：1-2 满足
     XX._s.rank = 0; XX._s.towerMax = 0;                                      // 1-3/1-4 先不满足（否则凑够 4 段走补记）
     Story._resetBurst();
     Story._tick();
     L('storyGapFirst', SM.getAttribute('data-seg') || '');                   // 1-2
     Story.closeCard();
-    XX._s.rank = 1;                                                          // 1-3 这时才满足
+    XX._s.rank = 2;                                                          // rv5：1-3 这时才满足
     Story._tick();                                                           // 但距上一张不足 6 秒
     L('storyGapWait', SM.classList.contains('hidden') ? 'yes' : 'no');       // 排着，先不弹
     L('storyGapQueued', Story._burst().queued);                              // 1
@@ -2596,6 +2607,7 @@ const DIAG = `
     /* 老档回归（真实场景）：一次补 15 段（1-4b 上线后多一段）→ 不逐段演，出一张补记卡 */
     XX._s.story = { claimed: {} };
     XX._s.rank = 12; XX._s.cave = 8; XX._s.towerMax = 20; XX._s.mastery.alchemyExp = 500;
+    XX._s.npcs.stele.met = 1;                                                // rv5：老档也必须已见过沈碑
     XX._s.stats.farmN = 40; XX._s.pets = [{ bid: 'rat', lv: 5, exp: 0 }]; XX._s.enc.lastId = 'beggar';
     XX._s.secret.prog = [12, 0, 0, 0]; XX._s.gong1 = 6; XX._s.gong2 = 6; XX._s.gong3 = 6;
     XX._s.arena.win = 5;
@@ -3405,8 +3417,15 @@ const DIAG = `
       L('trNoDup', T.tick() + '/' + (S.stone === stD && S.herb === hbD ? 'same' : 'changed'));
       /* 采两把灵草：两下采药 → 第 2 事，奖里带灵草 +6 */
       for(let i = 0; i < 2; i++){ XX._resetCd(); XX._act('herb'); }
-      L('trHerb', [T.idx(), txt('st-name'), txt('st-prog'), S.herb].join('/'));         // 2/破境至炼气三层/…%/12
+      L('trHerb', [T.idx(), txt('st-name'), txt('st-prog'), S.herb].join('/'));         // 2/破境至炼气三层/1/3 层/12
       L('trHerbLog', ((S.log[0] || {}).t || '').indexOf('灵草 +6') >= 0 ? 'ok' : ((S.log[0] || {}).t || ''));
+      /* batch11：八事小字统一「当前值/目标值」；修为是否满不再改变破境小字的层数口径。 */
+      /* 不能用 | 连接：外层 DIAG 也以 | 分字段，会被解析器截成 trProgAll=3/3。 */
+      L('trProgAll', T.list.map((st, n) => T.prog(n)).join('~'));
+      const trExpKeep = S.exp;
+      S.exp = XX._need(S.rank);
+      L('trBrkFull', T.prog(2));
+      S.exp = trExpKeep;
       /* 条件全补上 → 一帧把剩下六件一路了完：每件一笔「入门第X事」，末件再送一枚破境丹 */
       S.rank = 2; S.cave = 1; S.towerMax = 1; S.stats.craftPill = 1; S.stats.hunt = 1;
       S.secret = { prog: [1, 0, 0, 0], day: '', swept: 0 };
@@ -4113,6 +4132,12 @@ const DIAG = `
   ok((F.trHerb || '').split('/')[0] === '2' && (F.trHerb || '').split('/')[1] === '破境至炼气三层' &&
      (F.trHerb || '').slice(-3) === '/12',
      '采两把灵草 → 第 3 事，灵草 +6 到账（' + F.trHerb + '）');
+  ok(F.trHerb === '2/破境至炼气三层/1/3 层/12',
+     'batch11 破境小字按层数显示当前值/目标值，不再显示修为百分比（' + F.trHerb + '）');
+  ok(F.trProgAll === '3/3~2/2~1/3 层~Lv.0/1~0/1 层~0/1 层~0/1 炉~0/1 只',
+     'batch11 八事小字逐项统一当前值/目标值（' + F.trProgAll + '）');
+  ok(F.trBrkFull === '1/3 层',
+     'batch11 修为满格仍按真实层数显示 1/3，不误报 100%（' + F.trBrkFull + '）');
   ok(F.trHerbLog === 'ok', '第二事落账写明灵草 +6（' + F.trHerbLog + '）');
   ok(F.trChain === '6/8/false/dao/ok',
      '条件补齐一帧了完剩下六件，纸签当场换成道途第一程（' + F.trChain + '）');
@@ -5522,29 +5547,33 @@ const DIAG = `
   ok(F.guideLegacyUi === 'none', '旧引导 DOM（tut-mask / tut-tip / tut-btn）不再存在（' + F.guideLegacyUi + '）');
   ok(F.guideOldSkip === 'ok', '旧档保护：有业务进度 + 无引导档 → 不建气泡、不写引导标记（' + F.guideOldSkip + '）');
   ok(F.guideStart === 'ok', '新档起盘：step 0 上台 + body.guide-active + data-guide-step=0 + started 入档（' + F.guideStart + '）');
-  ok(F.guideEnterTxt === 'ok', '入场台词 = 太虚真人自报家门（' + F.guideEnterTxt + '）');
+  ok(F.guideEnterTxt === 'ok', '入场第二拍 = 太虚自报家门（' + F.guideEnterTxt + '）');
   ok(F.guideSkipBtn === 'ok', '气泡带「先别唠叨」跳过钮');
   ok(F.guideLocks0 === '6' && F.guideLocks1 === '5',
      '渐进解锁只做视觉：入场步 6 个目标变灰，教到打坐后那一格去灰、余 5（' + F.guideLocks0 + '→' + F.guideLocks1 + '）');
   ok(F.guideLockNow === 'clear/greyed', '已教的去灰、未教的仍灰（打坐格/沈碑横幅：' + F.guideLockNow + '）');
   ok(F.guideToSit === 'ok' && F.guideSitTxt === 'ok',
-     'enter 是脚本化演出（auto 2600ms）→ 自动进「打坐」步（' + F.guideToSit + ' / ' + F.guideSitTxt + '）');
-  ok(F.guidePollSit === 'ok', 'POLL 路径认权威状态：打坐计数 +1 后引导自己推进到突破步（不是猜点击）');
-  ok(F.guideBrkTxt === 'ok', '突破步台词在位（' + F.guideBrkTxt + '）');
+     'enter.a / enter.b 两拍点击推进 → 进「打坐」步（' + F.guideToSit + ' / ' + F.guideSitTxt + '）');
+  ok(F.guidePollSit === 'ok', 'POLL 路径认权威状态：打坐计数 +1 后引导自己推进到打坐追叙拍（不是猜点击）');
+  ok(F.guideSelfGrowTxt === 'ok', '打坐追叙写入新版台词：灵气会自己聚拢（' + F.guideSelfGrowTxt + '）');
+  ok(F.guideToBrk === 'ok' && F.guideBrkTxt === 'ok', '打坐追叙点击后进突破步，台词指向炼气二层（' + F.guideToBrk + ' / ' + F.guideBrkTxt + '）');
   ok(F.guideWrongStep === 'ok', 'complete() 只认当前步：错步返回 false 且步骤不动');
   ok(F.guideBrkComplete === 'ok' && F.guideFlagBrk === 'ok', '业务成功 → complete(brk) true 且写完成标记 flags.c_brk');
   ok(F.guideAfterTxt === 'ok', '本步有追叙台词时先播追叙（' + F.guideAfterTxt + '）');
   ok(F.guideBrkIdem === 'ok', '同一步重复 complete 幂等：返回 false 且不跳步');
   ok(F.guideAfterAdvance === 'ok', '追叙播完（2600ms）才进下一步（' + F.guideAfterAdvance + '）');
+  ok(F.guideFieldIntroTxt === 'ok' && F.guideToFieldAction === 'ok' && F.guideFieldActionTxt === 'ok',
+     '灵田引路两拍齐全：先划灵田、再点播种（' + F.guideFieldIntroTxt + '/' + F.guideToFieldAction + '/' + F.guideFieldActionTxt + '）');
   ok(F.guideField === 'ok' && F.guideFieldAdvance === 'ok', '灵田步 complete → 进背包步');
-  ok(F.guideDanCount === '1' && F.guideDanClaim === 'ok', '进背包步发 1 枚下品聚气丹 + 唯一凭证（枚数 ' + F.guideDanCount + '）');
+  ok(F.guideDanCount === '1' && F.guideDanClaim === 'ok', '进背包步发 1 枚下品破境丹 + 唯一凭证（枚数 ' + F.guideDanCount + '）');
   ok(F.guideDanSaved === 'ok', '丹药与领取凭证在同一份存档里（发丹即落盘，不空口发）');
-  ok(F.guideToFlash === 'ok' && F.guideToHandoff === 'ok', '背包 3000ms / 举重若轻 3200ms 演出步自动走完并落到交接步');
+  ok(F.guideToFlash === 'ok' && F.guideFlashTxt === 'ok' && F.guideToHandoff === 'ok' && F.guideHandoffTxt === 'ok',
+     '背包 / 镇妖塔两句点击推进后落到沈碑交接拍（' + F.guideToFlash + '/' + F.guideFlashTxt + '/' + F.guideToHandoff + '/' + F.guideHandoffTxt + '）');
   ok(F.guideFinish === 'ok', '收尾步 POLL 认「见过碑」（S.npcs.stele.met）→ 引导 done（档形 ' + F.guideSteleShape + '）');
   ok(F.guideFinishLog === 'ok', '收尾旁白进日志（去吧。后山那位…）');
   ok(F.guideOutBubble === 'ok' && F.guideLockCleared === '0', '引导收工：气泡隐藏 + guide-active 退 + 灰置清零（灰置 ' + F.guideLockCleared + '）');
-  ok(F.guideResume === 'ok', '断点续走：气泡摘掉重挂后从 step 3 接着讲，不回第一步（' + F.guideResume + '）');
-  ok(F.guideNoRepop === 'ok', '已完结再进不复发（只剩隐藏壳、不上台）');
+  ok(F.guideResume === 'ok', '断点续走：气泡摘掉重挂后从 step 5 接着讲，不回第一步（' + F.guideResume + '）');
+  ok(F.guideNoRepop === 'ok', '已完结再进不复发（整组摘除、不上台）');
   ok(F.guideSkip === 'ok' && F.guideSkipLog === 'ok', '点「先别唠叨」→ skipped+done、限制解除、无残留 UI、跳过旁白进日志');
   ok(F.guideTellOnce === '1', '跳过者补讲：同一系统首次打开只讲一次（本次 ' + F.guideTellOnce + ' 遍）');
   ok(F.guideTellSilent === '0', '没跳过的人不被补讲（本次 ' + F.guideTellSilent + ' 遍）');
@@ -5568,7 +5597,8 @@ const DIAG = `
   ok(F.tribApi === 'object', 'trib.js 已加载（window.TRIB）');
   ok(F.tribPlaying === 'yes' && F.tribPhase === 'cloud', '突破即开演：劫云汇聚阶段 + busy 上锁');
   ok(F.tribRankDelta === '1', '演出不拦结算：境界照常 +1（' + F.tribRankDelta + '）');
-  ok(F.tribStack === 'no' && F.tribDoneOnce === '0', '演出中重复触发不叠播、不重复收尾');
+  ok(F.tribStack === 'no' && F.tribStackQueued === 'yes' && F.tribDoneOnce === '1',
+     '演出中重复触发不叠播；回调进入队列，跳过后只补发一次（' + F.tribStack + '/' + F.tribStackQueued + '/' + F.tribDoneOnce + '）');
   ok(F.tribSkipR === 'true' && F.tribBreakShown === 'yes', '跳过 → 照常弹出突破结算');
   ok(F.tribBTitle.indexOf('突破成功') >= 0, '结算文案：突破成功（' + F.tribBTitle + '）');
   ok(F.tribFailOk === 'fail' && F.tribFailPhase === 'cloud', '失败路径同样开演（劫雷压顶）');
@@ -5615,7 +5645,7 @@ const DIAG = `
   ok(F.storyGain === 'yes', '浮片上写明所得', F.storyGain);
   ok(F.storyWisGain === 'yes', '奖励当场入账（原稿丢了 wisdomGain 的返回值）');
   ok(F.storyRec === 'yes', '记进 S.story.claimed（这是唯一新增写入）');
-  ok(F.storyHintLog === 'yes' && String(F.storyHintTxt).indexOf('洞府') >= 0,
+  ok(F.storyHintLog === 'yes' && String(F.storyHintTxt).indexOf('识人页') >= 0 && String(F.storyHintTxt).indexOf('守碑人') >= 0,
      '结算完在日志里落一句「下一步」——指路得递到玩家每天都看的地方', F.storyHintTxt);
   ok(F.storyNoStack === 'no', '卡片在台上时不叠第二张');
   ok(F.storyClosed === 'yes', '点「继续」即收');
@@ -5755,7 +5785,7 @@ const DIAG = `
      而且创角那一下没点道途 —— confirmChar 在 game.js:11579 直接 return，弹窗不关、boot 不下去，
      #sc-break 根本没机会出现，于是 rank 永远 0（旧驱动插桩实测见 probe_old_onboard.out，逐 tick 记录）。
      现行口径：创角 = 选道途 + 取名 + 确认；收工 = S.guide.done（并核对真落盘）；
-     七步按 window.Guide 的 step 索引逐条真点（打坐 / 突破 / 灵田开垦播种 / 主场景沈碑横幅 → 识人页）。 */
+     十拍按 window.Guide 的 step 索引逐条真点（打坐 / 突破 / 灵田开垦播种 / 城镇镇妖塔引路 / 主场景沈碑横幅 → 识人页）。 */
   const onbInj = `<script>
 var O={},t=0,idle=0,seen={};
 function sh(id){var e=document.getElementById(id);if(!e||e.classList.contains("hidden"))return false;return getComputedStyle(e).display!=="none";}
@@ -5772,7 +5802,7 @@ function done(why){if(O.done)return;O.done=1;O.why=why;O.t=t;O.rank=XX._s.rank;O
   O.dan=(XX._s.bag||[]).filter(function(x){return x&&x.t==="dan1";}).length;
   O.legacy=localStorage.getItem("hasFinishedTutorial");
   document.title=JSON.stringify(O);}
-var STEP=["enter.a","enter.b","sit","sit.b1","sit.b2","brk.pre","brk","field.intro","field.joke","field","bag","flash.a","flash.b","handoff"];
+var STEP=["enter.a","enter.b","sit","sit.b1","brk","field.intro","field","bag","flash.a","handoff"];
 setInterval(function(){
   if(O.done)return;
   t+=200;
@@ -5793,7 +5823,7 @@ setInterval(function(){
     else if(!tb){O.bothNo=(O.bothNo||0)+1;}
     else{O.bothOff=(O.bothOff||0)+1;}}
   if(sh("char-modal")){                                   /* 创角：道途四选一必点，否则 game.js:11579 挡回 */
-    if(!q("#char-path-picks .char-pick.active")){
+    if(!document.querySelector("#char-path-picks .char-pick.active")){
       var p=q("#char-path-picks .char-pick[data-path]");
       if(p){O.path=p.getAttribute("data-path");p.click();}else O.path="MISSING";}
     var ni=document.getElementById("char-name");if(ni)ni.value="问心";
@@ -5808,8 +5838,19 @@ setInterval(function(){
   if(g.done){done("guidedone");return;}
   if(st>=0&&STEP[st]!=="enter.a"&&STEP[st]!=="enter.b"){var tr0=document.getElementById("sc-trail");O.trailOnStage=tr0?(tr0.hidden?"hidden":"shown"):"noEl";}
   var id=STEP[st];
-  /* 2026-11-20 B1 乙案 14 拍：台词拍点气泡推进 */
-  if(id!=="sit"&&id!=="brk"&&id!=="field"&&id!=="handoff"){
+  /* rv5 十拍：台词拍点气泡推进；动作拍只认业务状态 */
+  if(id==="flash.a"){
+    /* 灵田操作后仍在面板页：先回城镇，让镇妖塔引路的锚点真实在台。 */
+    if(ROUTER.current()!=="scene"||!document.getElementById("scene-town").classList.contains("active")){
+      clk('.scene-tab[data-tab="town"]',"town");return;}}
+  if(id==="handoff"){
+    /* 交接锚点在主场景洞府：先退出城镇/面板，再点沈碑横幅进识人页。 */
+    if(ROUTER.current()!=="scene"||!document.getElementById("scene-cave").classList.contains("active")){
+      clk('.scene-tab[data-tab="cave"]',"cave");return;}
+    if(!document.getElementById("npc-topics")){
+      clk('.npc-banner[data-scroll="xx-role-npc"]',"npcBanner");return;}
+    return;}
+  if(id!=="sit"&&id!=="brk"&&id!=="field"){
     var bbq=document.getElementById("taixu-bubble"); if(bbq) bbq.click(); return;
   }
   if(id==="sit"){clk('#sc-acts .cave-act[data-k="sit"]',"sit");return;}
@@ -5841,10 +5882,6 @@ setInterval(function(){
     clk("#xx-field-buy","fieldBuy");
     var pl=q("#xx-plots .plot.empty");
     if(pl){pl.click();O.planted=1;}
-    return;}
-  if(id==="handoff"){                                     /* rv4：人物页已无传送门，改点主场景常驻沈碑横幅 */
-    if(!document.getElementById("npc-topics")){
-      clk('.npc-banner[data-scroll="xx-role-npc"]',"npcBanner");return;}
     return;}
   idle++;if(idle>=8){idle=0;O.stuckAt=(O.stuckAt||0)+1;}
 },200);

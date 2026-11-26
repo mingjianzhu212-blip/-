@@ -5292,7 +5292,7 @@ const XX = (function(){
       S.trun = null;
       S.trunLast = null;
       /* 角色字段（道号/性别/服装） */
-      if(typeof o.name === 'string') S.name = o.name.slice(0, 8);
+      if(typeof o.name === 'string') S.name = o.name.slice(0, 12);
       if(typeof o.sex === 'string' && (o.sex === 'm' || o.sex === 'f')) S.sex = o.sex;
       /* 立绘性别（2026-10-18）：gender 与 sex 同源，老档从 sex 补正 */
       S.gender = genderOf(typeof o.gender === 'string' && o.gender ? o.gender : S.sex);
@@ -12363,12 +12363,12 @@ function towerBossCompLetter(){
     switch(st.key){
       case 'sit':     return (S.stats.sit | 0) + '/3';
       case 'herb':    return (S.stats.herb | 0) + '/2';
-      case 'brk':     return Math.round(Math.min(1, S.exp / needOf(S.rank)) * 100) + '%';
-      case 'array':   return 'Lv.' + (S.cave | 0);
-      case 'tower':   return (S.towerMax | 0) + ' 层';
-      case 'secret':  return secretTotal() + ' 层';
-      case 'alchemy': return (S.stats.craftPill | 0) + ' 炉';
-      case 'hunt':    return (S.stats.hunt | 0) + ' 只';
+      case 'brk':     return ((S.rank | 0) + 1) + '/3 层';
+      case 'array':   return 'Lv.' + (S.cave | 0) + '/1';
+      case 'tower':   return (S.towerMax | 0) + '/1 层';
+      case 'secret':  return secretTotal() + '/1 层';
+      case 'alchemy': return (S.stats.craftPill | 0) + '/1 炉';
+      case 'hunt':    return (S.stats.hunt | 0) + '/1 只';
     }
     return '';
   }
@@ -12652,7 +12652,7 @@ function towerBossCompLetter(){
       const st = TRAIL[i1];
       title = '入门 · ' + st.name;
       sub = st.hint;
-      idx = (i1 + 1) + ' / ' + TRAIL.length;
+      idx = i1 + ' / ' + TRAIL.length;
     }else if(trail3Active()){
       const st = TRAIL3[i3];
       title = '轮回 · 第' + gens() + '世 · ' + st.name;
@@ -15976,6 +15976,10 @@ function towerBossCompLetter(){
       : (charPath
           ? ('已选道途：' + pathName(charPath))
           : ('请选择道途' + (charEditing ? '（老档补选）' : '（创角必选）')));
+    /* batch11：改名/换装是已有存档的编辑态，只改道号与外观；道途标签和选择器一起隐藏。
+       每次打开都重设 display，避免编辑后再重开创角时留下隐藏状态。 */
+    label.style.display = charEditing ? 'none' : '';
+    box.style.display = charEditing ? 'none' : '';
     if(!box.dataset.bound){
       box.dataset.bound = '1';
       box.addEventListener('click', ev => {
@@ -16025,6 +16029,8 @@ function towerBossCompLetter(){
     /* P2b：改名/换装（编辑态）给明确关闭；新档创角必须确认，不提供关闭 */
     const cc = document.getElementById('char-close');
     if(cc) cc.style.display = charEditing ? '' : 'none';
+    const cf = document.getElementById('char-confirm');
+    if(cf) cf.textContent = charEditing ? '保存' : '踏入仙途';
   }
   function closeCharModal(){
     if(!charEditing) return;   /* 新档创角：必须确认后才可进入 */
@@ -16035,7 +16041,7 @@ function towerBossCompLetter(){
   }
   function confirmChar(){
     const nameInput = document.getElementById('char-name');
-    let name = (nameInput ? nameInput.value : '').trim().slice(0, 8);
+    let name = (nameInput ? nameInput.value : '').trim().slice(0, 12);
     if(!name) name = '无名散修';
     if(needNewGame && !charPath){ log('请先选择道途，再确认创角。', 'bad'); return; } /* 创角必选（GPT 审查④） */
     /* 终身道途：仅当本源尚未确定（创角/老档补选）才写入；已选道途不可被普通编辑覆盖（禁止转职，GPT 代码审查②）。

@@ -94,15 +94,34 @@ export class AssetLedger {
     if (typeof toToken !== 'string' || !toToken) throw new Error('接收方 token 必填');
 
     // —— 原子段开始（无中间失败点）——
-    r.qty -= q;
-    r.ownerToken = toToken;
-    r.history.push({ op: 'transfer', from: fromToken, to: toToken, qty: q, at: Date.now() });
-    if (r.qty === 0) r.status = STATUS.TRADED;
+    const nowAt = Date.now();
+    let result;
+    if (q === r.qty) {
+      r.ownerToken = toToken;
+      r.locked = false;
+      r.status = STATUS.IDLE;
+      r.history.push({ op: 'transfer', from: fromToken, to: toToken, qty: q, at: nowAt });
+      result = { ...r, history: r.history.slice() };
+    } else {
+      r.qty -= q;
+      r.history.push({ op: 'transfer_out', from: fromToken, to: toToken, qty: q, remain: r.qty, at: nowAt });
+      const subId = itemId + '#' + (this._splitSeq = (this._splitSeq || 0) + 1);
+      const child = {
+        itemId: subId,
+        parentItemId: itemId,
+        ownerToken: toToken,
+        qty: q,
+        locked: false,
+        status: STATUS.IDLE,
+        history: [{ op: 'transfer_in', from: fromToken, to: toToken, qty: q, sourceItemId: itemId, at: nowAt }]
+      };
+      this.items.set(subId, child);
+      result = { ...child, history: child.history.slice() };
+    }
     // —— 原子段结束 ——
 
     this._idem.add(idempotencyId);
     if (!this._idemResults) this._idemResults = new Map();
-    const result = { ...r, history: r.history.slice() };
     this._idemResults.set(idempotencyId, result);
     return { replayed: false, result };
   }

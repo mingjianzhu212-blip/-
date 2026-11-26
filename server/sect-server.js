@@ -165,7 +165,16 @@ function createSectServer(options = {}) {
 
   function player(pid, nick) {
     if (!state.players[pid]) {
-      if (Object.keys(state.players).length >= MAX_PLAYERS) throw Object.assign(new Error('宗门名册已满'), { status: 503 });
+      if (Object.keys(state.players).length >= MAX_PLAYERS) {
+        const cutoff = now() - 30 * DAY_MS;
+        for (const [k, v] of Object.entries(state.players)) {
+          if ((v.seen || 0) < cutoff && (v.pendStone | 0) === 0 && (v.pendExp | 0) === 0 && !activeRequest(k)) {
+            delete state.players[k];
+            if (Object.keys(state.players).length < MAX_PLAYERS) break;
+          }
+        }
+        if (Object.keys(state.players).length >= MAX_PLAYERS) throw Object.assign(new Error('宗门名册已满'), { status: 503 });
+      }
       state.players[pid] = { nick, guardDay: '', guard: 0, pubDay: '', pub: 0, pendStone: 0, pendExp: 0,
         seen: 0, rank: 0, joined: now(), guardsAll: 0, pubsAll: 0,
         power: 0, powerAt: 0, powerSource: 'none', powerVer: 0 };
@@ -226,7 +235,8 @@ function createSectServer(options = {}) {
   function cors(req, res) {
     const origin = req.headers.origin;
     if (!origin) return true;
-    const local = origin === 'null' || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    const allowNull = options.allowNullOrigin === true || process.env.SECT_ALLOW_NULL_ORIGIN === '1';
+    const local = (allowNull && origin === 'null') || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
     const allowed = options.allowedOrigins || [];
     if (!local && !allowed.includes(origin)) return false;
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -315,19 +325,20 @@ function createSectServer(options = {}) {
       const stamp = now();
       const atOf = x => Number.isFinite(x.powerAt) && x.powerAt > 0 ? x.powerAt : 0;
       p.seen = stamp;
-      const all = Object.values(state.players).filter(x => (x.power | 0) > 0);
-      all.sort((a, b) => (b.power | 0) - (a.power | 0) || atOf(b) - atOf(a) ||
+      const powOf = x => Math.max(0, Math.min(POWER_MAX, Math.floor(Number(x && x.power) || 0)));
+      const all = Object.values(state.players).filter(x => powOf(x) > 0);
+      all.sort((a, b) => powOf(b) - powOf(a) || atOf(b) - atOf(a) ||
         String(a.nick).localeCompare(String(b.nick)));
       const list = all.slice(0, POWER_BOARD_CAP).map((x, i) => ({
-        no: i + 1, nick: x.nick, rank: x.rank | 0, power: x.power | 0, at: atOf(x), me: x === p
+        no: i + 1, nick: x.nick, rank: x.rank | 0, power: powOf(x), at: atOf(x), me: x === p
       }));
       const fresh = all.filter(x => stamp - atOf(x) <= POWER_FRESH_MS);
-      const freshSum = fresh.reduce((s, x) => s + (x.power | 0), 0);
+      const freshSum = fresh.reduce((sumAcc, x) => sumAcc + powOf(x), 0);
       const myIndex = all.indexOf(p);
       return response(res, 200, { ok: true, list, total: all.length, cap: POWER_BOARD_CAP,
         sum: freshSum, fresh: fresh.length,
-        me: { power: p.power | 0, at: atOf(p),
-          fresh: (p.power | 0) > 0 && stamp - (p.powerAt || 0) <= POWER_FRESH_MS,
+        me: { power: powOf(p), at: atOf(p),
+          fresh: powOf(p) > 0 && stamp - (p.powerAt || 0) <= POWER_FRESH_MS,
           rank: myIndex >= 0 ? myIndex + 1 : 0 } });
     }
     if (req.method !== 'POST') return response(res, 405, { ok: false, msg: '请求方法不支持' });

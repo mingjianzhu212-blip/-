@@ -81,7 +81,7 @@ function sectStart() {
   return new Promise(res => {
     try {
       SECT_CHILD = spawn(process.execPath, [SECT_RUNNER], {
-        env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1', SECT_DATA }),
+        env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1', SECT_DATA, SECT_ALLOW_NULL_ORIGIN: '1' }),
         stdio: ['ignore', 'pipe', 'ignore'],
       });
     } catch (e) { SECT_ERR = String((e && e.message) || e); return res(); }
@@ -239,12 +239,12 @@ const SCENARIOS = [
     }
   },
 
-  /* ② 真人开局：创角（含道途四选一）→ 现行引导七步 → 打坐 → 突破 → 渡劫 → 结算 → 灵田 → 识人收尾
+  /* ② 真人开局：创角（含道途四选一）→ 现行引导十步 → 打坐 → 突破 → 渡劫 → 结算 → 灵田 → 背包 → 镇妖塔 → 识人收尾
      ⚠️ 换代重写（制作人拍板 2026-11-13，落码第 5 项）：旧夹具认的是 tut-mask / tut-btn /
      localStorage.hasFinishedTutorial，这三样在现行 DOM 与存档里都不存在了；而且创角那一下没点道途，
      confirmChar 在 game.js:11579 直接 return，弹窗关不掉 → boot 走不下去 → #sc-break 压根不出现，
      于是三条检查一起红（境界 0 / 标记 null / 主线没接上）。现行口径：S.guide 是引导状态，
-     #taixu-bubble 是气泡，七步按 step 索引逐条真点，收工条件 = S.guide.done。 */
+     #taixu-bubble 是气泡，十步按 step 索引逐条真点，收工条件 = S.guide.done。 */
   {
     id: 'onboard', name: '真人开局全链路（全新档）', budget: 26000, size: '900,1200', fresh: true,
     body: `
@@ -258,8 +258,8 @@ const SCENARIOS = [
           if(!seen[k]){ seen[k] = 1; O.ov.push(k); }
         }
       }, 150);
-      var STEP = ['enter.a','enter.b','sit','sit.b1','sit.b2','brk.pre','brk','field.intro','field.joke','field','bag','flash.a','flash.b','handoff'];
-      /* 2026-11-20 B1 乙案 14 拍：台词拍点击气泡推进，动作拍走真按钮 */
+      var STEP = ['enter.a','enter.b','sit','sit.b1','brk','field.intro','field','bag','flash.a','handoff'];
+      /* rv5 太虚引导 10 拍：台词拍点击气泡推进，动作拍走真按钮/真实场景路线 */
       var ACT_IDS = { sit: 1, brk: 1, field: 1, handoff: 1 };
       var t = 0, lastStep = -99;
       function gstep(){ return XX._s.guide ? XX._s.guide.step : -1; }
@@ -295,6 +295,12 @@ const SCENARIOS = [
         if(st !== lastStep){ lastStep = st; O.steps.push(STEP[st] || ('s' + st)); }
         if(XX._s.guide && XX._s.guide.done){ fin('done'); return; }
         var id = STEP[st];
+        /* flash.a 的锚点在城镇镇妖塔；先走真实底栏路线，再点气泡，不让隐藏锚点空转 */
+        if(id === 'flash.a' && (window.ROUTER.current() !== 'scene' ||
+            !document.getElementById('scene-town').classList.contains('active'))){
+          __click('.scene-tab[data-tab="town"]', 'body');
+          return;
+        }
         if(!ACT_IDS[id]){
           /* 台词拍：点气泡继续（与真人操作同路径） */
           var bb = document.getElementById('taixu-bubble');
@@ -335,6 +341,12 @@ const SCENARIOS = [
           return;
         }
         if(id === 'handoff'){
+          /* 交接锚点在后山洞府；面板/城镇里先回洞府，再真点沈碑横幅完成会面 */
+          if(window.ROUTER.current() !== 'scene' ||
+              !document.getElementById('scene-cave').classList.contains('active')){
+            __click('.scene-tab[data-tab="cave"]', 'body');
+            return;
+          }
           if(!document.getElementById('npc-topics')){
             __click('.npc-banner[data-scroll="xx-role-npc"]', 'body');
           }
@@ -822,6 +834,7 @@ const SCENARIOS = [
       const s = baseSave();
       s.name = '节奏档'; s.rank = 0; s.cave = 0; s.stone = 99999;
       s.story = { claimed: {} };
+      s.npcs = { stele: { met: 0 } };                 /* rv5：1-2 必须从未见过沈碑起跑 */
       return s;
     },
     body: `
@@ -835,8 +848,8 @@ const SCENARIOS = [
         if(!on && seen) seen = '';
       }, 150);
       /* 模拟真人推进：只在时间点改状态，不调任何 Story 内部方法 */
-      [[6000, function(){ XX._s.cave = 2; }],
-       [13000, function(){ XX._s.rank = 1; }],
+      [[6000, function(){ XX._s.npcs.stele.met = 1; }],
+       [13000, function(){ XX._s.rank = 2; }],
        [22000, function(){ XX._s.towerMax = 3; }],
        [31000, function(){ XX._s.towerMax = 5; }],
        [40000, function(){ XX._s.rank = 12; XX._s.mastery.alchemyExp = 5; }]
@@ -850,15 +863,15 @@ const SCENARIOS = [
     checks(d) {
       const tl = d.tl || [];
       const segs = tl.map(x => x.seg);
-      const want = ['1-1','1-2','1-3','1-4','1-5','2-1'];
+      const want = ['1-1','1-2','1-3','1-4','1-4b','1-5','2-1'];
       const missing = want.filter(s => segs.indexOf(s) < 0);
       const first = tl.length ? tl[0].ms : 99999;
       /* 相邻两张的间隔：排队模型下应当 ≥ 4 秒（关掉后 460ms 接上的除外，那种是玩家亲手点） */
       return [
         { ok: first < 3000, label: '开局第一段自己弹（' + (first / 1000).toFixed(1) + 's）', detail: String(tl.length ? tl[0].seg : '-') },
-        { ok: missing.length === 0, label: '46 秒里六拍全演（不静默）',
+        { ok: missing.length === 0, label: '46 秒里七拍全演（不静默）',
           detail: missing.length ? '漏演 ' + missing.join(',') : segs.join(' → ') },
-        { ok: (d.claimed || []).length >= 6, label: '六段奖励全部结算', detail: String((d.claimed || []).length) }
+        { ok: (d.claimed || []).length >= 7, label: '七段奖励全部结算', detail: String((d.claimed || []).length) }
       ];
     }
   },
@@ -876,6 +889,7 @@ const SCENARIOS = [
         mastery: { alchemyLv: 4, alchemyExp: 500, forgeLv: 3, forgeExp: 210 },
         story: { claimed: {} }
       });
+      s.npcs = { stele: { met: 1 } };                 /* rv5：老档补记也必须已见过沈碑 */
       s.arena.win = 5;
       return s;
     },
@@ -2499,8 +2513,8 @@ const SCENARIOS = [
         { ok: d.here === 'xiu_acts' && d.herbBtn === true,
           label: '真点纸签：第二事路由到藏经阁「修炼」页，日课里就有【采药】',
           detail: [d.here, d.herbBtn].join(' · ') },
-        { ok: /^三\|破境至炼气三层\|\d+%\|brk$/.test(d.s3 || ''),
-          label: '采药两下：纸签翻到第三事「破境至炼气三层」，进度换成修为百分比',
+        { ok: /^三\|破境至炼气三层\|1\/3 层\|brk$/.test(d.s3 || ''),
+          label: '采药两下：纸签翻到第三事「破境至炼气三层」，进度显示当前层数/目标层数',
           detail: d.s3 },
         { ok: d.p3 === '8/2/1' && d.herbN === 2 && d.herb === 12,
           label: '采药两下真入账：灵草 3+3，加上第二事的 6 株 = 12',

@@ -107,6 +107,7 @@
 
   /* ---- SSE 事件 → 状态机 ---- */
   function applyEvent(ev, d) {
+    if (!d || typeof d !== 'object') d = {};
     if (ev === 'hello') {
       data.players = d.players || [];
       data.rooms = d.rooms || [];
@@ -219,7 +220,7 @@
           setTimeout(function () {
             if (done) return;
             done = true; off();
-            if (window.Net.state() === 'offline') resolve({ ok: false, error: 'STREAM_FAIL' });
+            if (window.Net.state() === 'offline') { hardReset(); resolve({ ok: false, error: 'STREAM_FAIL' }); }
             else resolve({ ok: true, me: me, resumed: resumed, roomId: roomId });
           }, 5000);
         });
